@@ -1,0 +1,30 @@
+.app-container {
+  min-height: 100vh;
+  background-color: #fcfaf9;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #4a5a67; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #ebc1b6; }
+
+h1, h2, h3, h4, h5, h6, p, span, div, button, input {
+  font-family: 'Century Gothic', 'AppleGothic', 'Futura', sans-serif;
+}
+
+/* Shift Calendar Styles */
+.mini-calendar {
+  width: 100% !important;
+  border: none !important;
+  font-size: 0.75rem !important;
+}
+
+.react-calendar__tile--active {
+  background: #4a5a67 !important;
+  color: #ebc1b6 !important;
+  border-radius: 8px !important;
+}
+
+.react-calendar__tile--rangeStart { border-radius: 8px 0 0 8px !important; }
+.react-calendar__tile--rangeEnd { border-radius: 0 8px 8px 0 !important; }

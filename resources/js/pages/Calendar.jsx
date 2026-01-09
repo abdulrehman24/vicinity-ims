@@ -1,0 +1,264 @@
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import Calendar from 'react-calendar';
+import SafeIcon from '../common/SafeIcon';
+import { useInventory } from '../context/InventoryContext';
+import { format, isSameDay, isWithinInterval, parseISO } from 'date-fns';
+import { downloadCalendarFeed } from '../utils/calendarUtils';
+import * as FiIcons from 'react-icons/fi';
+import toast from 'react-hot-toast';
+
+const { FiCalendar, FiClock, FiUser, FiCamera, FiShare2, FiDownload, FiExternalLink, FiInfo, FiX } = FiIcons;
+import 'react-calendar/dist/Calendar.css';
+
+function CalendarPage() {
+  const { bookings, equipment } = useInventory();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showSyncModal, setShowSyncModal] = useState(false);
+
+  const selectedDateBookings = useMemo(() => {
+    return bookings.filter(booking => {
+      try {
+        const startDate = parseISO(booking.startDate);
+        const endDate = parseISO(booking.endDate);
+        return isWithinInterval(selectedDate, { start: startDate, end: endDate });
+      } catch (e) { return false; }
+    });
+  }, [bookings, selectedDate]);
+
+  const enrichedBookings = useMemo(() => {
+    return bookings.map(booking => {
+      const equipmentItem = equipment.find(item => item.id === booking.equipmentId);
+      return { ...booking, equipment: equipmentItem };
+    });
+  }, [bookings, equipment]);
+
+  const handleExport = () => {
+    if (bookings.length === 0) {
+      toast.error("No bookings found to export");
+      return;
+    }
+    downloadCalendarFeed(bookings);
+    toast.success("Calendar feed generated");
+  };
+
+  const tileContent = ({ date, view }) => {
+    if (view === 'month') {
+      const dayHasBooking = bookings.some(booking => {
+        try {
+          return isWithinInterval(date, { 
+            start: parseISO(booking.startDate), 
+            end: parseISO(booking.endDate) 
+          });
+        } catch (e) { return false; }
+      });
+      if (dayHasBooking) {
+        return (
+          <div className="flex justify-center mt-1">
+            <div className="w-1.5 h-1.5 bg-[#ebc1b6] rounded-full shadow-sm"></div>
+          </div>
+        );
+      }
+    }
+    return null;
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="p-8 max-w-7xl mx-auto space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <h1 className="text-4xl font-black text-[#4a5a67] uppercase tracking-tight mb-2">Schedule</h1>
+          <div className="w-12 h-1 bg-[#ebc1b6] rounded-full" />
+        </div>
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={() => setShowSyncModal(true)}
+            className="flex items-center space-x-2 px-6 py-3 bg-[#4a5a67] text-[#ebc1b6] rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:shadow-xl hover:scale-105 transition-all"
+          >
+            <SafeIcon icon={FiShare2} />
+            <span>Sync to External</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Calendar Main */}
+        <div className="lg:col-span-8">
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8">
+            <div className="calendar-container">
+              <Calendar 
+                onChange={setSelectedDate} 
+                value={selectedDate} 
+                tileContent={tileContent}
+                className="custom-calendar-vicinity"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar Info */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="bg-[#4a5a67] rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-[#ebc1b6] opacity-5 rounded-full -mr-16 -mt-16" />
+             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ebc1b6] mb-4">
+                {format(selectedDate, 'EEEE, MMMM do')}
+             </h3>
+             
+             <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                {selectedDateBookings.length > 0 ? (
+                  selectedDateBookings.map((booking) => (
+                    <div key={booking.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
+                      <p className="text-xs font-bold text-[#ebc1b6] mb-1">{booking.equipmentName}</p>
+                      <p className="text-[10px] font-medium text-white/60 mb-3">{booking.shootName}</p>
+                      <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-white/40">
+                        <div className="flex items-center space-x-2">
+                          <SafeIcon icon={FiUser} />
+                          <span>{booking.user}</span>
+                        </div>
+                        <span>{booking.startDate}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12 opacity-30">
+                    <SafeIcon icon={FiCalendar} className="text-4xl mx-auto mb-4" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">No deployments</p>
+                  </div>
+                )}
+             </div>
+          </div>
+
+          <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm">
+            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 ml-1">Fleet Overview</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-gray-50 rounded-2xl">
+                <p className="text-[9px] font-black text-gray-400 uppercase">Active Bookings</p>
+                <p className="text-2xl font-black text-[#4a5a67]">{bookings.length}</p>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-2xl">
+                <p className="text-[9px] font-black text-gray-400 uppercase">Current Month</p>
+                <p className="text-2xl font-black text-[#4a5a67]">
+                  {bookings.filter(b => b.startDate.includes(format(new Date(), 'yyyy-MM'))).length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sync Modal */}
+      <AnimatePresence>
+        {showSyncModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSyncModal(false)} className="absolute inset-0 bg-[#4a5a67]/90 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden" >
+              <div className="bg-[#4a5a67] p-8 text-center text-white relative">
+                <div className="absolute top-4 right-4">
+                  <button onClick={() => setShowSyncModal(false)} className="text-white/40 hover:text-white transition-colors">
+                    <SafeIcon icon={FiX} />
+                  </button>
+                </div>
+                <div className="inline-flex p-4 bg-[#ebc1b6] rounded-2xl mb-4 shadow-lg">
+                  <SafeIcon icon={FiShare2} className="text-2xl text-[#4a5a67]" />
+                </div>
+                <h2 className="text-xl font-black uppercase tracking-widest">Calendar Sync</h2>
+                <p className="text-[10px] font-bold text-[#ebc1b6] uppercase tracking-[0.2em] mt-1">Universal Calendar Feed</p>
+              </div>
+              
+              <div className="p-8 space-y-6">
+                <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex items-start space-x-4">
+                  <div className="p-2 bg-white rounded-lg shadow-sm">
+                    <SafeIcon icon={FiInfo} className="text-[#4a5a67]" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-[#4a5a67] mb-1">How it works</h4>
+                    <p className="text-[10px] text-gray-500 leading-relaxed font-medium">
+                      Download the .ics file below to import all current bookings into your preferred calendar app. 
+                      In production, this provides a live subscription link.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button 
+                    onClick={handleExport}
+                    className="w-full flex items-center justify-center space-x-3 py-4 bg-[#4a5a67] text-[#ebc1b6] rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:shadow-xl transition-all"
+                  >
+                    <SafeIcon icon={FiDownload} />
+                    <span>Download iCal Feed (.ics)</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      window.open('https://calendar.google.com/calendar/u/0/r/settings/addbyurl', '_blank');
+                      toast.success("Opening Google Calendar settings...");
+                    }}
+                    className="w-full flex items-center justify-center space-x-3 py-4 border-2 border-[#4a5a67] text-[#4a5a67] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-all"
+                  >
+                    <SafeIcon icon={FiExternalLink} />
+                    <span>Add to Google Calendar</span>
+                  </button>
+                </div>
+
+                <div className="text-center">
+                  <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">
+                    Compatible with: Google • Outlook • Apple • Proton
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <style jsx>{`
+        .custom-calendar-vicinity {
+          width: 100% !important;
+          border: none !important;
+          font-family: inherit !important;
+        }
+        .custom-calendar-vicinity .react-calendar__navigation {
+          margin-bottom: 2rem !important;
+        }
+        .custom-calendar-vicinity .react-calendar__navigation button {
+          font-size: 1.2rem !important;
+          font-weight: 800 !important;
+          color: #4a5a67 !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.1em !important;
+        }
+        .custom-calendar-vicinity .react-calendar__month-view__weekdays__weekday {
+          text-decoration: none !important;
+          font-size: 0.7rem !important;
+          font-weight: 900 !important;
+          text-transform: uppercase !important;
+          color: #cbd5e1 !important;
+          padding: 1rem 0 !important;
+        }
+        .custom-calendar-vicinity .react-calendar__tile {
+          padding: 1.5rem 0.5rem !important;
+          font-weight: 700 !important;
+          color: #4a5a67 !important;
+          border-radius: 1rem !important;
+          transition: all 0.2s !important;
+        }
+        .custom-calendar-vicinity .react-calendar__tile:enabled:hover {
+          background-color: #f8fafc !important;
+          color: #ebc1b6 !important;
+        }
+        .custom-calendar-vicinity .react-calendar__tile--active {
+          background: #4a5a67 !important;
+          color: #ebc1b6 !important;
+          box-shadow: 0 10px 15px -3px rgba(74, 90, 103, 0.2) !important;
+        }
+        .custom-calendar-vicinity .react-calendar__tile--now {
+          background: #ebc1b622 !important;
+          color: #4a5a67 !important;
+        }
+      `}</style>
+    </motion.div>
+  );
+}
+
+export default CalendarPage;

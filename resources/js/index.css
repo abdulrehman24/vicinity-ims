@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Century Gothic', 'AppleGothic', 'Futura', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #fcfaf9;
+  color: #4a5a67;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* approachable typography - sentence case everywhere */
+h1, h2, h3, h4, h5, h6, span, p, button, input, div {
+  text-transform: none !important;
+}
+
+/* maintain uppercase only for small UI metadata labels where specified */
+.uppercase {
+  text-transform: uppercase !important;
+}
+
+/* Custom scrollbar for charcoal containers */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ebc1b633;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ebc1b655;
+}
