@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { initialInventoryData } from '../data/inventoryData';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 const InventoryContext = createContext();
 
 const initialState = {
-  equipment: initialInventoryData,
+  equipment: [],
   bookings: [],
   records: [],
   isAdmin: false
@@ -13,6 +13,22 @@ const initialState = {
 
 function inventoryReducer(state, action) {
   switch (action.type) {
+    case 'SET_EQUIPMENT':
+      return { ...state, equipment: action.payload };
+    case 'ADD_EQUIPMENT':
+      return { ...state, equipment: [...state.equipment, action.payload] };
+    case 'UPDATE_EQUIPMENT':
+      return {
+        ...state,
+        equipment: state.equipment.map(item => 
+          item.id === action.payload.id ? action.payload : item
+        )
+      };
+    case 'DELETE_EQUIPMENT':
+      return {
+        ...state,
+        equipment: state.equipment.filter(item => item.id !== action.payload)
+      };
     case 'SET_ADMIN':
       return { ...state, isAdmin: action.payload };
 
@@ -25,15 +41,14 @@ function inventoryReducer(state, action) {
         timestamp: new Date().toISOString()
       };
 
-      // For single units, update status to checked_out
-      // For multi-units, we keep 'available' but track quantities in availability checks
+      // Update local state for immediate feedback
+      // Ideally this should also sync with backend status
       const updatedEquipment = state.equipment.map(item => {
         if (item.id === booking.equipmentId) {
-          const isSingleUnit = item.totalQuantity === 1;
           return {
             ...item,
-            status: isSingleUnit ? 'checked_out' : 'available',
-            currentBooking: isSingleUnit ? booking : null
+            status: 'checked_out',
+            currentBooking: booking
           };
         }
         return item;
@@ -50,7 +65,6 @@ function inventoryReducer(state, action) {
     case 'BATCH_CHECK_IN': {
       const { items, user, shootName } = action.payload;
       
-      // Fix: Process each item individually to avoid condition inheritance bug
       const updatedEquipment = state.equipment.map(eqItem => {
         const returnedItem = items.find(i => i.id === eqItem.id);
         if (returnedItem) {
@@ -105,13 +119,69 @@ function inventoryReducer(state, action) {
 export function InventoryProvider({ children }) {
   const [state, dispatch] = useReducer(inventoryReducer, initialState);
 
+  useEffect(() => {
+    fetchEquipment();
+  }, []);
+
+  const fetchEquipment = async () => {
+    try {
+      const response = await axios.get('/equipment');
+      dispatch({ type: 'SET_EQUIPMENT', payload: response.data.data });
+    } catch (error) {
+      console.error("Failed to fetch equipment", error);
+      toast.error("Failed to load inventory");
+    }
+  };
+
+  const addEquipment = async (newItem) => {
+    try {
+      const response = await axios.post('/equipment', newItem);
+      dispatch({ type: 'ADD_EQUIPMENT', payload: response.data.data });
+      toast.success("Equipment added successfully");
+    } catch (error) {
+      console.error("Failed to add equipment", error);
+      toast.error("Failed to add equipment");
+    }
+  };
+
+  const updateEquipment = async (updatedItem) => {
+    try {
+      const response = await axios.put(`/equipment/${updatedItem.id}`, updatedItem);
+      dispatch({ type: 'UPDATE_EQUIPMENT', payload: response.data.data });
+      toast.success("Equipment updated successfully");
+    } catch (error) {
+      console.error("Failed to update equipment", error);
+      toast.error("Failed to update equipment");
+    }
+  };
+
+  const deleteEquipment = async (id) => {
+      try {
+          await axios.delete(`/equipment/${id}`);
+          dispatch({ type: 'DELETE_EQUIPMENT', payload: id });
+          toast.success("Equipment deleted successfully");
+      } catch (error) {
+          console.error("Failed to delete equipment", error);
+          toast.error("Failed to delete equipment");
+      }
+  };
+
   const checkOutEquipment = (booking) => dispatch({ type: 'CHECK_OUT_EQUIPMENT', payload: booking });
   const batchCheckIn = (payload) => dispatch({ type: 'BATCH_CHECK_IN', payload });
   const reportProblem = (report) => dispatch({ type: 'REPORT_PROBLEM', payload: report });
   const toggleAdmin = (val) => dispatch({ type: 'SET_ADMIN', payload: val });
 
   return (
-    <InventoryContext.Provider value={{ ...state, checkOutEquipment, batchCheckIn, reportProblem, toggleAdmin }}>
+    <InventoryContext.Provider value={{ 
+        ...state, 
+        addEquipment, 
+        updateEquipment, 
+        deleteEquipment,
+        checkOutEquipment, 
+        batchCheckIn, 
+        reportProblem, 
+        toggleAdmin 
+    }}>
       {children}
     </InventoryContext.Provider>
   );

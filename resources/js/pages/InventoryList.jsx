@@ -21,7 +21,8 @@ function InventoryList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showDecommissioned, setShowDecommissioned] = useState(false);
   
-  // Modal States
+  const [editingItem, setEditingItem] = useState(null);
+
   const [decommissioningItem, setDecommissioningItem] = useState(null);
   const [repairingItem, setRepairingItem] = useState(null);
 
@@ -102,6 +103,7 @@ function InventoryList() {
             isAdmin={isAdmin} 
             onDecommission={() => setDecommissioningItem(item)}
             onRepair={() => setRepairingItem(item)}
+            onEdit={() => setEditingItem(item)}
             onActivate={(id) => updateEquipment({id, status: 'available'})}
           />
         ))}
@@ -110,6 +112,14 @@ function InventoryList() {
       <AnimatePresence>
         {isModalOpen && (
           <NewEntryModal onClose={() => setIsModalOpen(false)} onSubmit={(data) => { addEquipment(data); setIsModalOpen(false); }} />
+        )}
+
+        {editingItem && (
+          <NewEntryModal 
+            initialData={editingItem}
+            onClose={() => setEditingItem(null)} 
+            onSubmit={(data) => { updateEquipment({...data, id: editingItem.id}); setEditingItem(null); }} 
+          />
         )}
         
         {decommissioningItem && (
@@ -224,7 +234,7 @@ function ActionModal({ item, type, onClose, onConfirm }) {
   );
 }
 
-function AssetCard({ item, isAdmin, onDecommission, onRepair, onActivate }) {
+function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate }) {
   return (
     <motion.div layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-md transition-all ${item.status === 'decommissioned' ? 'opacity-60 grayscale' : ''}`}>
       <div className="h-48 relative overflow-hidden">
@@ -256,7 +266,7 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onActivate }) {
         )}
         
         <div className="flex justify-between items-center border-t border-gray-50 pt-4 mt-4">
-          <button className="text-gray-400 hover:text-[#4a5a67] transition-colors p-2"><SafeIcon icon={FiEdit2} /></button>
+          <button onClick={onEdit} className="text-gray-400 hover:text-[#4a5a67] transition-colors p-2"><SafeIcon icon={FiEdit2} /></button>
           
           {isAdmin && (
             <div className="flex space-x-2">
@@ -294,8 +304,8 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onActivate }) {
   );
 }
 
-function NewEntryModal({ onClose, onSubmit }) {
-  const [formData, setFormData] = useState({
+function NewEntryModal({ onClose, onSubmit, initialData }) {
+  const [formData, setFormData] = useState(initialData || {
     name: '',
     category: 'Camera Body',
     equipmentType: 'Camera',
@@ -305,8 +315,11 @@ function NewEntryModal({ onClose, onSubmit }) {
     condition: 'excellent',
     location: '',
     image: '',
-    purchaseDate: new Date().toISOString().split('T')[0]
+    purchaseDate: new Date().toISOString().split('T')[0],
+    totalQuantity: 1
   });
+
+  const isEditing = !!initialData;
 
   const onDrop = useCallback((acceptedFiles) => {
     const file = acceptedFiles[0];
@@ -336,9 +349,9 @@ function NewEntryModal({ onClose, onSubmit }) {
         <div className="bg-[#4a5a67] p-6 flex justify-between items-center text-white">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-[#ebc1b6] rounded-lg">
-              <SafeIcon icon={FiPlus} className="text-[#4a5a67]" />
+              <SafeIcon icon={isEditing ? FiEdit2 : FiPlus} className="text-[#4a5a67]" />
             </div>
-            <h2 className="text-xl font-bold uppercase tracking-tight">Register New Asset</h2>
+            <h2 className="text-xl font-bold uppercase tracking-tight">{isEditing ? 'Edit Asset' : 'Register New Asset'}</h2>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
             <SafeIcon icon={FiX} className="text-xl text-[#ebc1b6]" />
@@ -371,10 +384,14 @@ function NewEntryModal({ onClose, onSubmit }) {
                 </div>
                 <InputField label="Serial Number" icon={FiHash} value={formData.serialNumber} onChange={(v) => setFormData({ ...formData, serialNumber: v })} placeholder="SN-XXXX" />
               </div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                 <InputField label="Quantity" icon={FiHash} value={formData.totalQuantity} onChange={(v) => setFormData({ ...formData, totalQuantity: parseInt(v) || 1 })} placeholder="1" />
+                 <InputField label="Location" icon={FiMapPin} value={formData.location} onChange={(v) => setFormData({ ...formData, location: v })} placeholder="e.g. Studio A" />
+              </div>
             </div>
           </div>
           <div className="pt-8 mt-8 border-t border-gray-100 flex justify-end">
-            <button type="submit" className="bg-[#4a5a67] text-[#ebc1b6] px-12 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:shadow-xl transition-all"> Register Equipment </button>
+            <button type="submit" className="bg-[#4a5a67] text-[#ebc1b6] px-12 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:shadow-xl transition-all"> {isEditing ? 'Update Equipment' : 'Register Equipment'} </button>
           </div>
         </form>
       </motion.div>
