@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 import { useInventory } from '../context/InventoryContext';
-import AdminAuthModal from './AdminAuthModal';
+import SecurityModal from './SecurityModal';
 
 const { 
   FiPackage, FiCamera, FiRefreshCw, FiCalendar, 
@@ -23,7 +23,7 @@ const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: FiPackage }
 ];
 
-function Navbar({ onLogout }) {
+function Navbar({ onLogout, user }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const location = useLocation();
@@ -35,6 +35,12 @@ function Navbar({ onLogout }) {
     } else {
       setIsAdminModalOpen(true);
     }
+  };
+
+  const handleAdminVerified = (level) => {
+      toggleAdmin(true);
+      // Optional: Store level if needed, but context handles simple boolean for now
+      setIsAdminModalOpen(false);
   };
 
   return (
@@ -73,15 +79,17 @@ function Navbar({ onLogout }) {
 
             <div className="h-6 w-px bg-white/10 mx-4" />
 
-            <button
-              onClick={handleAdminToggle}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-                isAdmin ? 'bg-red-500 text-white shadow-lg' : 'bg-white/5 text-gray-400 hover:text-white'
-              }`}
-            >
-              <SafeIcon icon={FiShield} />
-              <span>{isAdmin ? 'Admin Active' : 'Enable Admin'}</span>
-            </button>
+            {user?.is_admin > 0 && (
+              <button
+                onClick={handleAdminToggle}
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                  isAdmin ? 'bg-red-500 text-white shadow-lg' : 'bg-white/5 text-gray-400 hover:text-white'
+                }`}
+              >
+                <SafeIcon icon={FiShield} />
+                <span>{isAdmin ? 'Admin Active' : 'Enable Admin'}</span>
+              </button>
+            )}
 
             <button
               onClick={onLogout}
@@ -100,49 +108,52 @@ function Navbar({ onLogout }) {
         </div>
       </div>
 
-      <AdminAuthModal
-        isOpen={isAdminModalOpen}
-        onClose={() => setIsAdminModalOpen(false)}
-        onVerified={() => toggleAdmin(true)}
-      />
-
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="md:hidden overflow-hidden bg-[#4a5a67] border-t border-white/10"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden bg-[#4a5a67] border-t border-white/10"
           >
-            <div className="py-2">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setIsOpen(false)}
-                  className={`flex items-center space-x-3 px-6 py-4 transition-colors ${
-                    location.pathname === item.path ? 'text-[#ebc1b6] bg-black/10' : 'text-gray-300'
-                  }`}
-                >
-                  <SafeIcon icon={item.icon} className="text-lg" />
-                  <span className="font-bold text-sm">{item.label}</span>
-                </Link>
-              ))}
-              <div className="px-6 py-4 border-t border-white/5">
+            <div className="px-4 py-4 space-y-2">
+              {navItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setIsOpen(false)}
+                    className={`block px-4 py-3 rounded-lg transition-colors ${
+                      isActive ? 'bg-white/10 text-[#ebc1b6]' : 'text-gray-300 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <SafeIcon icon={item.icon} className="text-xl" />
+                      <span className="font-medium">{item.label}</span>
+                    </div>
+                  </Link>
+                );
+              })}
+              <div className="pt-4 mt-4 border-t border-white/10">
                 <button
-                  onClick={handleAdminToggle}
-                  className={`flex items-center space-x-3 font-bold text-sm ${
-                    isAdmin ? 'text-red-400' : 'text-[#ebc1b6]'
-                  }`}
+                  onClick={onLogout}
+                  className="w-full flex items-center space-x-3 px-4 py-3 text-gray-400 hover:text-[#ebc1b6] transition-colors"
                 >
-                  <SafeIcon icon={FiShield} />
-                  <span>{isAdmin ? 'Exit Admin Mode' : 'Enter Admin Mode'}</span>
+                  <SafeIcon icon={FiLogOut} className="text-xl" />
+                  <span className="font-medium">Logout</span>
                 </button>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <SecurityModal 
+        isOpen={isAdminModalOpen} 
+        onClose={() => setIsAdminModalOpen(false)} 
+        onVerified={handleAdminVerified}
+      />
     </nav>
   );
 }

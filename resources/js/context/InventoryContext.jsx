@@ -8,7 +8,7 @@ const initialState = {
   equipment: [],
   bookings: [],
   records: [],
-  isAdmin: false
+  isAdmin: localStorage.getItem('isAdmin') === 'true'
 };
 
 function inventoryReducer(state, action) {
@@ -116,12 +116,16 @@ function inventoryReducer(state, action) {
   }
 }
 
-export function InventoryProvider({ children }) {
+export function InventoryProvider({ children, user }) {
   const [state, dispatch] = useReducer(inventoryReducer, initialState);
 
   useEffect(() => {
     fetchEquipment();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('isAdmin', state.isAdmin);
+  }, [state.isAdmin]);
 
   const fetchEquipment = async () => {
     try {

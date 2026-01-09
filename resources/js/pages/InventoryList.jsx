@@ -7,7 +7,8 @@ import { categories, equipmentTypes, businessUnits, statuses } from '../data/inv
 import Fuse from 'fuse.js';
 import * as FiIcons from 'react-icons/fi';
 import toast from 'react-hot-toast';
-import AdminAuthModal from '../components/AdminAuthModal';
+import AdminAuthModal from '../components/AdminAuthModal'; // Deprecated but keeping for reference if needed
+import SecurityModal from '../components/SecurityModal';
 
 const { 
   FiSearch, FiPlus, FiEdit2, FiX, FiCamera, FiHash, FiMapPin, 
@@ -69,11 +70,11 @@ function InventoryList() {
   };
 
   const executeProtectedAction = (action) => {
+    // Deprecated: Now we rely on global admin mode
     if (isAdmin) {
       action();
     } else {
-      setPendingAction(() => action);
-      setAdminAuthOpen(true);
+        toast.error("Please enable Admin Mode in the navigation bar first.");
     }
   };
 
@@ -121,10 +122,10 @@ function InventoryList() {
             key={item.id} 
             item={item} 
             isAdmin={isAdmin} 
-            onDecommission={() => executeProtectedAction(() => setDecommissioningItem(item))}
-            onRepair={() => executeProtectedAction(() => setRepairingItem(item))}
-            onEdit={() => executeProtectedAction(() => setEditingItem(item))}
-            onActivate={(id) => executeProtectedAction(() => updateEquipment({id, status: 'available'}))}
+            onDecommission={() => setDecommissioningItem(item)}
+            onRepair={() => setRepairingItem(item)}
+            onEdit={() => setEditingItem(item)}
+            onActivate={(id) => updateEquipment({id, status: 'available'})}
           />
         ))}
       </div>
@@ -134,11 +135,11 @@ function InventoryList() {
           <NewEntryModal onClose={() => setIsModalOpen(false)} onSubmit={(data) => { addEquipment(data); setIsModalOpen(false); }} />
         )}
 
-        <AdminAuthModal 
+        {/* <AdminAuthModal 
           isOpen={adminAuthOpen} 
           onClose={() => { setAdminAuthOpen(false); setPendingAction(null); }} 
           onVerified={handleAuthSuccess} 
-        />
+        /> */}
 
         {editingItem && (
           <NewEntryModal 
@@ -292,9 +293,9 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate
         )}
         
         <div className="flex justify-between items-center border-t border-gray-50 pt-4 mt-4">
-          <button onClick={onEdit} className="text-gray-400 hover:text-[#4a5a67] transition-colors p-2"><SafeIcon icon={FiEdit2} /></button>
+          <button onClick={onEdit} className={`text-gray-400 hover:text-[#4a5a67] transition-colors p-2`}><SafeIcon icon={FiEdit2} /></button>
           
-          <div className="flex space-x-2">
+          <div className={`flex space-x-2 transition-all duration-300 ${isAdmin ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             {item.status === 'decommissioned' || item.status === 'maintenance' ? (
               <button 
                 onClick={() => onActivate(item.id)}

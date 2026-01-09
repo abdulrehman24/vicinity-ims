@@ -22,6 +22,7 @@ function App() {
   const handleLogout = async () => {
     try {
         await axios.post('/logout');
+        localStorage.removeItem('isAdmin');
         window.location.href = '/';
     } catch (error) {
         console.error("Logout failed", error);
@@ -45,7 +46,7 @@ function App() {
   }
 
   return (
-    <InventoryProvider>
+    <InventoryProvider user={user}>
       <div className="min-h-screen flex flex-col bg-[#fcfaf9]">
         <Navbar onLogout={handleLogout} user={user} />
         <main className="pt-16 flex-grow">

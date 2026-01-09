@@ -1,8 +1,11 @@
 <?php
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+
 use App\Http\Controllers\AuthController;
 
+use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\EquipmentController;
 
 Route::get('/', function () {
@@ -15,6 +18,11 @@ Route::post('/logout', function () {
     Auth::logout();
     return redirect('/');
 })->name('logout');
+
+Route::middleware(['auth'])->group(function () {
+    Route::post('/security/validate-pin', [SecurityController::class, 'validatePin']);
+    Route::post('/security/verify-otp', [SecurityController::class, 'verifyOtp']);
+});
 
 Route::resource('equipment', EquipmentController::class);
 

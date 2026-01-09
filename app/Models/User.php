@@ -23,6 +23,10 @@ class User extends Authenticatable
         'password',
         'google_id',
         'avatar',
+        'is_admin',
+        'pin',
+        'two_factor_code',
+        'two_factor_expires_at',
     ];
 
     /**
@@ -33,6 +37,9 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'pin',
+        'two_factor_code',
+        'two_factor_expires_at',
     ];
 
     /**
@@ -45,6 +52,9 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'integer',
+            'two_factor_expires_at' => 'datetime',
+            'pin' => 'hashed',
         ];
     }
 }
