@@ -13,3 +13,6 @@ Route::post('/logout', function () {
     Auth::logout();
     return redirect('/');
 })->name('logout');
+
+// Catch-all route for React SPA (must be last)
+Route::view('/{any}', 'welcome')->where('any', '.*');
