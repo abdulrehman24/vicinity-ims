@@ -138,7 +138,9 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 block">2. Select Equipment</label>
           <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
-            {equipment.map(item => {
+            {equipment
+              .filter(item => item.status !== 'maintenance' && item.status !== 'decommissioned')
+              .map(item => {
               const avail = getAvailableQty(item, requestedDates, shift);
               const isSelected = selectedItems.find(i => i.id === item.id);
               return (
