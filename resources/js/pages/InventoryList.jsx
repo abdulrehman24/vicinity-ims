@@ -7,6 +7,7 @@ import { categories, equipmentTypes, businessUnits, statuses } from '../data/inv
 import Fuse from 'fuse.js';
 import * as FiIcons from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import AdminAuthModal from '../components/AdminAuthModal';
 
 const { 
   FiSearch, FiPlus, FiEdit2, FiX, FiCamera, FiHash, FiMapPin, 
@@ -15,10 +16,12 @@ const {
 } = FiIcons;
 
 function InventoryList() {
-  const { equipment, addEquipment, updateEquipment, isAdmin } = useInventory();
+  const { equipment, addEquipment, updateEquipment, isAdmin, toggleAdmin } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [adminAuthOpen, setAdminAuthOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
   const [showDecommissioned, setShowDecommissioned] = useState(false);
   
   const [editingItem, setEditingItem] = useState(null);
@@ -65,6 +68,23 @@ function InventoryList() {
     toast.success("Asset sent to service bay");
   };
 
+  const executeProtectedAction = (action) => {
+    if (isAdmin) {
+      action();
+    } else {
+      setPendingAction(() => action);
+      setAdminAuthOpen(true);
+    }
+  };
+
+  const handleAuthSuccess = () => {
+      toggleAdmin(true);
+      if (pendingAction) {
+          pendingAction();
+          setPendingAction(null);
+      }
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="p-8 max-w-7xl mx-auto min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
@@ -101,10 +121,10 @@ function InventoryList() {
             key={item.id} 
             item={item} 
             isAdmin={isAdmin} 
-            onDecommission={() => setDecommissioningItem(item)}
-            onRepair={() => setRepairingItem(item)}
-            onEdit={() => setEditingItem(item)}
-            onActivate={(id) => updateEquipment({id, status: 'available'})}
+            onDecommission={() => executeProtectedAction(() => setDecommissioningItem(item))}
+            onRepair={() => executeProtectedAction(() => setRepairingItem(item))}
+            onEdit={() => executeProtectedAction(() => setEditingItem(item))}
+            onActivate={(id) => executeProtectedAction(() => updateEquipment({id, status: 'available'}))}
           />
         ))}
       </div>
@@ -113,6 +133,12 @@ function InventoryList() {
         {isModalOpen && (
           <NewEntryModal onClose={() => setIsModalOpen(false)} onSubmit={(data) => { addEquipment(data); setIsModalOpen(false); }} />
         )}
+
+        <AdminAuthModal 
+          isOpen={adminAuthOpen} 
+          onClose={() => { setAdminAuthOpen(false); setPendingAction(null); }} 
+          onVerified={handleAuthSuccess} 
+        />
 
         {editingItem && (
           <NewEntryModal 
@@ -268,36 +294,34 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate
         <div className="flex justify-between items-center border-t border-gray-50 pt-4 mt-4">
           <button onClick={onEdit} className="text-gray-400 hover:text-[#4a5a67] transition-colors p-2"><SafeIcon icon={FiEdit2} /></button>
           
-          {isAdmin && (
-            <div className="flex space-x-2">
-              {item.status === 'decommissioned' || item.status === 'maintenance' ? (
+          <div className="flex space-x-2">
+            {item.status === 'decommissioned' || item.status === 'maintenance' ? (
+              <button 
+                onClick={() => onActivate(item.id)}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-green-600 hover:text-white transition-all"
+              >
+                <SafeIcon icon={FiCheck} />
+                <span>Restore</span>
+              </button>
+            ) : (
+              <>
                 <button 
-                  onClick={() => onActivate(item.id)}
-                  className="flex items-center space-x-2 px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-green-600 hover:text-white transition-all"
+                  onClick={onRepair}
+                  className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all"
                 >
-                  <SafeIcon icon={FiCheck} />
-                  <span>Restore</span>
+                  <SafeIcon icon={FiTool} />
+                  <span>Repair</span>
                 </button>
-              ) : (
-                <>
-                  <button 
-                    onClick={onRepair}
-                    className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all"
-                  >
-                    <SafeIcon icon={FiTool} />
-                    <span>Repair</span>
-                  </button>
-                  <button 
-                    onClick={onDecommission}
-                    className="flex items-center space-x-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 hover:text-white transition-all"
-                  >
-                    <SafeIcon icon={FiAlertTriangle} />
-                    <span>Decommission</span>
-                  </button>
-                </>
-              )}
-            </div>
-          )}
+                <button 
+                  onClick={onDecommission}
+                  className="flex items-center space-x-2 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 hover:text-white transition-all"
+                >
+                  <SafeIcon icon={FiAlertTriangle} />
+                  <span>Decommission</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </motion.div>
