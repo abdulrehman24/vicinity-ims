@@ -102,7 +102,10 @@ function InventoryList() {
           >
             {showDecommissioned ? 'Show Active' : 'Show Decommissioned'}
           </button>
-          <button onClick={() => setIsModalOpen(true)} className="bg-[#4a5a67] text-[#ebc1b6] px-6 py-3 rounded-xl font-bold text-sm flex items-center space-x-2 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" >
+          <button 
+            onClick={() => executeProtectedAction(() => setIsModalOpen(true))} 
+            className="bg-[#4a5a67] text-[#ebc1b6] px-6 py-3 rounded-xl font-bold text-sm flex items-center space-x-2 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95" 
+          >
             <SafeIcon icon={FiPlus} />
             <span>New Entry</span>
           </button>
@@ -124,7 +127,7 @@ function InventoryList() {
             isAdmin={isAdmin} 
             onDecommission={() => setDecommissioningItem(item)}
             onRepair={() => setRepairingItem(item)}
-            onEdit={() => setEditingItem(item)}
+            onEdit={() => executeProtectedAction(() => setEditingItem(item))}
             onActivate={(id) => updateEquipment({id, status: 'available'})}
           />
         ))}

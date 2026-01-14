@@ -56,10 +56,9 @@ function Dashboard() {
       const date = subDays(new Date(), i);
       dates.push(format(date, daysCount > 31 ? 'MMM d, yy' : 'MMM d'));
       
-      // Calculate actual usage instead of random
       const count = bookings.filter(b => {
-        const dStr = format(date, 'dd/MM/yyyy');
-        return b.dates.includes(dStr);
+        const dStr = format(date, 'yyyy-MM-dd');
+        return Array.isArray(b.dates) && b.dates.includes(dStr);
       }).length;
       
       usageData.push(count);
@@ -178,7 +177,10 @@ function Dashboard() {
             <div className="space-y-4">
               {statusOnDate.bookedOnDate.length > 0 ? (
                 statusOnDate.bookedOnDate.map((booking) => (
-                  <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-[#ebc1b6] transition-all">
+                  <div
+                    key={booking.bookingEquipmentId ?? `${booking.id}-${booking.equipmentId}` ?? booking.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-[#ebc1b6] transition-all"
+                  >
                     <div className="flex items-center space-x-4">
                       <div className="w-10 h-10 bg-[#4a5a67] rounded-xl flex items-center justify-center text-[#ebc1b6]"><SafeIcon icon={FiBox} /></div>
                       <div>
@@ -187,7 +189,9 @@ function Dashboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-bold text-[#4a5a67]">{booking.user}</p>
+                      <p className="text-[10px] font-bold text-[#4a5a67]">
+                        {booking.user?.name || booking.user || 'Operations'}
+                      </p>
                       <p className="text-[9px] text-gray-400 font-medium">Quote: {booking.quotationNumber}</p>
                     </div>
                   </div>
