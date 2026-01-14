@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Booking;
 use App\Models\Equipment;
+use App\Mail\BookingNotificationMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class BookingController extends Controller
 {
@@ -63,6 +65,18 @@ class BookingController extends Controller
             if ($equipment) {
                 $equipment->status = 'checked_out';
                 $equipment->save();
+            }
+        }
+
+        $booking->load(['equipments', 'user']);
+
+        if (!empty($validated['collaborators'])) {
+            foreach ($validated['collaborators'] as $email) {
+                try {
+                    Mail::to($email)->send(new BookingNotificationMail($booking));
+                } catch (\Throwable $e) {
+                    Log::error('Booking notification email failed: '.$e->getMessage());
+                }
             }
         }
 

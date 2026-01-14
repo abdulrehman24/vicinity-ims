@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Models\Booking;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -9,42 +10,31 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Contracts\Queue\ShouldQueue;
 
-class AdminOtpMail extends Mailable implements ShouldQueue
+class BookingNotificationMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public $otp;
+    public Booking $booking;
 
-    /**
-     * Create a new message instance.
-     */
-    public function __construct($otp)
+    public function __construct(Booking $booking)
     {
-        $this->otp = $otp;
+        $this->booking = $booking;
     }
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Admin Verification Code',
+            subject: 'New Equipment Booking: '.$this->booking->project_title,
         );
     }
 
     public function content(): Content
     {
         return new Content(
-            view: 'emails.admin.otp',
+            view: 'emails.booking.notification',
         );
     }
 
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
     public function attachments(): array
     {
         return [];

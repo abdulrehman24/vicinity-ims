@@ -35,9 +35,9 @@ class SecurityController extends Controller
         ]);
 
         try {
-            Mail::to($user->email)->send(new AdminOtpMail($otp));
+            Mail::to($user->email)->queue(new AdminOtpMail($otp));
         } catch (\Exception $e) {
-            Log::error("Failed to send OTP: " . $e->getMessage());
+            Log::error("Failed to queue OTP email: " . $e->getMessage());
             return response()->json(['message' => 'Failed to send OTP email'], 500);
         }
 
