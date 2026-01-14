@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import { eachDayOfInterval, parseISO, format } from 'date-fns';
 
 const InventoryContext = createContext();
 
@@ -32,70 +33,17 @@ function inventoryReducer(state, action) {
     case 'SET_ADMIN':
       return { ...state, isAdmin: action.payload };
 
-    case 'CHECK_OUT_EQUIPMENT': {
-      const booking = action.payload;
-      const record = {
-        id: Date.now() + Math.random(),
-        type: 'checkout',
-        ...booking,
-        timestamp: new Date().toISOString()
-      };
-
-      // Update local state for immediate feedback
-      // Ideally this should also sync with backend status
-      const updatedEquipment = state.equipment.map(item => {
-        if (item.id === booking.equipmentId) {
-          return {
-            ...item,
-            status: 'checked_out',
-            currentBooking: booking
-          };
-        }
-        return item;
-      });
-
+    case 'SET_BOOKINGS':
+      return { ...state, bookings: action.payload };
+    case 'ADD_BOOKING':
+      return { ...state, bookings: [...state.bookings, action.payload] };
+    case 'UPDATE_BOOKING_STATUS':
       return {
         ...state,
-        equipment: updatedEquipment,
-        bookings: [...state.bookings, { ...booking, id: Date.now() + Math.random() }],
-        records: [record, ...state.records]
+        bookings: state.bookings.map(b => 
+            b.id === action.payload.id ? { ...b, ...action.payload } : b
+        )
       };
-    }
-
-    case 'BATCH_CHECK_IN': {
-      const { items, user, shootName } = action.payload;
-      
-      const updatedEquipment = state.equipment.map(eqItem => {
-        const returnedItem = items.find(i => i.id === eqItem.id);
-        if (returnedItem) {
-          return {
-            ...eqItem,
-            status: returnedItem.reportedProblem ? 'maintenance' : 'available',
-            condition: returnedItem.reportedProblem ? 'damaged' : eqItem.condition,
-            remarks: returnedItem.reportedProblem ? returnedItem.problemNote : eqItem.remarks,
-            currentBooking: null
-          };
-        }
-        return eqItem;
-      });
-
-      const returnedIds = items.map(i => i.id);
-      const batchRecord = {
-        id: Date.now() + Math.random(),
-        type: 'checkin',
-        equipmentName: `Group Return: ${shootName}`,
-        user,
-        timestamp: new Date().toISOString(),
-        notes: `Batch return of ${items.length} items.`
-      };
-
-      return {
-        ...state,
-        equipment: updatedEquipment,
-        bookings: state.bookings.filter(b => !returnedIds.includes(b.equipmentId)),
-        records: [batchRecord, ...state.records]
-      };
-    }
 
     case 'REPORT_PROBLEM': {
       return {
@@ -121,6 +69,7 @@ export function InventoryProvider({ children, user }) {
 
   useEffect(() => {
     fetchEquipment();
+    fetchBookings();
   }, []);
 
   useEffect(() => {
@@ -134,6 +83,25 @@ export function InventoryProvider({ children, user }) {
     } catch (error) {
       console.error("Failed to fetch equipment", error);
       toast.error("Failed to load inventory");
+    }
+  };
+
+  const fetchBookings = async () => {
+    try {
+      const response = await axios.get('/bookings');
+      const bookings = response.data.data.map(b => ({
+           ...b,
+           id: b.id,
+           equipmentId: b.equipment_id,
+           shootName: b.project_title,
+           quotationNumber: b.quotation_number,
+           dates: eachDayOfInterval({ start: parseISO(b.start_date), end: parseISO(b.end_date) }).map(d => format(d, 'yyyy-MM-dd')),
+           shift: b.shift,
+           quantity: b.quantity
+       }));
+      dispatch({ type: 'SET_BOOKINGS', payload: bookings });
+    } catch (error) {
+      console.error("Failed to fetch bookings", error);
     }
   };
 
@@ -170,8 +138,45 @@ export function InventoryProvider({ children, user }) {
       }
   };
 
-  const checkOutEquipment = (booking) => dispatch({ type: 'CHECK_OUT_EQUIPMENT', payload: booking });
-  const batchCheckIn = (payload) => dispatch({ type: 'BATCH_CHECK_IN', payload });
+  const checkOutEquipment = async (bookingData) => {
+      try {
+          const response = await axios.post('/bookings', bookingData);
+          const newBooking = response.data.data;
+          const formattedBooking = {
+               ...newBooking,
+               id: newBooking.id,
+               equipmentId: newBooking.equipment_id,
+               shootName: newBooking.project_title,
+               quotationNumber: newBooking.quotation_number,
+               dates: eachDayOfInterval({ start: parseISO(newBooking.start_date), end: parseISO(newBooking.end_date) }).map(d => format(d, 'yyyy-MM-dd')),
+               shift: newBooking.shift,
+               quantity: newBooking.quantity
+           };
+          dispatch({ type: 'ADD_BOOKING', payload: formattedBooking });
+          toast.success("Booking created successfully");
+          fetchEquipment();
+      } catch (error) {
+          console.error("Checkout failed", error);
+          toast.error("Failed to check out equipment");
+      }
+  };
+
+  const batchCheckIn = async (payload) => {
+      try {
+          const response = await axios.post('/bookings/return', payload);
+          const returnedBookings = response.data.data;
+          
+          returnedBookings.forEach(b => {
+             dispatch({ type: 'UPDATE_BOOKING_STATUS', payload: { id: b.id, status: 'returned' } });
+          });
+          
+          toast.success("Items returned successfully");
+          fetchEquipment();
+      } catch (error) {
+          console.error("Return failed", error);
+          toast.error("Failed to return items");
+      }
+  };
   const reportProblem = (report) => dispatch({ type: 'REPORT_PROBLEM', payload: report });
   const toggleAdmin = (val) => dispatch({ type: 'SET_ADMIN', payload: val });
 

@@ -7,6 +7,7 @@ use App\Http\Controllers\AuthController;
 
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\EquipmentController;
+use App\Http\Controllers\BookingController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -22,6 +23,10 @@ Route::post('/logout', function () {
 Route::middleware(['auth'])->group(function () {
     Route::post('/security/validate-pin', [SecurityController::class, 'validatePin']);
     Route::post('/security/verify-otp', [SecurityController::class, 'verifyOtp']);
+    
+    Route::get('/bookings', [BookingController::class, 'index']);
+    Route::post('/bookings', [BookingController::class, 'store']);
+    Route::post('/bookings/return', [BookingController::class, 'returnItems']);
 });
 
 Route::resource('equipment', EquipmentController::class);

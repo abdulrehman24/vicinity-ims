@@ -13,10 +13,42 @@ const {
 } = FiIcons;
 
 function Records() {
-  const { records } = useInventory();
+  const { bookings, equipment } = useInventory();
   const [view, setView] = useState('list'); // 'list' or 'calendar'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const records = useMemo(() => {
+    const events = [];
+    bookings.forEach(b => {
+        const eqName = equipment.find(e => e.id === b.equipmentId)?.name || 'Unknown Equipment';
+        // Checkout Event
+        events.push({
+            id: `out-${b.id}`,
+            type: 'checkout',
+            equipmentName: eqName,
+            shootName: b.shootName,
+            quotationNumber: b.quotationNumber,
+            user: b.user?.name || 'Operations',
+            timestamp: b.created_at || b.start_date, 
+            details: `Qty: ${b.quantity}, Shift: ${b.shift}`
+        });
+        
+        // Return Event
+        if (b.status === 'returned') {
+             events.push({
+                id: `in-${b.id}`,
+                type: 'checkin',
+                equipmentName: eqName,
+                shootName: b.shootName,
+                user: b.user?.name || 'Operations',
+                timestamp: b.returned_at || b.end_date,
+                details: b.return_notes || 'Returned'
+            });
+        }
+    });
+    return events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }, [bookings, equipment]);
 
   const filteredRecords = useMemo(() => {
     let result = records;

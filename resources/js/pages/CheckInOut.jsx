@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Calendar from 'react-calendar';
 import SafeIcon from '../common/SafeIcon';
 import { useInventory } from '../context/InventoryContext';
-import { shifts } from '../data/inventoryData';
+import { shifts, categories } from '../data/inventoryData';
 import * as FiIcons from 'react-icons/fi';
 import { format, parseISO, eachDayOfInterval, isSameDay } from 'date-fns';
 import toast from 'react-hot-toast';
+import CollaboratorList from '../components/CollaboratorList';
 
 const { 
   FiZap, FiLogIn, FiLogOut, FiPackage, FiBox, FiCalendar, FiClock,
@@ -36,7 +37,7 @@ function CheckInOut() {
         {activeTab === 'in' ? (
           <ManualOutForm key="in" equipment={equipment} bookings={bookings} onConfirm={checkOutEquipment} />
         ) : (
-          <GroupReturnView key="out" equipment={equipment} onConfirm={batchCheckIn} />
+          <GroupReturnView key="out" equipment={equipment} bookings={bookings} onConfirm={batchCheckIn} />
         )}
       </AnimatePresence>
     </motion.div>
@@ -48,6 +49,9 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
   const [dateRange, setDateRange] = useState([null, null]);
   const [shift, setShift] = useState('Full Day');
   const [formData, setFormData] = useState({ projTitle: '', quote: '', shootType: 'Commercial' });
+  const [collaborators, setCollaborators] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   // 1. Availability Logic for Multi-Unit & Shifts
   const requestedDates = useMemo(() => {
@@ -59,6 +63,7 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
     let bookedMax = 0;
     dates.forEach(date => {
       const bookedOnDate = bookings.filter(b => {
+        if (b.status === 'returned') return false;
         if (b.equipmentId !== item.id) return false;
         const isSameDay = b.dates.includes(date) || b.dates.includes(format(parseISO(date), 'dd/MM/yyyy'));
         if (!isSameDay) return false;
@@ -119,6 +124,24 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
     setFormData({ projTitle: '', quote: '', shootType: 'Commercial' });
   };
 
+  const filteredEquipment = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return equipment
+      .filter(item => item.status !== 'maintenance' && item.status !== 'decommissioned')
+      .filter(item => {
+        if (selectedCategory === 'all') return true;
+        return item.category === selectedCategory;
+      })
+      .filter(item => {
+        if (!term) return true;
+        return (
+          item.name.toLowerCase().includes(term) ||
+          (item.serialNumber && item.serialNumber.toLowerCase().includes(term)) ||
+          (item.category && item.category.toLowerCase().includes(term))
+        );
+      });
+  }, [equipment, searchTerm, selectedCategory]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       {/* Sidebar: Selection */}
@@ -137,10 +160,34 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
 
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 block">2. Select Equipment</label>
-          <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
-            {equipment
-              .filter(item => item.status !== 'maintenance' && item.status !== 'decommissioned')
-              .map(item => {
+          <div className="space-y-3">
+            <div className="relative">
+              <SafeIcon icon={FiSearch} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search gear..."
+                className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67]"
+              />
+            </div>
+            <div>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67]"
+              >
+                <option value="all">All Categories</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar mt-3">
+            {filteredEquipment.map(item => {
               const avail = getAvailableQty(item, requestedDates, shift);
               const isSelected = selectedItems.find(i => i.id === item.id);
               return (
@@ -163,6 +210,11 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
                 </button>
               );
             })}
+            {filteredEquipment.length === 0 && (
+              <p className="text-[10px] text-gray-400 italic py-2 text-center">
+                No matching equipment found
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -207,6 +259,20 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
               </div>
             </div>
 
+            <div className="pt-4 border-t border-gray-100">
+              <CollaboratorList
+                collaborators={collaborators}
+                onAdd={(email) => {
+                  setCollaborators((prev) =>
+                    prev.includes(email) ? prev : [...prev, email]
+                  );
+                }}
+                onRemove={(email) => {
+                  setCollaborators((prev) => prev.filter((c) => c !== email));
+                }}
+              />
+            </div>
+
             <button 
               onClick={handleBooking}
               disabled={selectedItems.length === 0 || !formData.projTitle || requestedDates.length === 0}
@@ -221,21 +287,32 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
   );
 }
 
-function GroupReturnView({ equipment, onConfirm }) {
+function GroupReturnView({ equipment, bookings, onConfirm }) {
   const [selectedProject, setSelectedProject] = useState(null);
   const [returnStates, setReturnStates] = useState({}); // { itemId: { isDamaged: bool, note: str } }
 
   const activeProjects = useMemo(() => {
     const projects = {};
-    equipment.filter(e => e.status === 'checked_out' && e.currentBooking).forEach(e => {
-      const key = `${e.currentBooking.shootName}-${e.currentBooking.quotationNumber}`;
+    bookings.filter(b => b.status === 'active').forEach(b => {
+      const key = `${b.shootName}-${b.quotationNumber}`;
       if (!projects[key]) {
-        projects[key] = { ...e.currentBooking, items: [] };
+        projects[key] = { 
+            shootName: b.shootName, 
+            quotationNumber: b.quotationNumber, 
+            items: [] 
+        };
       }
-      projects[key].items.push(e);
+      const eq = equipment.find(e => e.id === b.equipmentId);
+      if (eq) {
+          projects[key].items.push({
+              ...eq,
+              // We use booking ID or Equipment ID? Logic uses equipment ID for return
+              bookingId: b.id
+          });
+      }
     });
     return Object.values(projects);
-  }, [equipment]);
+  }, [bookings, equipment]);
 
   const toggleDamage = (itemId) => {
     setReturnStates(prev => ({
