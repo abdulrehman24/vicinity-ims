@@ -22,28 +22,29 @@ function Records() {
     const events = [];
     bookings.forEach(b => {
         const eqName = equipment.find(e => e.id === b.equipmentId)?.name || 'Unknown Equipment';
+        const baseId = b.bookingEquipmentId ? `be-${b.bookingEquipmentId}` : `${b.id}-${b.equipmentId || 'unknown'}`;
         // Checkout Event
         events.push({
-            id: `out-${b.id}`,
+            id: `out-${baseId}`,
             type: 'checkout',
             equipmentName: eqName,
             shootName: b.shootName,
             quotationNumber: b.quotationNumber,
             user: b.user?.name || 'Operations',
-            timestamp: b.created_at || b.start_date, 
+            timestamp: b.startDate, 
             details: `Qty: ${b.quantity}, Shift: ${b.shift}`
         });
         
         // Return Event
         if (b.status === 'returned') {
              events.push({
-                id: `in-${b.id}`,
+                id: `in-${baseId}`,
                 type: 'checkin',
                 equipmentName: eqName,
                 shootName: b.shootName,
                 user: b.user?.name || 'Operations',
-                timestamp: b.returned_at || b.end_date,
-                details: b.return_notes || 'Returned'
+                timestamp: b.returnedAt || b.endDate,
+                details: 'Returned'
             });
         }
     });

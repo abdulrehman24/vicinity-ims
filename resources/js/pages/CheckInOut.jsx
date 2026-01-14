@@ -46,7 +46,7 @@ function CheckInOut() {
 
 function ManualOutForm({ equipment, bookings, onConfirm }) {
   const [selectedItems, setSelectedItems] = useState([]); // Array of {id, qty}
-  const [dateRange, setDateRange] = useState([null, null]);
+  const [dateRange, setDateRange] = useState(null);
   const [shift, setShift] = useState('Full Day');
   const [formData, setFormData] = useState({ projTitle: '', quote: '', shootType: 'Commercial' });
   const [collaborators, setCollaborators] = useState([]);
@@ -55,28 +55,44 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
 
   // 1. Availability Logic for Multi-Unit & Shifts
   const requestedDates = useMemo(() => {
-    if (!dateRange[0] || !dateRange[1]) return [];
-    return eachDayOfInterval({ start: dateRange[0], end: dateRange[1] }).map(d => format(d, 'yyyy-MM-dd'));
+    if (!dateRange) return [];
+
+    if (Array.isArray(dateRange)) {
+      const [start, end] = dateRange;
+      if (!start) return [];
+      const endDate = end || start;
+      return eachDayOfInterval({ start, end: endDate }).map(d => format(d, 'yyyy-MM-dd'));
+    }
+
+    return eachDayOfInterval({ start: dateRange, end: dateRange }).map(d => format(d, 'yyyy-MM-dd'));
   }, [dateRange]);
 
   const getAvailableQty = (item, dates, requestedShift) => {
+    const relevantBookings = bookings.filter(b => {
+      if (b.status === 'returned') return false;
+      return b.equipmentId === item.id;
+    });
+
+    if (!dates || dates.length === 0) {
+      const totalBooked = relevantBookings.reduce((acc, curr) => acc + (curr.quantity || 1), 0);
+      return Math.max(0, item.totalQuantity - totalBooked);
+    }
+
     let bookedMax = 0;
     dates.forEach(date => {
-      const bookedOnDate = bookings.filter(b => {
-        if (b.status === 'returned') return false;
-        if (b.equipmentId !== item.id) return false;
+      const bookedOnDate = relevantBookings.filter(b => {
         const isSameDay = b.dates.includes(date) || b.dates.includes(format(parseISO(date), 'dd/MM/yyyy'));
         if (!isSameDay) return false;
 
-        // Shift Conflict Logic
-        if (requestedShift === 'Full Day') return true; // Full Day conflicts with everything
-        if (b.shift === 'Full Day') return true; // Existing Full Day conflicts with everything
-        return b.shift === requestedShift; // AM conflicts with AM, PM with PM
+        if (requestedShift === 'Full Day') return true;
+        if (b.shift === 'Full Day') return true;
+        return b.shift === requestedShift;
       });
-      
+
       const totalBooked = bookedOnDate.reduce((acc, curr) => acc + (curr.quantity || 1), 0);
       if (totalBooked > bookedMax) bookedMax = totalBooked;
     });
+
     return Math.max(0, item.totalQuantity - bookedMax);
   };
 
@@ -106,20 +122,23 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
 
   const handleBooking = () => {
     const formattedDates = requestedDates.map(d => format(parseISO(d), 'dd/MM/yyyy'));
-    selectedItems.forEach(item => {
-      onConfirm({
+
+    const payload = {
+      shootName: formData.projTitle,
+      quotationNumber: formData.quote,
+      shift,
+      dates: formattedDates,
+      startDate: requestedDates[0],
+      endDate: requestedDates[requestedDates.length - 1],
+      user: 'Operations Team',
+      collaborators,
+      items: selectedItems.map(item => ({
         equipmentId: item.id,
-        equipmentName: item.name,
-        shootName: formData.projTitle,
-        quotationNumber: formData.quote,
         quantity: item.qty,
-        shift: shift,
-        dates: formattedDates,
-        startDate: requestedDates[0],
-        endDate: requestedDates[requestedDates.length - 1],
-        user: 'Operations Team'
-      });
-    });
+      })),
+    };
+
+    onConfirm(payload);
     setSelectedItems([]);
     setFormData({ projTitle: '', quote: '', shootType: 'Commercial' });
   };
@@ -155,7 +174,12 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
               </button>
             ))}
           </div>
-          <Calendar selectRange onChange={setDateRange} className="mini-calendar" />
+          <Calendar
+            selectRange
+            onChange={setDateRange}
+            value={dateRange}
+            className="mini-calendar"
+          />
         </div>
 
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
@@ -189,6 +213,7 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
           <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar mt-3">
             {filteredEquipment.map(item => {
               const avail = getAvailableQty(item, requestedDates, shift);
+              if (requestedDates.length > 0 && avail <= 0) return null;
               const isSelected = selectedItems.find(i => i.id === item.id);
               return (
                 <button 
@@ -306,8 +331,7 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
       if (eq) {
           projects[key].items.push({
               ...eq,
-              // We use booking ID or Equipment ID? Logic uses equipment ID for return
-              bookingId: b.id
+              bookingEquipmentId: b.bookingEquipmentId
           });
       }
     });
@@ -330,7 +354,7 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
 
   const handleReturn = () => {
     const itemsToReturn = selectedProject.items.map(item => ({
-      id: item.id,
+      bookingEquipmentId: item.bookingEquipmentId,
       reportedProblem: returnStates[item.id]?.isDamaged || false,
       problemNote: returnStates[item.id]?.note || ''
     }));

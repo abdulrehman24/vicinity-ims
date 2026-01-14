@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Calendar from 'react-calendar';
 import SafeIcon from '../common/SafeIcon';
 import { useInventory } from '../context/InventoryContext';
-import { format, isSameDay, isWithinInterval, parseISO } from 'date-fns';
+import { format, isSameDay, parseISO } from 'date-fns';
 import { downloadCalendarFeed } from '../utils/calendarUtils';
 import * as FiIcons from 'react-icons/fi';
 import toast from 'react-hot-toast';
@@ -16,22 +16,66 @@ function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showSyncModal, setShowSyncModal] = useState(false);
 
-  const selectedDateBookings = useMemo(() => {
-    return bookings.filter(booking => {
-      try {
-        const startDate = parseISO(booking.startDate);
-        const endDate = parseISO(booking.endDate);
-        return isWithinInterval(selectedDate, { start: startDate, end: endDate });
-      } catch (e) { return false; }
+  const activeBookingCount = useMemo(() => {
+    const ids = new Set();
+    bookings.forEach(b => {
+      if (b.status !== 'returned') {
+        ids.add(b.id);
+      }
     });
-  }, [bookings, selectedDate]);
+    return ids.size;
+  }, [bookings]);
 
-  const enrichedBookings = useMemo(() => {
-    return bookings.map(booking => {
-      const equipmentItem = equipment.find(item => item.id === booking.equipmentId);
-      return { ...booking, equipment: equipmentItem };
+  const currentMonthBookingCount = useMemo(() => {
+    const ids = new Set();
+    const monthPrefix = format(new Date(), 'yyyy-MM');
+    bookings.forEach(b => {
+      if (b.startDate && b.startDate.includes(monthPrefix)) {
+        ids.add(b.id);
+      }
     });
+    return ids.size;
+  }, [bookings]);
+
+  const events = useMemo(() => {
+    const list = [];
+    bookings.forEach(booking => {
+      const eqName = booking.equipmentName
+        ? booking.equipmentName
+        : equipment.find(item => item.id === booking.equipmentId)?.name || 'Unknown Equipment';
+      const userName = booking.user?.name || 'Operations';
+      const baseId = booking.bookingEquipmentId
+        ? `be-${booking.bookingEquipmentId}`
+        : `${booking.id}-${booking.equipmentId || 'unknown'}`;
+
+      if (booking.startDate) {
+        list.push({
+          id: `out-${baseId}`,
+          type: 'checkout',
+          date: parseISO(booking.startDate),
+          equipmentName: eqName,
+          shootName: booking.shootName,
+          userName,
+        });
+      }
+
+      if (booking.returnedAt) {
+        list.push({
+          id: `in-${baseId}`,
+          type: 'checkin',
+          date: parseISO(booking.returnedAt),
+          equipmentName: eqName,
+          shootName: booking.shootName,
+          userName,
+        });
+      }
+    });
+    return list;
   }, [bookings, equipment]);
+
+  const selectedDateBookings = useMemo(() => {
+    return events.filter(ev => isSameDay(ev.date, selectedDate));
+  }, [events, selectedDate]);
 
   const handleExport = () => {
     if (bookings.length === 0) {
@@ -44,15 +88,8 @@ function CalendarPage() {
 
   const tileContent = ({ date, view }) => {
     if (view === 'month') {
-      const dayHasBooking = bookings.some(booking => {
-        try {
-          return isWithinInterval(date, { 
-            start: parseISO(booking.startDate), 
-            end: parseISO(booking.endDate) 
-          });
-        } catch (e) { return false; }
-      });
-      if (dayHasBooking) {
+      const hasEvent = events.some(ev => isSameDay(ev.date, date));
+      if (hasEvent) {
         return (
           <div className="flex justify-center mt-1">
             <div className="w-1.5 h-1.5 bg-[#ebc1b6] rounded-full shadow-sm"></div>
@@ -107,16 +144,16 @@ function CalendarPage() {
              
              <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                 {selectedDateBookings.length > 0 ? (
-                  selectedDateBookings.map((booking) => (
-                    <div key={booking.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
-                      <p className="text-xs font-bold text-[#ebc1b6] mb-1">{booking.equipmentName}</p>
-                      <p className="text-[10px] font-medium text-white/60 mb-3">{booking.shootName}</p>
+                  selectedDateBookings.map((event) => (
+                    <div key={event.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
+                      <p className="text-xs font-bold text-[#ebc1b6] mb-1">{event.equipmentName}</p>
+                      <p className="text-[10px] font-medium text-white/60 mb-3">{event.shootName}</p>
                       <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-white/40">
                         <div className="flex items-center space-x-2">
                           <SafeIcon icon={FiUser} />
-                          <span>{booking.user}</span>
+                          <span>{event.userName}</span>
                         </div>
-                        <span>{booking.startDate}</span>
+                        <span>{event.type === 'checkout' ? 'OUT' : 'IN'}</span>
                       </div>
                     </div>
                   ))
@@ -134,12 +171,12 @@ function CalendarPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-[9px] font-black text-gray-400 uppercase">Active Bookings</p>
-                <p className="text-2xl font-black text-[#4a5a67]">{bookings.length}</p>
+                <p className="text-2xl font-black text-[#4a5a67]">{activeBookingCount}</p>
               </div>
               <div className="p-4 bg-gray-50 rounded-2xl">
                 <p className="text-[9px] font-black text-gray-400 uppercase">Current Month</p>
                 <p className="text-2xl font-black text-[#4a5a67]">
-                  {bookings.filter(b => b.startDate.includes(format(new Date(), 'yyyy-MM'))).length}
+                  {currentMonthBookingCount}
                 </p>
               </div>
             </div>

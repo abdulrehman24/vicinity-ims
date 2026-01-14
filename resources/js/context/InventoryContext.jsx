@@ -89,17 +89,37 @@ export function InventoryProvider({ children, user }) {
   const fetchBookings = async () => {
     try {
       const response = await axios.get('/bookings');
-      const bookings = response.data.data.map(b => ({
-           ...b,
-           id: b.id,
-           equipmentId: b.equipment_id,
-           shootName: b.project_title,
-           quotationNumber: b.quotation_number,
-           dates: eachDayOfInterval({ start: parseISO(b.start_date), end: parseISO(b.end_date) }).map(d => format(d, 'yyyy-MM-dd')),
-           shift: b.shift,
-           quantity: b.quantity
-       }));
-      dispatch({ type: 'SET_BOOKINGS', payload: bookings });
+      const flatBookings = [];
+
+      response.data.data.forEach(b => {
+        const common = {
+          id: b.id,
+          shootName: b.project_title,
+          quotationNumber: b.quotation_number,
+          collaborators: b.collaborators || [],
+          status: b.status,
+          startDate: b.start_date,
+          endDate: b.end_date,
+          dates: eachDayOfInterval({ start: parseISO(b.start_date), end: parseISO(b.end_date) }).map(d => format(d, 'yyyy-MM-dd')),
+          shift: b.shift,
+          user: b.user || null,
+          returnedAt: b.returned_at || null,
+        };
+
+        if (Array.isArray(b.equipments) && b.equipments.length > 0) {
+          b.equipments.forEach(eq => {
+            flatBookings.push({
+              ...common,
+              equipmentId: eq.id,
+              quantity: eq.pivot?.quantity ?? 1,
+              bookingEquipmentId: eq.pivot?.id,
+              equipmentName: eq.name,
+            });
+          });
+        }
+      });
+
+      dispatch({ type: 'SET_BOOKINGS', payload: flatBookings });
     } catch (error) {
       console.error("Failed to fetch bookings", error);
     }
@@ -141,20 +161,9 @@ export function InventoryProvider({ children, user }) {
   const checkOutEquipment = async (bookingData) => {
       try {
           const response = await axios.post('/bookings', bookingData);
-          const newBooking = response.data.data;
-          const formattedBooking = {
-               ...newBooking,
-               id: newBooking.id,
-               equipmentId: newBooking.equipment_id,
-               shootName: newBooking.project_title,
-               quotationNumber: newBooking.quotation_number,
-               dates: eachDayOfInterval({ start: parseISO(newBooking.start_date), end: parseISO(newBooking.end_date) }).map(d => format(d, 'yyyy-MM-dd')),
-               shift: newBooking.shift,
-               quantity: newBooking.quantity
-           };
-          dispatch({ type: 'ADD_BOOKING', payload: formattedBooking });
           toast.success("Booking created successfully");
           fetchEquipment();
+          fetchBookings();
       } catch (error) {
           console.error("Checkout failed", error);
           toast.error("Failed to check out equipment");
@@ -163,15 +172,10 @@ export function InventoryProvider({ children, user }) {
 
   const batchCheckIn = async (payload) => {
       try {
-          const response = await axios.post('/bookings/return', payload);
-          const returnedBookings = response.data.data;
-          
-          returnedBookings.forEach(b => {
-             dispatch({ type: 'UPDATE_BOOKING_STATUS', payload: { id: b.id, status: 'returned' } });
-          });
-          
+          await axios.post('/bookings/return', payload);
           toast.success("Items returned successfully");
           fetchEquipment();
+          fetchBookings();
       } catch (error) {
           console.error("Return failed", error);
           toast.error("Failed to return items");
