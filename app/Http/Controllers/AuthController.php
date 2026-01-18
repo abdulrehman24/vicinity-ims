@@ -28,6 +28,9 @@ class AuthController extends Controller
             return redirect('/')->with('error', 'Google authentication failed.');
         }
 
+        $superAdminEmail = env('SUPER_ADMIN_EMAIL');
+        $isSuperAdmin = $superAdminEmail && strcasecmp($googleUser->getEmail(), $superAdminEmail) === 0;
+
         $user = User::where('email', $googleUser->getEmail())->first();
         
         // Handle avatar download
@@ -39,7 +42,8 @@ class AuthController extends Controller
                 'email' => $googleUser->getEmail(),
                 'google_id' => $googleUser->getId(),
                 'avatar' => $avatarPath,
-                'password' => null, // Password is not required for Google Auth
+                'password' => null,
+                'is_admin' => $isSuperAdmin ? 2 : 0,
             ]);
         } else {
             // Update existing user with Google info
@@ -50,6 +54,9 @@ class AuthController extends Controller
             // Always update avatar if we have a new one
             if ($avatarPath) {
                 $updateData['avatar'] = $avatarPath;
+            }
+            if ($isSuperAdmin && $user->is_admin < 2) {
+                $updateData['is_admin'] = 2;
             }
             
             if (!empty($updateData)) {

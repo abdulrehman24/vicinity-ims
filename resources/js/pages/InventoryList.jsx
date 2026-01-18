@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
 import SafeIcon from '../common/SafeIcon';
 import { useInventory } from '../context/InventoryContext';
-import { categories, equipmentTypes, businessUnits, statuses } from '../data/inventoryData';
+import { equipmentTypes, businessUnits, statuses } from '../data/inventoryData';
+import axios from 'axios';
 import Fuse from 'fuse.js';
 import * as FiIcons from 'react-icons/fi';
 import toast from 'react-hot-toast';
@@ -333,6 +334,7 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate
 }
 
 function NewEntryModal({ onClose, onSubmit, initialData }) {
+  const [categories, setCategories] = useState([]);
   const [formData, setFormData] = useState(initialData || {
     name: '',
     category: 'Camera Body',
@@ -346,6 +348,22 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
     purchaseDate: new Date().toISOString().split('T')[0],
     totalQuantity: 1
   });
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await axios.get('/api/admin/categories');
+        const list = (response.data.data || []).filter(c => c.is_active);
+        if (!initialData && list.length > 0) {
+          setFormData(prev => ({ ...prev, category: list[0].name }));
+        }
+        setCategories(list);
+      } catch (e) {
+        setCategories([]);
+      }
+    };
+    loadCategories();
+  }, [initialData]);
 
   const isEditing = !!initialData;
 
@@ -406,8 +424,16 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Category</label>
-                  <select className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:border-[#ebc1b6] rounded-xl outline-none font-bold text-sm text-[#4a5a67]" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })}>
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  <select
+                    className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:border-[#ebc1b6] rounded-xl outline-none font-bold text-sm text-[#4a5a67]"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  >
+                    {categories.map(c => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <InputField label="Serial Number" icon={FiHash} value={formData.serialNumber} onChange={(v) => setFormData({ ...formData, serialNumber: v })} placeholder="SN-XXXX" />

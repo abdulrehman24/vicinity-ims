@@ -12,6 +12,9 @@ import StockTake from './pages/StockTake';
 import Records from './pages/Records';
 import ReportProblem from './pages/ReportProblem';
 import Login from './components/Login';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminCategories from './pages/admin/AdminCategories';
+import AdminSettings from './pages/admin/AdminSettings';
 import { InventoryProvider } from './context/InventoryContext';
 import './App.css';
 
@@ -45,6 +48,14 @@ function App() {
     );
   }
 
+  const isSuperAdmin = user?.is_admin >= 2;
+
+  const adminElement = isSuperAdmin ? (
+    <AdminLayout />
+  ) : (
+    <Navigate to="/" />
+  );
+
   return (
     <InventoryProvider user={user}>
       <div className="min-h-screen flex flex-col bg-[#fcfaf9]">
@@ -60,6 +71,11 @@ function App() {
               <Route path="/report" element={<ReportProblem />} />
               <Route path="/records" element={<Records />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/admin/*" element={adminElement}>
+                <Route index element={<Navigate to="/admin/categories" replace />} />
+                <Route path="categories" element={<AdminCategories />} />
+                <Route path="settings" element={<AdminSettings />} />
+              </Route>
               
               {/* Legacy redirect for users who had bookmarked the old link */}
               <Route path="/check-in-out" element={<Navigate to="/" />} />
