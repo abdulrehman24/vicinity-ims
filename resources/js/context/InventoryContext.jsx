@@ -184,7 +184,22 @@ export function InventoryProvider({ children, user }) {
           toast.error("Failed to return items");
       }
   };
-  const reportProblem = (report) => dispatch({ type: 'REPORT_PROBLEM', payload: report });
+
+  const reportProblem = async (report) => {
+    try {
+      const response = await axios.post('/support-tickets', report);
+      const ticket = response.data?.data;
+      dispatch({ type: 'REPORT_PROBLEM', payload: { ...report, ticketCode: ticket?.ticket_code } });
+      if (ticket?.ticket_code) {
+        toast.success(`Support ticket ${ticket.ticket_code} created`);
+      } else {
+        toast.success('Support ticket created');
+      }
+    } catch (error) {
+      console.error("Support ticket failed", error);
+      toast.error("Failed to create support ticket");
+    }
+  };
   const toggleAdmin = (val) => dispatch({ type: 'SET_ADMIN', payload: val });
   const addStockTake = (record) => {
     dispatch({ type: 'ADD_STOCK_TAKE', payload: record });

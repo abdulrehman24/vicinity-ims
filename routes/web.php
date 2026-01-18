@@ -10,6 +10,7 @@ use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\SupportTicketController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -31,6 +32,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::post('/bookings', [BookingController::class, 'store']);
     Route::post('/bookings/return', [BookingController::class, 'returnItems']);
+    Route::post('/support-tickets', [SupportTicketController::class, 'store']);
 });
 
 Route::resource('equipment', EquipmentController::class);

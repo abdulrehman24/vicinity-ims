@@ -73,11 +73,20 @@ class BookingController extends Controller
         if (!empty($validated['collaborators'])) {
             foreach ($validated['collaborators'] as $email) {
                 try {
-                    Mail::to($email)->send(new BookingNotificationMail($booking));
+                    Mail::to($email)->queue(new BookingNotificationMail($booking));
                 } catch (\Throwable $e) {
                     Log::error('Booking notification email failed: '.$e->getMessage());
                 }
             }
+        }
+
+        try {
+            $operationsAddress = config('mail.operations_address') ?? config('mail.from.address');
+            if ($operationsAddress) {
+                Mail::to($operationsAddress)->queue(new BookingNotificationMail($booking));
+            }
+        } catch (\Throwable $e) {
+            Log::error('Operations booking email failed: '.$e->getMessage());
         }
 
         return response()->json([
@@ -148,9 +157,28 @@ class BookingController extends Controller
             return response()->json(['message' => 'Failed to process returns'], 500);
         }
 
+        $bookingIds = array_keys($affectedBookings);
+
+        if (!empty($bookingIds)) {
+            $bookings = Booking::with(['equipments', 'user'])
+                ->whereIn('id', $bookingIds)
+                ->get();
+
+            foreach ($bookings as $booking) {
+                try {
+                    $operationsAddress = config('mail.operations_address') ?? config('mail.from.address');
+                    if ($operationsAddress) {
+                        Mail::to($operationsAddress)->queue(new BookingNotificationMail($booking));
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('Return booking email failed: '.$e->getMessage());
+                }
+            }
+        }
+
         return response()->json([
             'message' => 'Items returned successfully',
-            'data' => array_keys($affectedBookings)
+            'data' => $bookingIds
         ]);
     }
 }
