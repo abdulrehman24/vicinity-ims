@@ -15,6 +15,8 @@ import Login from './components/Login';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminCategories from './pages/admin/AdminCategories';
 import AdminSettings from './pages/admin/AdminSettings';
+import AdminTickets from './pages/admin/AdminTickets';
+import AdminUsers from './pages/admin/AdminUsers';
 import { InventoryProvider } from './context/InventoryContext';
 import './App.css';
 
@@ -76,6 +78,8 @@ function App() {
               <Route path="/admin/*" element={adminElement}>
                 <Route index element={<Navigate to="/admin/categories" replace />} />
                 <Route path="categories" element={<AdminCategories />} />
+                <Route path="tickets" element={<AdminTickets />} />
+                <Route path="users" element={<AdminUsers />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
               

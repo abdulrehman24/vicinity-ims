@@ -11,6 +11,19 @@ use Illuminate\Support\Facades\Mail;
 
 class SupportTicketController extends Controller
 {
+    public function index(Request $request)
+    {
+        $query = SupportTicket::with('equipment')->orderByDesc('created_at');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        $tickets = $query->paginate($request->input('length', 20));
+
+        return response()->json($tickets);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -48,6 +61,18 @@ class SupportTicketController extends Controller
         ], 201);
     }
 
+    public function updateStatus(Request $request, SupportTicket $ticket)
+    {
+        $validated = $request->validate([
+            'status' => 'required|string|in:open,in_progress,resolved',
+        ]);
+
+        $ticket->status = $validated['status'];
+        $ticket->save();
+
+        return response()->json($ticket->load('equipment'));
+    }
+
     protected function generateTicketCode(): string
     {
         do {
@@ -59,4 +84,3 @@ class SupportTicketController extends Controller
         return $code;
     }
 }
-

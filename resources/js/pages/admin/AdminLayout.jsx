@@ -3,7 +3,8 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import SafeIcon from '../../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 
-const { FiSettings, FiTag, FiMenu, FiChevronLeft, FiHome, FiLogOut } = FiIcons;
+const { FiSettings, FiTag, FiMenu, FiChevronLeft, FiHome, FiLogOut, FiAlertCircle, FiUsers } =
+  FiIcons;
 
 function AdminLayout({ onLogout }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -71,6 +72,48 @@ function AdminLayout({ onLogout }) {
                 className={`text-lg ${collapsed ? 'mx-auto' : 'mr-3'}`}
               />
               {!collapsed && <span>Categories</span>}
+            </NavLink>
+            <NavLink
+              to="/admin/users"
+              className={({ isActive }) =>
+                `group relative flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-white text-[#4a5a67] shadow-sm'
+                    : 'text-gray-200 hover:bg-white/10 hover:text-white'
+                }`
+              }
+            >
+              <div
+                className={`absolute left-0 inset-y-1 w-1 rounded-full transition-opacity ${
+                  collapsed ? 'opacity-0' : 'opacity-100'
+                } ${location.pathname.startsWith('/admin/users') ? 'bg-[#ebc1b6]' : 'bg-transparent'}`}
+              />
+              <SafeIcon
+                icon={FiUsers}
+                className={`text-lg ${collapsed ? 'mx-auto' : 'mr-3'}`}
+              />
+              {!collapsed && <span>Users</span>}
+            </NavLink>
+            <NavLink
+              to="/admin/tickets"
+              className={({ isActive }) =>
+                `group relative flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-white text-[#4a5a67] shadow-sm'
+                    : 'text-gray-200 hover:bg-white/10 hover:text-white'
+                }`
+              }
+            >
+              <div
+                className={`absolute left-0 inset-y-1 w-1 rounded-full transition-opacity ${
+                  collapsed ? 'opacity-0' : 'opacity-100'
+                } ${location.pathname.startsWith('/admin/tickets') ? 'bg-[#ebc1b6]' : 'bg-transparent'}`}
+              />
+              <SafeIcon
+                icon={FiAlertCircle}
+                className={`text-lg ${collapsed ? 'mx-auto' : 'mr-3'}`}
+              />
+              {!collapsed && <span>Support tickets</span>}
             </NavLink>
             <NavLink
               to="/admin/settings"
