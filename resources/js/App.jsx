@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import Navbar from './components/Navbar';
@@ -21,6 +21,7 @@ import './App.css';
 function App() {
   const [user, setUser] = useState(window.user || null);
   const [loading, setLoading] = useState(false);
+  const location = useLocation();
 
   const handleLogout = async () => {
     try {
@@ -49,9 +50,10 @@ function App() {
   }
 
   const isSuperAdmin = user?.is_admin >= 2;
+  const isAdminRoute = location.pathname.startsWith('/admin');
 
   const adminElement = isSuperAdmin ? (
-    <AdminLayout />
+    <AdminLayout onLogout={handleLogout} />
   ) : (
     <Navigate to="/" />
   );
@@ -59,8 +61,8 @@ function App() {
   return (
     <InventoryProvider user={user}>
       <div className="min-h-screen flex flex-col bg-[#fcfaf9]">
-        <Navbar onLogout={handleLogout} user={user} />
-        <main className="pt-16 flex-grow">
+        {!isAdminRoute && <Navbar onLogout={handleLogout} user={user} />}
+        <main className={`${isAdminRoute ? '' : 'pt-16'} flex-grow`}>
           <AnimatePresence mode="wait">
             <Routes>
               {/* Check In/Out is now the Home Page */}
@@ -83,7 +85,7 @@ function App() {
             </Routes>
           </AnimatePresence>
         </main>
-        <Footer />
+        {!isAdminRoute && <Footer />}
       </div>
     </InventoryProvider>
   );

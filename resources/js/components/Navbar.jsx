@@ -30,16 +30,14 @@ function Navbar({ onLogout, user }) {
   const { isAdmin, toggleAdmin } = useInventory();
 
   const handleAdminToggle = () => {
-    if (isAdmin) {
-      toggleAdmin(false);
-    } else {
-      setIsAdminModalOpen(true);
+    if (!user?.is_admin) {
+      return;
     }
+    toggleAdmin(!isAdmin);
   };
 
   const handleAdminVerified = (level) => {
       toggleAdmin(true);
-      // Optional: Store level if needed, but context handles simple boolean for now
       setIsAdminModalOpen(false);
   };
 

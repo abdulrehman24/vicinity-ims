@@ -13,14 +13,34 @@ function AdminCategories() {
   const [deletingId, setDeletingId] = useState(null);
   const [form, setForm] = useState({ id: null, name: '', description: '' });
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState('');
 
   const isEditing = form.id !== null;
 
   const loadCategories = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/admin/categories');
-      setCategories(response.data.data || []);
+      const response = await axios.get('/api/admin/categories', {
+        params: {
+          page,
+          length: pageSize,
+          search: search || undefined,
+          'search[value]': search || undefined,
+          'search[regex]': false,
+        },
+      });
+      const payload = response.data || {};
+      const rows = payload.data || [];
+      setCategories(rows);
+      const totalRecords =
+        payload.recordsFiltered ??
+        payload.recordsTotal ??
+        payload.total ??
+        rows.length;
+      setTotal(totalRecords);
     } catch (e) {
       toast.error('Failed to load categories');
     } finally {
@@ -30,7 +50,7 @@ function AdminCategories() {
 
   useEffect(() => {
     loadCategories();
-  }, []);
+  }, [page, pageSize, search]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,6 +73,8 @@ function AdminCategories() {
         toast.success('Category created');
       }
       setForm({ id: null, name: '', description: '' });
+      setIsModalOpen(false);
+      setPage(1);
       loadCategories();
     } catch (e) {
       toast.error('Failed to save category');
@@ -76,6 +98,7 @@ function AdminCategories() {
     try {
       await axios.delete(`/api/admin/categories/${category.id}`);
       toast.success('Category deleted');
+      setPage(1);
       loadCategories();
     } catch (e) {
       toast.error('Failed to delete category');
@@ -83,6 +106,8 @@ function AdminCategories() {
       setDeletingId(null);
     }
   };
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <div>
@@ -108,11 +133,35 @@ function AdminCategories() {
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
             Existing Categories
           </p>
-          {loading && (
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              Loading…
-            </p>
-          )}
+          <div className="flex items-center space-x-3">
+            {loading && (
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Loading…
+              </p>
+            )}
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setPage(1);
+                setSearch(e.target.value);
+              }}
+              placeholder="Search categories…"
+              className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-[#4a5a67] bg-gray-50 focus:bg-white focus:border-[#ebc1b6] outline-none"
+            />
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPage(1);
+                setPageSize(Number(e.target.value));
+              }}
+              className="px-2 py-1.5 rounded-lg border border-gray-200 text-[10px] uppercase tracking-widest bg-gray-50 text-gray-500 focus:bg-white focus:border-[#ebc1b6] outline-none"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -172,6 +221,39 @@ function AdminCategories() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
+          <div>
+            {total > 0 ? (
+              <span>
+                Showing {(page - 1) * pageSize + 1}–
+                {Math.min(page * pageSize, total)} of {total} categories
+              </span>
+            ) : (
+              <span>Showing 0 of 0 categories</span>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span>
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((prev) => (prev < totalPages ? prev + 1 : prev))}
+              disabled={page >= totalPages}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 

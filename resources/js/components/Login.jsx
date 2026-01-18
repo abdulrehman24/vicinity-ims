@@ -1,13 +1,34 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 const { FiCamera, FiZap, FiShieldOff } = FiIcons;
 
 function Login() {
   const [loading, setLoading] = useState(false);
+  const [backgroundUrl, setBackgroundUrl] = useState(null);
+  const [backgroundOpacity, setBackgroundOpacity] = useState(0.4);
+
+  useEffect(() => {
+    const loadBackground = async () => {
+      try {
+        const response = await axios.get('/api/login-settings');
+        const data = response.data || {};
+        if (data.background_url) {
+          setBackgroundUrl(data.background_url);
+        }
+        if (typeof data.background_opacity === 'number') {
+          setBackgroundOpacity(data.background_opacity);
+        }
+      } catch (e) {
+      }
+    };
+
+    loadBackground();
+  }, []);
 
   const handleGoogleLogin = () => {
     setLoading(true);
@@ -15,11 +36,20 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#4a5a67] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#4a5a67] flex items-center justify-center p-4 relative overflow-hidden">
+      {backgroundUrl && (
+        <div
+          className="absolute inset-0 bg-center bg-cover"
+          style={{
+            backgroundImage: `url(${backgroundUrl})`,
+            opacity: backgroundOpacity,
+          }}
+        />
+      )}
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }} 
         animate={{ opacity: 1, scale: 1 }}
-        className="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden"
+        className="relative max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden"
       >
         <div className="bg-[#4a5a67] p-12 text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#ebc1b6] opacity-10 rounded-full -mr-16 -mt-16" />

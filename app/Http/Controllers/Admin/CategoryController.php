@@ -16,13 +16,46 @@ class CategoryController extends Controller
         }
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $this->ensureSuperAdmin();
-        $categories = Category::orderBy('name')->get();
+
+        $query = Category::query();
+
+        $search = $request->input('search');
+        if (is_array($search)) {
+            $search = $search['value'] ?? null;
+        }
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%')
+                    ->orWhere('description', 'like', '%' . $search . '%');
+            });
+        }
+
+        $length = (int) $request->input('length', 10);
+        if ($length <= 0) {
+            $length = 10;
+        }
+
+        $page = (int) $request->input('page', 1);
+        if ($page <= 0) {
+            $page = 1;
+        }
+
+        $total = $query->count();
+
+        $categories = $query
+            ->orderBy('name')
+            ->skip(($page - 1) * $length)
+            ->take($length)
+            ->get();
 
         return response()->json([
             'data' => $categories,
+            'recordsTotal' => $total,
+            'recordsFiltered' => $total,
         ]);
     }
 

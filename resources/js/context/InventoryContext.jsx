@@ -9,6 +9,7 @@ const initialState = {
   equipment: [],
   bookings: [],
   records: [],
+  stockTakes: [],
   isAdmin: localStorage.getItem('isAdmin') === 'true'
 };
 
@@ -32,6 +33,8 @@ function inventoryReducer(state, action) {
       };
     case 'SET_ADMIN':
       return { ...state, isAdmin: action.payload };
+    case 'ADD_STOCK_TAKE':
+      return { ...state, stockTakes: [action.payload, ...state.stockTakes] };
 
     case 'SET_BOOKINGS':
       return { ...state, bookings: action.payload };
@@ -183,6 +186,10 @@ export function InventoryProvider({ children, user }) {
   };
   const reportProblem = (report) => dispatch({ type: 'REPORT_PROBLEM', payload: report });
   const toggleAdmin = (val) => dispatch({ type: 'SET_ADMIN', payload: val });
+  const addStockTake = (record) => {
+    dispatch({ type: 'ADD_STOCK_TAKE', payload: record });
+    toast.success("Stock take saved");
+  };
 
   return (
     <InventoryContext.Provider value={{ 
@@ -193,7 +200,8 @@ export function InventoryProvider({ children, user }) {
         checkOutEquipment, 
         batchCheckIn, 
         reportProblem, 
-        toggleAdmin 
+        toggleAdmin,
+        addStockTake 
     }}>
       {children}
     </InventoryContext.Provider>

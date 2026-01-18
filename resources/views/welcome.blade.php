@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vicinity IMS - Equipment Dashboard</title>
+    <title>{{ $appTitle ?? 'Vicinity IMS - Equipment Dashboard' }}</title>
     <meta name="description" content="Professional camera equipment inventory management system for film production companies" />
+    <link rel="icon" href="{{ $appFavicon ?? asset('favicon.ico') }}" type="image/png">
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

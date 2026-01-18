@@ -315,6 +315,9 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
 function GroupReturnView({ equipment, bookings, onConfirm }) {
   const [selectedProject, setSelectedProject] = useState(null);
   const [returnStates, setReturnStates] = useState({}); // { itemId: { isDamaged: bool, note: str } }
+  const [selectedProjectKeys, setSelectedProjectKeys] = useState([]);
+
+  const projectKey = (project) => `${project.shootName}-${project.quotationNumber}`;
 
   const activeProjects = useMemo(() => {
     const projects = {};
@@ -352,6 +355,56 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
     }));
   };
 
+  const handleProjectReturn = (project) => {
+    const itemsToReturn = project.items.map(item => ({
+      bookingEquipmentId: item.bookingEquipmentId,
+      reportedProblem: false,
+      problemNote: ''
+    }));
+
+    onConfirm({
+      items: itemsToReturn,
+      shootName: project.shootName,
+      user: window.user?.name || 'Operations Team'
+    });
+
+    if (selectedProject && selectedProject.shootName === project.shootName && selectedProject.quotationNumber === project.quotationNumber) {
+      setSelectedProject(null);
+    }
+
+    toast.success('Project returned successfully');
+  };
+
+  const toggleProjectSelection = (project) => {
+    const key = projectKey(project);
+    setSelectedProjectKeys(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  const handleReturnSelected = () => {
+    const projectsToReturn = activeProjects.filter(p => selectedProjectKeys.includes(projectKey(p)));
+    if (projectsToReturn.length === 0) return;
+
+    projectsToReturn.forEach(project => {
+      const itemsToReturn = project.items.map(item => ({
+        bookingEquipmentId: item.bookingEquipmentId,
+        reportedProblem: false,
+        problemNote: ''
+      }));
+
+      onConfirm({
+        items: itemsToReturn,
+        shootName: project.shootName,
+        user: window.user?.name || 'Operations Team'
+      });
+    });
+
+    setSelectedProject(null);
+    setSelectedProjectKeys([]);
+    toast.success('Selected projects returned successfully');
+  };
+
   const handleReturn = () => {
     const itemsToReturn = selectedProject.items.map(item => ({
       bookingEquipmentId: item.bookingEquipmentId,
@@ -372,17 +425,66 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
       <div className="lg:col-span-4 space-y-4">
         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Active Projects</label>
         {activeProjects.map(p => (
-          <button key={p.shootName} onClick={() => setSelectedProject(p)} className={`w-full text-left p-6 rounded-3xl border transition-all ${selectedProject?.shootName === p.shootName ? 'bg-[#4a5a67] text-white shadow-xl' : 'bg-white border-gray-100 hover:border-[#ebc1b6]'}`}>
-            <h3 className="font-bold text-sm mb-1">{p.shootName}</h3>
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-50">{p.quotationNumber}</p>
-            <div className="flex items-center space-x-2 mt-4">
-              <div className="flex -space-x-2">
-                {p.items.slice(0, 3).map(i => <img key={i.id} src={i.image} className="w-6 h-6 rounded-full border-2 border-white object-cover" />)}
+          <div
+            key={projectKey(p)}
+            onClick={() => setSelectedProject(p)}
+            className={`w-full text-left p-6 rounded-3xl border transition-all cursor-pointer ${
+              selectedProject?.shootName === p.shootName ? 'bg-[#4a5a67] text-white shadow-xl' : 'bg-white border-gray-100 hover:border-[#ebc1b6]'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-bold text-sm mb-1">{p.shootName}</h3>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-50">{p.quotationNumber}</p>
               </div>
-              <span className="text-[9px] font-bold opacity-60">+{p.items.length} items</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleProjectSelection(p);
+                }}
+                className="ml-2 p-1 rounded-lg bg-white/70 text-[#4a5a67] hover:bg-[#4a5a67] hover:text-[#ebc1b6] shadow-sm"
+              >
+                <SafeIcon
+                  icon={selectedProjectKeys.includes(projectKey(p)) ? FiCheckSquare : FiSquare}
+                  className="text-xs"
+                />
+              </button>
             </div>
-          </button>
+            <div className="flex items-center justify-between mt-4">
+              <div className="flex items-center space-x-2">
+                <div className="flex -space-x-2">
+                  {p.items.slice(0, 3).map(i => (
+                    <img
+                      key={i.id}
+                      src={i.image}
+                      className="w-6 h-6 rounded-full border-2 border-white object-cover"
+                    />
+                  ))}
+                </div>
+                <span className="text-[9px] font-bold opacity-60">+{p.items.length} items</span>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleProjectReturn(p);
+                }}
+                className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-xl border border-[#4a5a67]/10 bg-white/80 text-[#4a5a67] hover:bg-[#4a5a67] hover:text-[#ebc1b6] shadow-sm"
+              >
+                Return All
+              </button>
+            </div>
+          </div>
         ))}
+        <button
+          type="button"
+          onClick={handleReturnSelected}
+          disabled={selectedProjectKeys.length === 0}
+          className="w-full mt-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-gray-200 bg-white text-[#4a5a67] disabled:opacity-30 hover:border-[#4a5a67] hover:bg-[#f9fafb] transition-all"
+        >
+          Return Selected ({selectedProjectKeys.length})
+        </button>
       </div>
 
       <div className="lg:col-span-8">
