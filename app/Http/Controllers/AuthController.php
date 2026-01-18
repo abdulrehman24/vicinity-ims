@@ -14,6 +14,27 @@ use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
+    public function login(Request $request)
+    {
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        if (!Auth::attempt($credentials, true)) {
+            return response()->json([
+                'message' => 'Invalid email or password.',
+            ], 422);
+        }
+
+        $request->session()->regenerate();
+
+        return response()->json([
+            'message' => 'Logged in successfully.',
+            'user' => Auth::user(),
+        ]);
+    }
+
     public function redirectToGoogle()
     {
         return Socialite::driver('google')->redirect();

@@ -464,16 +464,6 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
                 </div>
                 <span className="text-[9px] font-bold opacity-60">+{p.items.length} items</span>
               </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleProjectReturn(p);
-                }}
-                className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-xl border border-[#4a5a67]/10 bg-white/80 text-[#4a5a67] hover:bg-[#4a5a67] hover:text-[#ebc1b6] shadow-sm"
-              >
-                Return All
-              </button>
             </div>
           </div>
         ))}

@@ -52,16 +52,22 @@ function Records() {
   }, [bookings, equipment]);
 
   const filteredRecords = useMemo(() => {
-    let result = records;
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(r => 
-        r.equipmentName.toLowerCase().includes(term) || 
-        (r.shootName && r.shootName.toLowerCase().includes(term)) ||
-        (r.quotationNumber && r.quotationNumber.toLowerCase().includes(term))
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return records;
+
+    return records.filter(r => {
+      const equipmentName = (r.equipmentName || '').toLowerCase();
+      const shootName = (r.shootName || '').toLowerCase();
+      const quotationNumber = (r.quotationNumber || '').toLowerCase();
+      const user = (r.user || '').toLowerCase();
+
+      return (
+        equipmentName.includes(term) ||
+        shootName.includes(term) ||
+        quotationNumber.includes(term) ||
+        user.includes(term)
       );
-    }
-    return result;
+    });
   }, [records, searchTerm]);
 
   const selectedDayRecords = useMemo(() => {

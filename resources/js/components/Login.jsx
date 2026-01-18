@@ -9,6 +9,8 @@ const { FiCamera, FiZap, FiShieldOff } = FiIcons;
 
 function Login() {
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [backgroundUrl, setBackgroundUrl] = useState(null);
   const [backgroundOpacity, setBackgroundOpacity] = useState(0.4);
 
@@ -33,6 +35,23 @@ function Login() {
   const handleGoogleLogin = () => {
     setLoading(true);
     window.location.href = '/auth/google';
+  };
+
+  const handleEmailLogin = async (e) => {
+    e.preventDefault();
+    if (!email || !password) {
+      toast.error('Please enter email and password');
+      return;
+    }
+    setLoading(true);
+    try {
+      await axios.post('/login', { email, password });
+      window.location.href = '/';
+    } catch (error) {
+      setLoading(false);
+      const message = error.response?.data?.message || 'Login failed';
+      toast.error(message);
+    }
   };
 
   return (
@@ -64,7 +83,43 @@ function Login() {
 
         <div className="p-10 text-center">
           <h2 className="text-[#4a5a67] text-xl font-bold mb-8">System Authentication</h2>
-          
+
+          <form onSubmit={handleEmailLogin} className="space-y-4 mb-8">
+            <div className="text-left space-y-2">
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm font-bold text-[#4a5a67] focus:bg-white focus:border-[#ebc1b6]"
+                placeholder="user@example.com"
+                disabled={loading}
+              />
+            </div>
+            <div className="text-left space-y-2">
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none text-sm font-bold text-[#4a5a67] focus:bg:white focus:border-[#ebc1b6]"
+                placeholder="••••••••"
+                disabled={loading}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-[#4a5a67] text-[#ebc1b6] rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg disabled:opacity-40 hover:shadow-xl transition-all"
+            >
+              Sign in
+            </button>
+          </form>
+
           <div className="space-y-4">
             <button 
               type="button"
