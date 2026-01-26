@@ -70,7 +70,17 @@
             Collaborators
         </div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:24px;">
-            {{ implode(', ', $booking->collaborators) }}
+            @php
+                $collabEmails = [];
+                foreach($booking->collaborators as $collab) {
+                    if (is_array($collab) && isset($collab['email'])) {
+                        $collabEmails[] = $collab['email'];
+                    } elseif (is_string($collab)) {
+                        $collabEmails[] = $collab;
+                    }
+                }
+            @endphp
+            {{ implode(', ', $collabEmails) }}
         </div>
     @endif
 

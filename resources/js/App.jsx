@@ -12,6 +12,8 @@ import StockTake from './pages/StockTake';
 import Records from './pages/Records';
 import ReportProblem from './pages/ReportProblem';
 import Login from './components/Login';
+import Register from './components/Register';
+import ChangePassword from './pages/ChangePassword';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminCategories from './pages/admin/AdminCategories';
 import AdminSettings from './pages/admin/AdminSettings';
@@ -46,9 +48,14 @@ function App() {
   if (!user) {
     return (
       <Routes>
+        <Route path="/register" element={<Register />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
+  }
+
+  if (user.must_change_password) {
+    return <ChangePassword onUpdate={() => window.location.reload()} />;
   }
 
   const isSuperAdmin = user?.is_admin >= 2;

@@ -131,7 +131,10 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
       startDate: requestedDates[0],
       endDate: requestedDates[requestedDates.length - 1],
       user: 'Operations Team',
-      collaborators,
+      collaborators: collaborators.map(c => {
+        if (typeof c === 'string') return { email: c, expiryDate: null };
+        return c;
+      }),
       items: selectedItems.map(item => ({
         equipmentId: item.id,
         quantity: item.qty,
@@ -161,6 +164,22 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
       });
   }, [equipment, searchTerm, selectedCategory]);
 
+  const handleDayClick = (value) => {
+    // If no range selected, or we already have a range with different start/end dates, start new selection
+    if (!dateRange || (Array.isArray(dateRange) && dateRange.length === 2 && !isSameDay(dateRange[0], dateRange[1]))) {
+      setDateRange([value, value]);
+    } else {
+      // We have a single day selected (start == end), so extend the range
+      const start = Array.isArray(dateRange) ? dateRange[0] : dateRange;
+      
+      if (value < start) {
+        setDateRange([value, start]);
+      } else {
+        setDateRange([start, value]);
+      }
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       {/* Sidebar: Selection */}
@@ -176,7 +195,7 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
           </div>
           <Calendar
             selectRange
-            onChange={setDateRange}
+            onClickDay={handleDayClick}
             value={dateRange}
             className="mini-calendar"
           />
@@ -287,13 +306,23 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
             <div className="pt-4 border-t border-gray-100">
               <CollaboratorList
                 collaborators={collaborators}
-                onAdd={(email) => {
-                  setCollaborators((prev) =>
-                    prev.includes(email) ? prev : [...prev, email]
-                  );
+                onAdd={(collab) => {
+                  const email = typeof collab === 'string' ? collab : collab.email;
+                  const exists = collaborators.some(c => {
+                    const existingEmail = typeof c === 'string' ? c : c.email;
+                    return existingEmail === email;
+                  });
+                  
+                  if (!exists) {
+                     setCollaborators((prev) => [...prev, collab]);
+                  }
                 }}
-                onRemove={(email) => {
-                  setCollaborators((prev) => prev.filter((c) => c !== email));
+                onRemove={(collab) => {
+                  const emailToRemove = typeof collab === 'string' ? collab : collab.email;
+                  setCollaborators((prev) => prev.filter((c) => {
+                    const currentEmail = typeof c === 'string' ? c : c.email;
+                    return currentEmail !== emailToRemove;
+                  }));
                 }}
               />
             </div>

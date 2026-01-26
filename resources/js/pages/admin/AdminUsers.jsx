@@ -10,9 +10,20 @@ function AdminUsers() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
+  const [openMenuId, setOpenMenuId] = useState(null);
 
   const currentUserId =
     typeof window !== 'undefined' && window.user && window.user.id ? window.user.id : null;
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openMenuId && !event.target.closest('.user-actions-menu')) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openMenuId]);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -89,6 +100,25 @@ function AdminUsers() {
     }
   };
 
+  const handleStatusChange = async (user, newStatus) => {
+    if (user.is_approved === newStatus) return;
+    setUpdatingId(user.id);
+    try {
+      const response = await axios.patch(`/api/admin/users/${user.id}/approve`, {
+        is_approved: newStatus,
+      });
+      setUsers((current) =>
+        current.map((u) => (u.id === user.id ? { ...u, is_approved: newStatus } : u)),
+      );
+      toast.success(`User ${user.email} ${newStatus ? 'activated' : 'deactivated'}`);
+    } catch (e) {
+      toast.error('Failed to update user status');
+    } finally {
+      setUpdatingId(null);
+      setOpenMenuId(null);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -145,6 +175,9 @@ function AdminUsers() {
                 <th className="py-3 px-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   Role
                 </th>
+                <th className="py-3 px-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  Status
+                </th>
                 <th className="py-3 px-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">
                   Actions
                 </th>
@@ -178,35 +211,80 @@ function AdminUsers() {
                       </span>
                     </td>
                     <td className="py-3 px-3">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => handleRoleChange(user, true)}
-                          disabled={
-                            isProtected || updatingId === user.id || user.is_admin === 1
-                          }
-                          className="px-3 py-1 rounded-lg border border-amber-200 bg-amber-50 text-[10px] font-black uppercase tracking-widest text-amber-800 hover:bg-amber-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          Make admin
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRoleChange(user, false)}
-                          disabled={
-                            isProtected || updatingId === user.id || user.is_admin === 0
-                          }
-                          className="px-3 py-1 rounded-lg border border-gray-200 bg-gray-50 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          Remove admin
-                        </button>
-                      </div>
+                         {user.is_approved ? (
+                             <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border bg-green-100 text-green-800 border-green-200">
+                                 Active
+                             </span>
+                         ) : (
+                             <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border bg-red-100 text-red-800 border-red-200">
+                                 Pending
+                             </span>
+                         )}
+                    </td>
+                    <td className="py-3 px-3 text-right relative user-actions-menu">
+                      <button
+                        onClick={() => setOpenMenuId(openMenuId === user.id ? null : user.id)}
+                        className="p-1 rounded-full hover:bg-gray-100 text-gray-500"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-three-dots-vertical" viewBox="0 0 16 16">
+                          <path d="M9.5 13a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+                        </svg>
+                      </button>
+
+                      {openMenuId === user.id && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden text-left">
+                          {!user.is_approved ? (
+                            <button
+                              onClick={() => handleStatusChange(user, true)}
+                              disabled={updatingId === user.id}
+                              className="w-full text-left px-4 py-2.5 text-xs font-bold text-green-700 hover:bg-green-50 uppercase tracking-wider flex items-center space-x-2"
+                            >
+                                <span>Activate User</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleStatusChange(user, false)}
+                              disabled={updatingId === user.id}
+                              className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-700 hover:bg-red-50 uppercase tracking-wider flex items-center space-x-2"
+                            >
+                                <span>Deactivate User</span>
+                            </button>
+                          )}
+                          
+                          {user.is_admin === 0 && !isProtected && (
+                             <button
+                               onClick={() => {
+                                 handleRoleChange(user, true);
+                                 setOpenMenuId(null);
+                               }}
+                               disabled={updatingId === user.id}
+                               className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#4a5a67] hover:bg-gray-50 uppercase tracking-wider"
+                             >
+                               Make Admin
+                             </button>
+                          )}
+
+                          {user.is_admin === 1 && !isProtected && (
+                             <button
+                               onClick={() => {
+                                 handleRoleChange(user, false);
+                                 setOpenMenuId(null);
+                               }}
+                               disabled={updatingId === user.id}
+                               className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 uppercase tracking-wider"
+                             >
+                               Remove Admin
+                             </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
               })}
               {!loading && users.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="py-6 text-center text-xs text-gray-400">
+                  <td colSpan={5} className="py-6 text-center text-xs text-gray-400">
                     No users found.
                   </td>
                 </tr>

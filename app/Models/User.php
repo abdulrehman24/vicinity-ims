@@ -27,6 +27,9 @@ class User extends Authenticatable
         'pin',
         'two_factor_code',
         'two_factor_expires_at',
+        'is_approved',
+        'expires_at',
+        'must_change_password',
     ];
 
     /**
@@ -37,9 +40,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
-        'pin',
         'two_factor_code',
-        'two_factor_expires_at',
+        'pin',
     ];
 
     /**
@@ -54,7 +56,9 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_admin' => 'integer',
             'two_factor_expires_at' => 'datetime',
-            'pin' => 'hashed',
+            'is_approved' => 'boolean',
+            'expires_at' => 'datetime',
+            'must_change_password' => 'boolean',
         ];
     }
 }

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 
-const { FiUserPlus, FiX, FiMail, FiUsers, FiCheck } = FiIcons;
+const { FiUserPlus, FiX, FiMail, FiUsers, FiCalendar } = FiIcons;
 
 function CollaboratorList({ collaborators = [], onAdd, onRemove, isEditable = true }) {
   const [email, setEmail] = useState('');
@@ -11,7 +11,7 @@ function CollaboratorList({ collaborators = [], onAdd, onRemove, isEditable = tr
   const handleAdd = (e) => {
     e.preventDefault();
     if (!email) return;
-    onAdd(email);
+    onAdd({ email });
     setEmail('');
   };
 
@@ -51,28 +51,34 @@ function CollaboratorList({ collaborators = [], onAdd, onRemove, isEditable = tr
 
       <div className="flex flex-wrap gap-2">
         <AnimatePresence>
-          {collaborators.map((collab) => (
-            <motion.div
-              key={collab}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="flex items-center space-x-2 bg-white border border-gray-100 px-3 py-1.5 rounded-full shadow-sm"
-            >
-              <div className="w-4 h-4 rounded-full bg-[#ebc1b6] flex items-center justify-center">
-                <span className="text-[8px] font-black text-[#4a5a67] uppercase">{collab[0]}</span>
-              </div>
-              <span className="text-[10px] font-bold text-[#4a5a67] truncate max-w-[120px]">{collab}</span>
-              {isEditable && (
-                <button
-                  onClick={() => onRemove(collab)}
-                  className="text-gray-300 hover:text-red-500 transition-colors"
-                >
-                  <SafeIcon icon={FiX} className="text-[10px]" />
-                </button>
-              )}
-            </motion.div>
-          ))}
+          {collaborators.map((collab, index) => {
+            const email = typeof collab === 'string' ? collab : collab.email;
+            
+            return (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="flex items-center space-x-2 bg-white border border-gray-100 px-3 py-1.5 rounded-full shadow-sm"
+              >
+                <div className="w-4 h-4 rounded-full bg-[#ebc1b6] flex items-center justify-center">
+                  <span className="text-[8px] font-black text-[#4a5a67] uppercase">{email[0]}</span>
+                </div>
+                <div className="flex flex-col leading-none">
+                    <span className="text-[10px] font-bold text-[#4a5a67] truncate max-w-[120px]">{email}</span>
+                </div>
+                {isEditable && (
+                  <button
+                    onClick={() => onRemove(collab)}
+                    className="text-gray-300 hover:text-red-500 transition-colors"
+                  >
+                    <SafeIcon icon={FiX} className="text-[10px]" />
+                  </button>
+                )}
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
         {collaborators.length === 0 && (
           <p className="text-[10px] text-gray-400 italic py-2">No collaborators invited yet</p>

@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
+use App\Models\User;
+use App\Mail\CollaborationInviteMail;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;
+
 class BookingController extends Controller
 {
     public function index()
@@ -33,7 +38,21 @@ class BookingController extends Controller
             'endDate' => 'required|date',
             'shift' => 'required|string',
             'collaborators' => 'nullable|array',
-            'collaborators.*' => 'string|email',
+            'collaborators.*' => [
+                function ($attribute, $value, $fail) {
+                    if (is_string($value)) {
+                        if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                            $fail('The '.$attribute.' must be a valid email address.');
+                        }
+                    } elseif (is_array($value)) {
+                        if (!isset($value['email']) || !filter_var($value['email'], FILTER_VALIDATE_EMAIL)) {
+                            $fail('The '.$attribute.' must contain a valid email address.');
+                        }
+                    } else {
+                        $fail('The '.$attribute.' must be a string or an object.');
+                    }
+                },
+            ],
             'items' => 'required|array|min:1',
             'items.*.equipmentId' => 'required|exists:equipment,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -71,11 +90,36 @@ class BookingController extends Controller
         $booking->load(['equipments', 'user']);
 
         if (!empty($validated['collaborators'])) {
-            foreach ($validated['collaborators'] as $email) {
+            foreach ($validated['collaborators'] as $collaborator) {
+                $email = is_string($collaborator) ? $collaborator : $collaborator['email'];
+                // Auto-set expiry to 7 days from now
+                $expiry = now()->addDays(7);
+
                 try {
-                    Mail::to($email)->queue(new BookingNotificationMail($booking));
+                    $user = User::where('email', $email)->first();
+                    
+                    if (!$user) {
+                        // Create new user for collaborator
+                        $password = Str::random(10);
+                        $user = User::create([
+                            'name' => 'Collaborator', // Or extract from email
+                            'email' => $email,
+                            'password' => Hash::make($password),
+                            'is_approved' => true, // Auto-approve invited users
+                            'must_change_password' => true,
+                            'expires_at' => $expiry,
+                        ]);
+
+                        // Send invitation email with credentials
+                        Mail::to($email)->queue(new CollaborationInviteMail($booking, $email, $password));
+                    } else {
+                        // Update expiry for existing users too
+                        $user->update(['expires_at' => $expiry]);
+                        Mail::to($email)->queue(new BookingNotificationMail($booking));
+                    }
+
                 } catch (\Throwable $e) {
-                    Log::error('Booking notification email failed: '.$e->getMessage());
+                    Log::error('Booking notification/invite email failed for ' . $email . ': ' . $e->getMessage());
                 }
             }
         }

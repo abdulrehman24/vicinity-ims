@@ -12,6 +12,19 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\SupportTicketController;
+use Illuminate\Support\Facades\Mail;
+
+Route::get('/test-email', function () {
+    try {
+        Mail::raw('This is a test email from Vicinity IMS.', function ($message) {
+            $message->to('ar5555789@gmail.com')
+                ->subject('Test Email');
+        });
+        return 'Test email sent successfully to ar5555789@gmail.com';
+    } catch (\Exception $e) {
+        return 'Failed to send email: ' . $e->getMessage();
+    }
+});
 
 Route::get('/', function () {
     return view('welcome');
@@ -37,12 +50,12 @@ Route::view('/records', 'welcome');
 Route::view('/dashboard', 'welcome');
 Route::view('/admin/{any}', 'welcome')->where('any', '.*');
 Route::view('/login', 'welcome');
+Route::view('/register', 'welcome');
 Route::view('/check-in-out', 'welcome');
 
 Route::post('/login', [AuthController::class, 'login'])->name('login');
+Route::post('/register', [AuthController::class, 'register'])->name('register');
 
-Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google');
-Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
 Route::post('/logout', function () {
     Auth::logout();
     return redirect('/');
@@ -56,6 +69,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/bookings', [BookingController::class, 'store']);
     Route::post('/bookings/return', [BookingController::class, 'returnItems']);
     Route::post('/support-tickets', [SupportTicketController::class, 'store']);
+    Route::post('/change-password', [AuthController::class, 'changePassword']);
 });
 
 Route::resource('equipment', EquipmentController::class);
@@ -73,4 +87,6 @@ Route::middleware(['auth'])->prefix('api/admin')->group(function () {
     Route::patch('/support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus']);
     Route::get('/users', [UserController::class, 'index']);
     Route::patch('/users/{user}/role', [UserController::class, 'updateRole']);
+    Route::patch('/users/{user}/approve', [UserController::class, 'approve']);
+    Route::patch('/users/{user}/expiry', [UserController::class, 'updateExpiry']);
 });

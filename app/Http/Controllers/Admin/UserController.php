@@ -34,9 +34,51 @@ class UserController extends Controller
             $perPage = 20;
         }
 
-        $users = $query->select(['id', 'name', 'email', 'is_admin', 'created_at'])->paginate($perPage);
+        $users = $query->select(['id', 'name', 'email', 'is_admin', 'created_at', 'is_approved', 'expires_at'])->paginate($perPage);
 
         return response()->json($users);
+    }
+
+    public function approve(Request $request, User $user)
+    {
+        $this->ensureSuperAdmin();
+        
+        $data = $request->validate([
+            'is_approved' => ['required', 'boolean'],
+        ]);
+
+        $user->update(['is_approved' => $data['is_approved']]);
+        
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'is_admin' => $user->is_admin,
+            'is_approved' => $user->is_approved,
+            'expires_at' => $user->expires_at,
+            'created_at' => $user->created_at,
+        ]);
+    }
+
+    public function updateExpiry(Request $request, User $user)
+    {
+        $this->ensureSuperAdmin();
+
+        $data = $request->validate([
+            'expires_at' => ['nullable', 'date'],
+        ]);
+
+        $user->update(['expires_at' => $data['expires_at']]);
+
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'is_admin' => $user->is_admin,
+            'is_approved' => $user->is_approved,
+            'expires_at' => $user->expires_at,
+            'created_at' => $user->created_at,
+        ]);
     }
 
     public function updateRole(Request $request, User $user)

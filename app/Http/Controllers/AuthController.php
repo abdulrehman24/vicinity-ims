@@ -9,17 +9,63 @@ use Laravel\Socialite\Facades\Socialite;
 
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
+    public function register(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = User::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'is_approved' => false, // Default to pending
+        ]);
+
+        // Don't login automatically if approval is required
+        // Auth::login($user);
+
+        return response()->json([
+            'message' => 'Registration successful. Please wait for admin approval.',
+            'user' => $user,
+        ]);
+    }
+
     public function login(Request $request)
     {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
         ]);
+
+        $user = User::where('email', $credentials['email'])->first();
+
+        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+             return response()->json([
+                'message' => 'Invalid email or password.',
+            ], 422);
+        }
+
+        if (!$user->is_approved) {
+             return response()->json([
+                'message' => 'Your account is pending approval by an administrator.',
+            ], 403);
+        }
+
+        if ($user->expires_at && Carbon::parse($user->expires_at)->isPast()) {
+             return response()->json([
+                'message' => 'Your account has expired.',
+            ], 403);
+        }
 
         if (!Auth::attempt($credentials, true)) {
             return response()->json([
@@ -35,77 +81,42 @@ class AuthController extends Controller
         ]);
     }
 
-    public function redirectToGoogle()
+    public function changePassword(Request $request)
     {
-        return Socialite::driver('google')->redirect();
-    }
+        $data = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
 
-    public function handleGoogleCallback()
-    {
-        try {
-            $googleUser = Socialite::driver('google')->stateless()->user();
-        } catch (\Exception $e) {
-            Log::error('Google Auth Failed: ' . $e->getMessage());
-            return redirect('/')->with('error', 'Google authentication failed.');
-        }
+        $user = Auth::user();
 
-        $superAdminEmail = env('SUPER_ADMIN_EMAIL');
-        $isSuperAdmin = $superAdminEmail && strcasecmp($googleUser->getEmail(), $superAdminEmail) === 0;
+        $wasForced = $user->must_change_password;
 
-        $user = User::where('email', $googleUser->getEmail())->first();
-        
-        // Handle avatar download
-        $avatarPath = $this->downloadAvatar($googleUser->getAvatar(), $googleUser->getId());
+        $user->forceFill([
+            'password' => Hash::make($data['password']),
+            'must_change_password' => false,
+        ]);
 
-        if (!$user) {
-            $user = User::create([
-                'name' => $googleUser->getName(),
-                'email' => $googleUser->getEmail(),
-                'google_id' => $googleUser->getId(),
-                'avatar' => $avatarPath,
-                'password' => null,
-                'is_admin' => $isSuperAdmin ? 2 : 0,
+        // If this was a forced password change (e.g. for a new collaborator),
+        // we revoke approval and force them to wait for admin approval again.
+        if ($wasForced) {
+            $user->is_approved = false;
+            $user->save();
+            
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return response()->json([
+                'message' => 'Password updated. Please wait for admin approval to log in again.',
+                'require_approval' => true,
             ]);
-        } else {
-            // Update existing user with Google info
-            $updateData = [];
-            if (!$user->google_id) {
-                $updateData['google_id'] = $googleUser->getId();
-            }
-            // Always update avatar if we have a new one
-            if ($avatarPath) {
-                $updateData['avatar'] = $avatarPath;
-            }
-            if ($isSuperAdmin && $user->is_admin < 2) {
-                $updateData['is_admin'] = 2;
-            }
-            
-            if (!empty($updateData)) {
-                $user->update($updateData);
-            }
         }
-
-        Auth::login($user);
         
-        return redirect('/');
-    }
+        $user->save();
 
-    private function downloadAvatar($url, $googleId)
-    {
-        try {
-            if (empty($url)) return null;
-
-            $contents = Http::get($url)->body();
-            $filename = 'avatars/' . $googleId . '.jpg';
-            
-            // Save to public disk
-            Storage::disk('public')->put($filename, $contents);
-            
-            // Return the accessible URL path
-            return '/storage/' . $filename;
-        } catch (\Exception $e) {
-            Log::error('Failed to download avatar: ' . $e->getMessage());
-            return null;
-        }
+        return response()->json([
+            'message' => 'Password updated successfully.',
+            'user' => $user,
+        ]);
     }
 }
