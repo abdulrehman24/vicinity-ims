@@ -38,39 +38,52 @@ function CalendarPage() {
   }, [bookings]);
 
   const events = useMemo(() => {
-    const list = [];
+    const projectMap = {};
+
     bookings.forEach(booking => {
       const eqName = booking.equipmentName
         ? booking.equipmentName
         : equipment.find(item => item.id === booking.equipmentId)?.name || 'Unknown Equipment';
       const userName = booking.user?.name || 'Operations';
-      const baseId = booking.bookingEquipmentId
-        ? `be-${booking.bookingEquipmentId}`
-        : `${booking.id}-${booking.equipmentId || 'unknown'}`;
+      const shootName = booking.shootName || 'Untitled Project';
+      const quotationNumber = booking.quotationNumber || '';
+
+      const addToMap = (dateStr, type) => {
+        const key = `${type}|${dateStr}|${shootName}|${quotationNumber}`;
+        if (!projectMap[key]) {
+          projectMap[key] = {
+            id: key,
+            type,
+            date: parseISO(dateStr),
+            shootName,
+            quotationNumber,
+            userName,
+            items: []
+          };
+        }
+        projectMap[key].items.push(eqName);
+      };
 
       if (booking.startDate) {
-        list.push({
-          id: `out-${baseId}`,
-          type: 'checkout',
-          date: parseISO(booking.startDate),
-          equipmentName: eqName,
-          shootName: booking.shootName,
-          userName,
-        });
+        try {
+          // Ensure we are working with just the date part for grouping
+          const dateStr = format(parseISO(booking.startDate), 'yyyy-MM-dd');
+          addToMap(dateStr, 'checkout');
+        } catch (e) {
+          console.error("Invalid start date", booking.startDate);
+        }
       }
 
       if (booking.returnedAt) {
-        list.push({
-          id: `in-${baseId}`,
-          type: 'checkin',
-          date: parseISO(booking.returnedAt),
-          equipmentName: eqName,
-          shootName: booking.shootName,
-          userName,
-        });
+        try {
+          const dateStr = format(parseISO(booking.returnedAt), 'yyyy-MM-dd');
+          addToMap(dateStr, 'checkin');
+        } catch (e) {
+          console.error("Invalid return date", booking.returnedAt);
+        }
       }
     });
-    return list;
+    return Object.values(projectMap);
   }, [bookings, equipment]);
 
   const selectedDateBookings = useMemo(() => {
@@ -146,14 +159,31 @@ function CalendarPage() {
                 {selectedDateBookings.length > 0 ? (
                   selectedDateBookings.map((event) => (
                     <div key={event.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
-                      <p className="text-xs font-bold text-[#ebc1b6] mb-1">{event.equipmentName}</p>
-                      <p className="text-[10px] font-medium text-white/60 mb-3">{event.shootName}</p>
-                      <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-white/40">
-                        <div className="flex items-center space-x-2">
-                          <SafeIcon icon={FiUser} />
-                          <span>{event.userName}</span>
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                           <p className="text-xs font-bold text-[#ebc1b6] mb-1">{event.shootName}</p>
+                           {event.quotationNumber && <p className="text-[10px] font-medium text-white/60">{event.quotationNumber}</p>}
                         </div>
-                        <span>{event.type === 'checkout' ? 'OUT' : 'IN'}</span>
+                        <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${event.type === 'checkout' ? 'bg-[#ebc1b6] text-[#4a5a67]' : 'bg-green-500/20 text-green-300'}`}>
+                           {event.type === 'checkout' ? 'OUT' : 'IN'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center space-x-2 text-[9px] text-white/40 mb-3">
+                        <SafeIcon icon={FiUser} />
+                        <span>{event.userName}</span>
+                      </div>
+
+                      <div className="border-t border-white/10 pt-3">
+                        <p className="text-[9px] font-bold text-white/60 mb-2">{event.items.length} Items</p>
+                        <ul className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                           {event.items.map((item, idx) => (
+                             <li key={idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2">
+                               <div className="w-1 h-1 bg-white/20 rounded-full" />
+                               <span>{item}</span>
+                             </li>
+                           ))}
+                        </ul>
                       </div>
                     </div>
                   ))
@@ -228,13 +258,18 @@ function CalendarPage() {
 
                   <button 
                     onClick={() => {
-                      window.open('https://calendar.google.com/calendar/u/0/r/settings/addbyurl', '_blank');
-                      toast.success("Opening Google Calendar settings...");
+                      handleExport();
+                      window.open('https://calendar.google.com/calendar/r/settings/export', '_blank');
+                      toast((t) => (
+                        <span>
+                          <b>Step 2:</b> Upload the downloaded file to the <b>"Import"</b> section in Google Calendar.
+                        </span>
+                      ), { icon: 'ℹ️', duration: 5000 });
                     }}
                     className="w-full flex items-center justify-center space-x-3 py-4 border-2 border-[#4a5a67] text-[#4a5a67] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-all"
                   >
                     <SafeIcon icon={FiExternalLink} />
-                    <span>Add to Google Calendar</span>
+                    <span>Import to Google Calendar</span>
                   </button>
                 </div>
 

@@ -16,7 +16,7 @@ const {
 } = FiIcons;
 
 function CheckInOut() {
-  const { equipment, bookings, checkOutEquipment, batchCheckIn, isAdmin } = useInventory();
+  const { equipment, bookings, bundles, checkOutEquipment, batchCheckIn, isAdmin } = useInventory();
   const [activeTab, setActiveTab] = useState('in');
 
   return (
@@ -29,13 +29,13 @@ function CheckInOut() {
       </div>
 
       <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl mb-10 w-fit">
-        <TabButton active={activeTab === 'in'} onClick={() => setActiveTab('in')} icon={FiLogIn} label="Manual Out" />
-        <TabButton active={activeTab === 'out'} onClick={() => setActiveTab('out')} icon={FiLogOut} label="Group Return" />
+        <TabButton active={activeTab === 'in'} onClick={() => setActiveTab('in')} icon={FiLogIn} label="Check Out" />
+        <TabButton active={activeTab === 'out'} onClick={() => setActiveTab('out')} icon={FiLogOut} label="Check In" />
       </div>
 
       <AnimatePresence mode="wait">
         {activeTab === 'in' ? (
-          <ManualOutForm key="in" equipment={equipment} bookings={bookings} onConfirm={checkOutEquipment} />
+          <ManualOutForm key="in" equipment={equipment} bookings={bookings} bundles={bundles} onConfirm={checkOutEquipment} />
         ) : (
           <GroupReturnView key="out" equipment={equipment} bookings={bookings} onConfirm={batchCheckIn} />
         )}
@@ -44,7 +44,7 @@ function CheckInOut() {
   );
 }
 
-function ManualOutForm({ equipment, bookings, onConfirm }) {
+function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
   const [selectedItems, setSelectedItems] = useState([]); // Array of {id, qty}
   const [dateRange, setDateRange] = useState(null);
   const [shift, setShift] = useState('Full Day');
@@ -107,6 +107,64 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
         return;
       }
       setSelectedItems([...selectedItems, { id: item.id, qty: 1, name: item.name, image: item.image }]);
+    }
+  };
+
+  const handleAddBundle = (bundleId) => {
+    if (!bundleId) return;
+    const bundle = bundles?.find(b => b.id === parseInt(bundleId));
+    if (!bundle) return;
+
+    if (!dateRange) {
+        toast.error("Please select dates first");
+        return;
+    }
+
+    const newItems = [...selectedItems];
+    let addedCount = 0;
+    let unavailableCount = 0;
+
+    bundle.items.forEach(bItem => {
+        const item = equipment.find(e => e.id === bItem.equipment_id);
+        if (!item) return;
+
+        // Skip if maintenance or decommissioned
+        if (item.status === 'maintenance' || item.status === 'decommissioned') {
+            unavailableCount++;
+            return;
+        }
+
+        const avail = getAvailableQty(item, requestedDates, shift);
+        const existingItemIndex = newItems.findIndex(i => i.id === item.id);
+        const currentQty = existingItemIndex >= 0 ? newItems[existingItemIndex].qty : 0;
+        
+        // Calculate how many we can add
+        const needed = bItem.quantity;
+        const canAdd = Math.min(needed, avail - currentQty);
+
+        if (canAdd > 0) {
+            if (existingItemIndex >= 0) {
+                newItems[existingItemIndex].qty += canAdd;
+            } else {
+                newItems.push({ id: item.id, qty: canAdd, name: item.name, image: item.image });
+            }
+            addedCount++;
+            if (canAdd < needed) unavailableCount++;
+        } else {
+            unavailableCount++;
+        }
+    });
+
+    setSelectedItems(newItems);
+    
+    if (unavailableCount > 0) {
+        toast((t) => (
+            <span>
+                Added partial bundle. <b>{unavailableCount} items</b> were unavailable or insufficient stock.
+            </span>
+        ), { icon: '⚠️' });
+    } else if (addedCount > 0) {
+        toast.success(`Bundle "${bundle.name}" added!`);
     }
   };
 
@@ -204,6 +262,24 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 block">2. Select Equipment</label>
           <div className="space-y-3">
+             {/* Bundles Dropdown */}
+            {bundles && bundles.length > 0 && (
+                <div className="relative">
+                    <SafeIcon icon={FiPackage} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                    <select
+                        onChange={(e) => {
+                            handleAddBundle(e.target.value);
+                            e.target.value = ""; // Reset
+                        }}
+                        className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67]"
+                    >
+                        <option value="">Load Bundle...</option>
+                        {bundles.map(b => (
+                            <option key={b.id} value={b.id}>{b.name} ({b.items?.length || 0} items)</option>
+                        ))}
+                    </select>
+                </div>
+            )}
             <div className="relative">
               <SafeIcon icon={FiSearch} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
               <input
@@ -342,7 +418,6 @@ function ManualOutForm({ equipment, bookings, onConfirm }) {
 }
 
 function GroupReturnView({ equipment, bookings, onConfirm }) {
-  const [selectedProject, setSelectedProject] = useState(null);
   const [returnStates, setReturnStates] = useState({}); // { itemId: { isDamaged: bool, note: str } }
   const [selectedProjectKeys, setSelectedProjectKeys] = useState([]);
 
@@ -355,7 +430,9 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
       if (!projects[key]) {
         projects[key] = { 
             shootName: b.shootName, 
-            quotationNumber: b.quotationNumber, 
+            quotationNumber: b.quotationNumber,
+            startDate: b.startDate,
+            endDate: b.endDate,
             items: [] 
         };
       }
@@ -384,26 +461,6 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
     }));
   };
 
-  const handleProjectReturn = (project) => {
-    const itemsToReturn = project.items.map(item => ({
-      bookingEquipmentId: item.bookingEquipmentId,
-      reportedProblem: false,
-      problemNote: ''
-    }));
-
-    onConfirm({
-      items: itemsToReturn,
-      shootName: project.shootName,
-      user: window.user?.name || 'Operations Team'
-    });
-
-    if (selectedProject && selectedProject.shootName === project.shootName && selectedProject.quotationNumber === project.quotationNumber) {
-      setSelectedProject(null);
-    }
-
-    toast.success('Project returned successfully');
-  };
-
   const toggleProjectSelection = (project) => {
     const key = projectKey(project);
     setSelectedProjectKeys(prev =>
@@ -411,15 +468,15 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
     );
   };
 
-  const handleReturnSelected = () => {
+  const handleBatchReturn = () => {
     const projectsToReturn = activeProjects.filter(p => selectedProjectKeys.includes(projectKey(p)));
     if (projectsToReturn.length === 0) return;
 
     projectsToReturn.forEach(project => {
       const itemsToReturn = project.items.map(item => ({
         bookingEquipmentId: item.bookingEquipmentId,
-        reportedProblem: false,
-        problemNote: ''
+        reportedProblem: returnStates[item.id]?.isDamaged || false,
+        problemNote: returnStates[item.id]?.note || ''
       }));
 
       onConfirm({
@@ -429,24 +486,9 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
       });
     });
 
-    setSelectedProject(null);
     setSelectedProjectKeys([]);
+    setReturnStates({});
     toast.success('Selected projects returned successfully');
-  };
-
-  const handleReturn = () => {
-    const itemsToReturn = selectedProject.items.map(item => ({
-      bookingEquipmentId: item.bookingEquipmentId,
-      reportedProblem: returnStates[item.id]?.isDamaged || false,
-      problemNote: returnStates[item.id]?.note || ''
-    }));
-
-    onConfirm({
-      items: itemsToReturn,
-      shootName: selectedProject.shootName,
-      user: window.user?.name || 'Operations Team'
-    });
-    setSelectedProject(null);
   };
 
   return (
@@ -456,9 +498,9 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
         {activeProjects.map(p => (
           <div
             key={projectKey(p)}
-            onClick={() => setSelectedProject(p)}
+            onClick={() => toggleProjectSelection(p)}
             className={`w-full text-left p-6 rounded-3xl border transition-all cursor-pointer ${
-              selectedProject?.shootName === p.shootName ? 'bg-[#4a5a67] text-white shadow-xl' : 'bg-white border-gray-100 hover:border-[#ebc1b6]'
+              selectedProjectKeys.includes(projectKey(p)) ? 'bg-[#4a5a67] text-white shadow-xl' : 'bg-white border-gray-100 hover:border-[#ebc1b6]'
             }`}
           >
             <div className="flex items-start justify-between">
@@ -466,19 +508,7 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
                 <h3 className="font-bold text-sm mb-1">{p.shootName}</h3>
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-50">{p.quotationNumber}</p>
               </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleProjectSelection(p);
-                }}
-                className="ml-2 p-1 rounded-lg bg-white/70 text-[#4a5a67] hover:bg-[#4a5a67] hover:text-[#ebc1b6] shadow-sm"
-              >
-                <SafeIcon
-                  icon={selectedProjectKeys.includes(projectKey(p)) ? FiCheckSquare : FiSquare}
-                  className="text-xs"
-                />
-              </button>
+              
             </div>
             <div className="flex items-center justify-between mt-4">
               <div className="flex items-center space-x-2">
@@ -493,33 +523,51 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
                 </div>
                 <span className="text-[9px] font-bold opacity-60">+{p.items.length} items</span>
               </div>
+              {p.startDate && p.endDate && (
+                <div className="flex items-center space-x-1 text-[#ebc1b6]">
+                  <SafeIcon icon={FiCalendar} className="text-[10px]" />
+                  <p className="text-[10px] font-bold">
+                    {format(parseISO(p.startDate), 'MMM d')} - {format(parseISO(p.endDate), 'MMM d')}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         ))}
-        <button
-          type="button"
-          onClick={handleReturnSelected}
-          disabled={selectedProjectKeys.length === 0}
-          className="w-full mt-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-gray-200 bg-white text-[#4a5a67] disabled:opacity-30 hover:border-[#4a5a67] hover:bg-[#f9fafb] transition-all"
-        >
-          Return Selected ({selectedProjectKeys.length})
-        </button>
       </div>
 
       <div className="lg:col-span-8">
-        {selectedProject ? (
+        {selectedProjectKeys.length > 0 ? (
           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
             <div className="bg-[#4a5a67] p-8 text-white flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold">{selectedProject.shootName}</h2>
+                <h2 className="text-2xl font-bold">
+                  {selectedProjectKeys.length === 1 
+                    ? activeProjects.find(p => projectKey(p) === selectedProjectKeys[0])?.shootName 
+                    : `Multiple Projects (${selectedProjectKeys.length})`}
+                </h2>
                 <p className="text-[10px] font-black text-[#ebc1b6] uppercase tracking-widest mt-1">Return Inspection</p>
+                {selectedProjectKeys.length === 1 && (() => {
+                   const p = activeProjects.find(proj => projectKey(proj) === selectedProjectKeys[0]);
+                   if (p && p.startDate && p.endDate) {
+                     return (
+                      <div className="flex items-center space-x-2 mt-2 text-white/80">
+                        <SafeIcon icon={FiCalendar} className="text-xs" />
+                        <p className="text-xs font-bold">
+                          {format(parseISO(p.startDate), 'MMM d, yyyy')} - {format(parseISO(p.endDate), 'MMM d, yyyy')}
+                        </p>
+                      </div>
+                     );
+                   }
+                   return null;
+                })()}
               </div>
-              <button onClick={() => setSelectedProject(null)} className="p-2 hover:bg-white/10 rounded-full"><SafeIcon icon={FiX} /></button>
+              <button onClick={() => setSelectedProjectKeys([])} className="p-2 hover:bg-white/10 rounded-full"><SafeIcon icon={FiX} /></button>
             </div>
 
             <div className="p-8 flex-1 space-y-4">
-              {selectedProject.items.map(item => (
-                <div key={item.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+              {activeProjects.filter(p => selectedProjectKeys.includes(projectKey(p))).flatMap(p => p.items).map(item => (
+                <div key={`${item.id}-${item.bookingEquipmentId}`} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <img src={item.image} className="w-12 h-12 rounded-xl object-cover border border-white" alt="" />
@@ -559,10 +607,10 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
                 </p>
               </div>
               <button 
-                onClick={handleReturn}
+                onClick={handleBatchReturn}
                 className="w-full py-5 bg-[#4a5a67] text-[#ebc1b6] rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:shadow-xl transition-all"
               >
-                Complete Project Return
+                Complete Return ({activeProjects.filter(p => selectedProjectKeys.includes(projectKey(p))).reduce((acc, p) => acc + p.items.length, 0)} Items)
               </button>
             </div>
           </div>
@@ -570,7 +618,7 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
           <div className="h-[500px] border-2 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center text-center p-12 bg-white">
             <SafeIcon icon={FiLayers} className="text-5xl text-gray-200 mb-4" />
             <h3 className="text-lg font-bold text-[#4a5a67]">Batch Return Management</h3>
-            <p className="text-xs text-gray-400 max-w-xs leading-relaxed mt-2">Select an active project from the list to begin the return inspection process.</p>
+            <p className="text-xs text-gray-400 max-w-xs leading-relaxed mt-2">Select active projects from the list to begin the return inspection process.</p>
           </div>
         )}
       </div>

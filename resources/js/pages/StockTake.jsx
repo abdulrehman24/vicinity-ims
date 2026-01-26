@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
 import SafeIcon from '../common/SafeIcon';
@@ -6,6 +6,7 @@ import { useInventory } from '../context/InventoryContext';
 import { conditions } from '../data/inventoryData';
 import { format, addMonths, isPast, parseISO, differenceInDays } from 'date-fns';
 import * as FiIcons from 'react-icons/fi';
+import axios from 'axios';
 
 const { FiUpload, FiCamera, FiCheck, FiX, FiSave, FiImage, FiMapPin, FiInfo, FiLayers, FiShield, FiLock, FiClock, FiAlertCircle } = FiIcons;
 
@@ -14,20 +15,41 @@ function StockTake() {
   const [selectedEquipment, setSelectedEquipment] = useState([]);
   const [stockTakeData, setStockTakeData] = useState({});
   const [uploadedImages, setUploadedImages] = useState({});
+  const [auditSettings, setAuditSettings] = useState({ interval: 6, nextDate: null });
+
+  useEffect(() => {
+    if (isAdmin) {
+      axios.get('/api/admin/audit-settings')
+        .then(res => {
+          setAuditSettings({
+            interval: res.data.audit_interval_months,
+            nextDate: res.data.audit_next_date
+          });
+        })
+        .catch(err => console.error('Failed to fetch audit settings', err));
+    }
+  }, [isAdmin]);
 
   // Audit Reminder Logic
   const auditStatus = useMemo(() => {
-    if (!stockTakes || stockTakes.length === 0) return { status: 'urgent', message: 'First audit required' };
+    let nextAuditDue;
+
+    if (auditSettings.nextDate) {
+      nextAuditDue = parseISO(auditSettings.nextDate);
+    } else if (!stockTakes || stockTakes.length === 0) {
+      return { status: 'urgent', message: 'First audit required' };
+    } else {
+      const lastAudit = parseISO(stockTakes[0].date);
+      nextAuditDue = addMonths(lastAudit, auditSettings.interval);
+    }
     
-    const lastAudit = parseISO(stockTakes[0].date);
-    const nextAuditDue = addMonths(lastAudit, 6);
     const daysRemaining = differenceInDays(nextAuditDue, new Date());
     
-    if (isPast(nextAuditDue)) {
+    if (isPast(nextAuditDue) && daysRemaining < 0) {
       return { status: 'overdue', date: format(nextAuditDue, 'MMM d, yyyy'), message: 'Full audit overdue!' };
     }
     return { status: 'current', date: format(nextAuditDue, 'MMM d, yyyy'), days: daysRemaining, message: 'Next audit due' };
-  }, [stockTakes]);
+  }, [stockTakes, auditSettings]);
 
   const onDrop = useCallback((acceptedFiles, rejectedFiles, equipmentId) => {
     acceptedFiles.forEach((file) => {

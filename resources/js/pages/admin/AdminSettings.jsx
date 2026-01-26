@@ -12,6 +12,10 @@ function AdminSettings() {
   const [backgroundFile, setBackgroundFile] = useState(null);
   const [faviconFile, setFaviconFile] = useState(null);
 
+  const [auditInterval, setAuditInterval] = useState(6);
+  const [auditNextDate, setAuditNextDate] = useState('');
+  const [auditSaving, setAuditSaving] = useState(false);
+
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -29,6 +33,12 @@ function AdminSettings() {
         if (typeof data.background_opacity === 'number') {
           setBackgroundOpacity(Math.round(data.background_opacity * 100));
         }
+
+        const auditRes = await axios.get('/api/admin/audit-settings');
+        if (auditRes.data) {
+          setAuditInterval(auditRes.data.audit_interval_months || 6);
+          setAuditNextDate(auditRes.data.audit_next_date || '');
+        }
       } catch (e) {
         toast.error('Failed to load settings');
       } finally {
@@ -39,6 +49,22 @@ function AdminSettings() {
 
     loadSettings();
   }, []);
+
+  const handleAuditSubmit = async (e) => {
+    e.preventDefault();
+    setAuditSaving(true);
+    try {
+      await axios.post('/api/admin/audit-settings', {
+        audit_interval_months: auditInterval,
+        audit_next_date: auditNextDate || null
+      });
+      toast.success('Audit settings updated');
+    } catch (e) {
+      toast.error('Failed to update audit settings');
+    } finally {
+      setAuditSaving(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -226,6 +252,60 @@ function AdminSettings() {
                 className="px-6 py-2 rounded-xl bg-[#4a5a67] text-[#ebc1b6] text-xs font-black uppercase tracking-[0.2em] shadow-md hover:shadow-lg transition-all disabled:opacity-50"
               >
                 {saving ? 'Saving…' : 'Save Settings'}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                Stock Take
+              </p>
+              <h2 className="text-sm font-bold text-[#4a5a67]">
+                Audit Schedule Configuration
+              </h2>
+            </div>
+          </div>
+          <form onSubmit={handleAuditSubmit} className="space-y-6">
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">
+                Audit Interval (Months)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="60"
+                value={auditInterval}
+                onChange={(e) => setAuditInterval(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-sm text-[#4a5a67]"
+              />
+              <p className="mt-2 text-[11px] text-gray-400">
+                Automatically schedule the next audit this many months after the last completed stock take.
+              </p>
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">
+                Next Audit Date Override (Optional)
+              </label>
+              <input
+                type="date"
+                value={auditNextDate}
+                onChange={(e) => setAuditNextDate(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-sm text-[#4a5a67]"
+              />
+              <p className="mt-2 text-[11px] text-gray-400">
+                Set a specific date for the next audit. This overrides the interval calculation. Leave empty to use the interval.
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={auditSaving}
+                className="px-6 py-2 rounded-xl bg-[#4a5a67] text-[#ebc1b6] text-xs font-black uppercase tracking-[0.2em] shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+              >
+                {auditSaving ? 'Saving…' : 'Save Audit Settings'}
               </button>
             </div>
           </form>

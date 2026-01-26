@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\SupportTicketController;
+use App\Http\Controllers\BundleController;
 use Illuminate\Support\Facades\Mail;
 
 Route::get('/test-email', function () {
@@ -70,6 +71,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/bookings/return', [BookingController::class, 'returnItems']);
     Route::post('/support-tickets', [SupportTicketController::class, 'store']);
     Route::post('/change-password', [AuthController::class, 'changePassword']);
+    Route::get('/api/bundles', [BundleController::class, 'index']);
 });
 
 Route::resource('equipment', EquipmentController::class);
@@ -83,10 +85,16 @@ Route::middleware(['auth'])->prefix('api/admin')->group(function () {
     Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
     Route::get('/login-settings', [SettingController::class, 'showLoginSettings']);
     Route::post('/login-settings', [SettingController::class, 'updateLoginSettings']);
+    Route::get('/audit-settings', [SettingController::class, 'showAuditSettings']);
+    Route::post('/audit-settings', [SettingController::class, 'updateAuditSettings']);
     Route::get('/support-tickets', [SupportTicketController::class, 'index']);
     Route::patch('/support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus']);
     Route::get('/users', [UserController::class, 'index']);
     Route::patch('/users/{user}/role', [UserController::class, 'updateRole']);
     Route::patch('/users/{user}/approve', [UserController::class, 'approve']);
     Route::patch('/users/{user}/expiry', [UserController::class, 'updateExpiry']);
+    
+    Route::post('/bundles', [BundleController::class, 'store']);
+    Route::put('/bundles/{bundle}', [BundleController::class, 'update']);
+    Route::delete('/bundles/{bundle}', [BundleController::class, 'destroy']);
 });

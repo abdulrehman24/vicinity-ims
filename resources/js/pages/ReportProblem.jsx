@@ -22,7 +22,7 @@ const issueTypes = [
 ];
 
 function ReportProblem() {
-  const { equipment, reportProblem } = useInventory();
+  const { equipment, reportProblem, updateEquipment } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [report, setReport] = useState({
@@ -63,6 +63,18 @@ function ReportProblem() {
       description: '',
       reportedBy: ''
     });
+    setSearchTerm('');
+  };
+
+  const handleResolve = async () => {
+    if (!selectedItem) return;
+    
+    await updateEquipment({
+      ...selectedItem,
+      status: 'available'
+    });
+    
+    setSelectedItem(null);
     setSearchTerm('');
   };
 
@@ -169,6 +181,27 @@ function ReportProblem() {
                   </div>
                 </div>
 
+                {(selectedItem.status === 'maintenance' || selectedItem.status === 'decommissioned') ? (
+                    <div className="p-12 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-2">
+                            <SafeIcon icon={FiCheck} className="text-3xl text-green-500" />
+                        </div>
+                        <div>
+                            <h3 className="text-2xl font-black text-[#4a5a67] uppercase tracking-tight mb-2">Maintenance Complete?</h3>
+                            <p className="text-sm text-gray-400 max-w-md mx-auto leading-relaxed">
+                                This item is currently marked as <span className="font-bold text-[#ebc1b6] uppercase">{selectedItem.status}</span>. 
+                                <br/>If repairs are finished, you can return it to the active inventory immediately.
+                            </p>
+                        </div>
+                        <button 
+                            onClick={handleResolve}
+                            className="bg-[#4a5a67] text-[#ebc1b6] px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:bg-[#3d4b56] hover:shadow-xl transition-all flex items-center space-x-3 mt-4"
+                        >
+                            <span>Return to Inventory</span>
+                            <SafeIcon icon={FiCheck} />
+                        </button>
+                    </div>
+                ) : (
                 <form onSubmit={handleSubmit} className="p-8 space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <section className="space-y-4">
@@ -249,6 +282,7 @@ function ReportProblem() {
                     </button>
                   </div>
                 </form>
+                )}
               </motion.div>
             ) : (
               <motion.div 

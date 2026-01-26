@@ -37,6 +37,50 @@ class SettingController extends Controller
         return $this->publicLoginSettings();
     }
 
+    public function showAuditSettings(Request $request)
+    {
+        // Allow access if user is admin (check middleware or ensureSuperAdmin if strictly for super admins)
+        // StockTake page is for admins, so this should be fine.
+        if (!auth()->user() || auth()->user()->is_admin < 1) {
+            abort(403);
+        }
+
+        $interval = Setting::where('key', 'audit_interval_months')->value('value');
+        $nextDate = Setting::where('key', 'audit_next_date')->value('value');
+
+        return response()->json([
+            'audit_interval_months' => $interval ? (int) $interval : 6,
+            'audit_next_date' => $nextDate ?: null,
+        ]);
+    }
+
+    public function updateAuditSettings(Request $request)
+    {
+        $this->ensureSuperAdmin();
+
+        $data = $request->validate([
+            'audit_interval_months' => ['required', 'integer', 'min:1', 'max:60'],
+            'audit_next_date' => ['nullable', 'date'],
+        ]);
+
+        Setting::updateOrCreate(
+            ['key' => 'audit_interval_months'],
+            ['value' => (string) $data['audit_interval_months']]
+        );
+
+        if (array_key_exists('audit_next_date', $data)) {
+            Setting::updateOrCreate(
+                ['key' => 'audit_next_date'],
+                ['value' => $data['audit_next_date']]
+            );
+        }
+
+        return response()->json([
+            'audit_interval_months' => $data['audit_interval_months'],
+            'audit_next_date' => $data['audit_next_date'] ?? null,
+        ]);
+    }
+
     public function updateLoginSettings(Request $request)
     {
         $this->ensureSuperAdmin();

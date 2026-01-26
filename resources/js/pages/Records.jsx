@@ -9,7 +9,7 @@ import 'react-calendar/dist/Calendar.css';
 
 const { 
   FiSearch, FiCalendar, FiList, FiClock, FiCamera, 
-  FiLogIn, FiLogOut, FiAlertTriangle, FiFilter, FiDownload 
+  FiLogIn, FiLogOut, FiAlertTriangle, FiFilter, FiDownload, FiChevronDown, FiChevronUp 
 } = FiIcons;
 
 function Records() {
@@ -51,30 +51,52 @@ function Records() {
     return events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   }, [bookings, equipment]);
 
+  const groupedRecords = useMemo(() => {
+    const groups = {};
+    records.forEach(r => {
+      const dateStr = format(new Date(r.timestamp), 'yyyy-MM-dd');
+      const key = `${r.shootName}|${r.quotationNumber}|${dateStr}|${r.type}`;
+      
+      if (!groups[key]) {
+        groups[key] = {
+          id: key,
+          shootName: r.shootName,
+          quotationNumber: r.quotationNumber,
+          date: r.timestamp,
+          type: r.type,
+          user: r.user,
+          items: []
+        };
+      }
+      groups[key].items.push(r);
+    });
+    return Object.values(groups).sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [records]);
+
   const filteredRecords = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    if (!term) return records;
+    if (!term) return groupedRecords;
 
-    return records.filter(r => {
-      const equipmentName = (r.equipmentName || '').toLowerCase();
-      const shootName = (r.shootName || '').toLowerCase();
-      const quotationNumber = (r.quotationNumber || '').toLowerCase();
-      const user = (r.user || '').toLowerCase();
+    return groupedRecords.filter(g => {
+      const shootName = (g.shootName || '').toLowerCase();
+      const quotationNumber = (g.quotationNumber || '').toLowerCase();
+      const user = (g.user || '').toLowerCase();
+      const hasMatchingItem = g.items.some(i => i.equipmentName.toLowerCase().includes(term));
 
       return (
-        equipmentName.includes(term) ||
         shootName.includes(term) ||
         quotationNumber.includes(term) ||
-        user.includes(term)
+        user.includes(term) ||
+        hasMatchingItem
       );
     });
-  }, [records, searchTerm]);
+  }, [groupedRecords, searchTerm]);
 
   const selectedDayRecords = useMemo(() => {
-    return records.filter(record => 
-      isSameDay(new Date(record.timestamp), selectedDate)
+    return groupedRecords.filter(group => 
+      isSameDay(new Date(group.date), selectedDate)
     );
-  }, [records, selectedDate]);
+  }, [groupedRecords, selectedDate]);
 
   const tileContent = ({ date, view }) => {
     if (view === 'month') {
@@ -137,8 +159,8 @@ function Records() {
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              {filteredRecords.map((record) => (
-                <RecordItem key={record.id} record={record} />
+              {filteredRecords.map((group) => (
+                <RecordGroup key={group.id} group={group} />
               ))}
               {filteredRecords.length === 0 && <EmptyState />}
             </div>
@@ -177,23 +199,37 @@ function Records() {
 
                 <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                   {selectedDayRecords.length > 0 ? (
-                    selectedDayRecords.map(record => (
-                      <div key={record.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl hover:bg-white/10 transition-colors">
+                    selectedDayRecords.map(group => (
+                      <div key={group.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl hover:bg-white/10 transition-colors">
                         <div className="flex items-center space-x-3 mb-2">
-                          <div className={`p-2 rounded-lg ${record.type === 'checkout' ? 'bg-[#ebc1b6] text-[#4a5a67]' : 'bg-green-500/20 text-green-400'}`}>
-                            <SafeIcon icon={record.type === 'checkout' ? FiLogOut : FiLogIn} className="text-xs" />
+                          <div className={`p-2 rounded-lg ${group.type === 'checkout' ? 'bg-[#ebc1b6] text-[#4a5a67]' : 'bg-green-500/20 text-green-400'}`}>
+                            <SafeIcon icon={group.type === 'checkout' ? FiLogOut : FiLogIn} className="text-xs" />
                           </div>
                           <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
-                            {record.type.replace('_', ' ')}
+                            {group.type.replace('_', ' ')}
                           </span>
                         </div>
-                        <h4 className="text-sm font-bold mb-1">{record.equipmentName}</h4>
-                        <div className="flex items-center justify-between text-[9px] font-bold text-white/50">
+                        <h4 className="text-sm font-bold mb-1">{group.shootName}</h4>
+                        {group.quotationNumber && <p className="text-[10px] font-medium text-white/60 mb-2">{group.quotationNumber}</p>}
+                        
+                        <div className="flex items-center justify-between text-[9px] font-bold text-white/50 mb-3">
                           <div className="flex items-center space-x-2">
-                            <SafeIcon icon={FiCamera} />
-                            <span>{record.shootName || 'N/A'}</span>
+                            <SafeIcon icon={FiIcons.FiUser} />
+                            <span>{group.user || 'N/A'}</span>
                           </div>
-                          <span>{format(new Date(record.timestamp), 'HH:mm')}</span>
+                          <span>{format(new Date(group.date), 'HH:mm')}</span>
+                        </div>
+
+                        <div className="border-t border-white/10 pt-3">
+                          <p className="text-[9px] font-bold text-white/60 mb-2">{group.items.length} Items</p>
+                          <ul className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                             {group.items.map((item, idx) => (
+                               <li key={idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2">
+                                 <div className="w-1 h-1 bg-white/20 rounded-full" />
+                                 <span>{item.equipmentName}</span>
+                               </li>
+                             ))}
+                          </ul>
                         </div>
                       </div>
                     ))
@@ -248,43 +284,83 @@ function Records() {
   );
 }
 
-function RecordItem({ record }) {
-  const isCheckout = record.type === 'checkout';
-  const isProblem = record.type === 'problem_report';
+function RecordGroup({ group }) {
+  const [expanded, setExpanded] = useState(false);
+  const isCheckout = group.type === 'checkout';
 
   return (
-    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row items-center justify-between hover:border-[#ebc1b6] transition-all group">
-      <div className="flex items-center space-x-6 w-full md:w-auto">
-        <div className={`p-4 rounded-xl shrink-0 ${isCheckout ? 'bg-[#ebc1b622] text-[#4a5a67]' : isProblem ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}>
-          <SafeIcon icon={isCheckout ? FiLogOut : isProblem ? FiAlertTriangle : FiLogIn} className="text-xl" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-3 mb-1">
-            <h3 className="text-lg font-bold text-[#4a5a67] truncate">{record.equipmentName}</h3>
-            {record.quotationNumber && (
-              <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-black uppercase tracking-widest shrink-0">
-                {record.quotationNumber}
-              </span>
-            )}
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:border-[#ebc1b6] transition-all group-card">
+       <div 
+         className="p-6 flex flex-col md:flex-row items-center justify-between cursor-pointer"
+         onClick={() => setExpanded(!expanded)}
+       >
+        <div className="flex items-center space-x-6 w-full md:w-auto">
+          <div className={`p-4 rounded-xl shrink-0 ${isCheckout ? 'bg-[#ebc1b622] text-[#4a5a67]' : 'bg-green-50 text-green-600'}`}>
+            <SafeIcon icon={isCheckout ? FiLogOut : FiLogIn} className="text-xl" />
           </div>
-          <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-            <div className="flex items-center space-x-1">
-              <SafeIcon icon={FiCamera} />
-              <span className="truncate max-w-[150px]">{record.shootName || 'General Maintenance'}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center space-x-3 mb-1">
+              <h3 className="text-lg font-bold text-[#4a5a67] truncate">{group.shootName}</h3>
+              {group.quotationNumber && (
+                <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-black uppercase tracking-widest shrink-0">
+                  {group.quotationNumber}
+                </span>
+              )}
             </div>
-            {record.user && (
+            <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
               <div className="flex items-center space-x-1">
-                <SafeIcon icon={FiIcons.FiUser} />
-                <span>{record.user}</span>
+                <SafeIcon icon={FiCamera} />
+                <span className="truncate max-w-[150px]">{group.type === 'checkout' ? 'Deployment' : 'Return'}</span>
               </div>
-            )}
+              {group.user && (
+                <div className="flex items-center space-x-1">
+                  <SafeIcon icon={FiIcons.FiUser} />
+                  <span>{group.user}</span>
+                </div>
+              )}
+              <div className="flex items-center space-x-1 text-[#4a5a67]">
+                <div className="w-1.5 h-1.5 bg-[#4a5a67] rounded-full" />
+                <span>{group.items.length} Items</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="text-right mt-4 md:mt-0 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 border-gray-50 flex md:flex-col justify-between items-center md:items-end">
-        <p className="text-xs font-bold text-[#4a5a67]">{format(new Date(record.timestamp), 'MMM d, yyyy')}</p>
-        <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">{format(new Date(record.timestamp), 'HH:mm')}</p>
-      </div>
+        
+        <div className="flex items-center space-x-6 mt-4 md:mt-0 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 border-gray-50 justify-between md:justify-end">
+          <div className="text-right">
+            <p className="text-xs font-bold text-[#4a5a67]">{format(new Date(group.date), 'MMM d, yyyy')}</p>
+            <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">{format(new Date(group.date), 'HH:mm')}</p>
+          </div>
+          <div className={`transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}>
+             <SafeIcon icon={FiChevronDown} className="text-gray-400" />
+          </div>
+        </div>
+       </div>
+
+       <AnimatePresence>
+         {expanded && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }} 
+              animate={{ height: 'auto', opacity: 1 }} 
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-gray-50 border-t border-gray-100"
+            >
+               <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                 {group.items.map(item => (
+                    <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
+                      <div className="flex items-center space-x-3 overflow-hidden">
+                        <div className="w-1.5 h-1.5 bg-[#ebc1b6] rounded-full shrink-0" />
+                        <span className="text-xs font-bold text-[#4a5a67] truncate">{item.equipmentName}</span>
+                      </div>
+                      {item.type === 'problem_report' && (
+                         <SafeIcon icon={FiAlertTriangle} className="text-red-500 text-xs" />
+                      )}
+                    </div>
+                 ))}
+               </div>
+            </motion.div>
+         )}
+       </AnimatePresence>
     </div>
   );
 }

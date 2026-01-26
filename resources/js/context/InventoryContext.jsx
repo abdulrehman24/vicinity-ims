@@ -7,6 +7,7 @@ const InventoryContext = createContext();
 
 const initialState = {
   equipment: [],
+  bundles: [],
   bookings: [],
   records: [],
   stockTakes: [],
@@ -38,6 +39,8 @@ function inventoryReducer(state, action) {
 
     case 'SET_BOOKINGS':
       return { ...state, bookings: action.payload };
+    case 'SET_BUNDLES':
+      return { ...state, bundles: action.payload };
     case 'ADD_BOOKING':
       return { ...state, bookings: [...state.bookings, action.payload] };
     case 'UPDATE_BOOKING_STATUS':
@@ -73,6 +76,7 @@ export function InventoryProvider({ children, user }) {
   useEffect(() => {
     fetchEquipment();
     fetchBookings();
+    fetchBundles();
   }, []);
 
   useEffect(() => {
@@ -125,6 +129,15 @@ export function InventoryProvider({ children, user }) {
       dispatch({ type: 'SET_BOOKINGS', payload: flatBookings });
     } catch (error) {
       console.error("Failed to fetch bookings", error);
+    }
+  };
+
+  const fetchBundles = async () => {
+    try {
+      const response = await axios.get('/api/bundles');
+      dispatch({ type: 'SET_BUNDLES', payload: response.data });
+    } catch (error) {
+      console.error("Failed to fetch bundles", error);
     }
   };
 
@@ -216,7 +229,8 @@ export function InventoryProvider({ children, user }) {
         batchCheckIn, 
         reportProblem, 
         toggleAdmin,
-        addStockTake 
+        addStockTake,
+        fetchBundles
     }}>
       {children}
     </InventoryContext.Provider>

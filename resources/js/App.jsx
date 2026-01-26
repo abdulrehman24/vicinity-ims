@@ -19,6 +19,7 @@ import AdminCategories from './pages/admin/AdminCategories';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminTickets from './pages/admin/AdminTickets';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminBundles from './pages/admin/AdminBundles';
 import { InventoryProvider } from './context/InventoryContext';
 import './App.css';
 
@@ -88,6 +89,7 @@ function App() {
                 <Route path="tickets" element={<AdminTickets />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="settings" element={<AdminSettings />} />
+                <Route path="bundles" element={<AdminBundles />} />
               </Route>
               
               {/* Legacy redirect for users who had bookmarked the old link */}
