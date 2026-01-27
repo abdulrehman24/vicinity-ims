@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -13,12 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->boolean('is_approved')->default(false);
-            $table->timestamp('expires_at')->nullable();
+            $table->string('otp_code')->nullable()->after('remember_token');
+            $table->timestamp('otp_expires_at')->nullable()->after('otp_code');
         });
-
-        // Auto-approve existing users
-        DB::table('users')->update(['is_approved' => true]);
     }
 
     /**
@@ -27,7 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['is_approved', 'expires_at']);
+            $table->dropColumn(['otp_code', 'otp_expires_at']);
         });
     }
 };

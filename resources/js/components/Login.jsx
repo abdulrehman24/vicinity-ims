@@ -106,6 +106,11 @@ function Login() {
                 placeholder="••••••••"
                 disabled={loading}
               />
+              <div className="text-right">
+                <Link to="/forgot-password" className="text-[10px] font-bold text-gray-400 hover:text-[#ebc1b6] uppercase tracking-wider">
+                    Forgot Password?
+                </Link>
+              </div>
             </div>
             <button
               type="submit"

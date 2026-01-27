@@ -1,19 +1,17 @@
 <?php
 
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Route;
-
-use App\Http\Controllers\AuthController;
-
-use App\Http\Controllers\SecurityController;
-use App\Http\Controllers\EquipmentController;
-use App\Http\Controllers\BookingController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\SupportTicketController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BundleController;
+use App\Http\Controllers\EquipmentController;
+use App\Http\Controllers\SecurityController;
+use App\Http\Controllers\SupportTicketController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/test-email', function () {
     try {
@@ -21,9 +19,10 @@ Route::get('/test-email', function () {
             $message->to('ar5555789@gmail.com')
                 ->subject('Test Email');
         });
+
         return 'Test email sent successfully to ar5555789@gmail.com';
     } catch (\Exception $e) {
-        return 'Failed to send email: ' . $e->getMessage();
+        return 'Failed to send email: '.$e->getMessage();
     }
 });
 
@@ -32,7 +31,7 @@ Route::get('/', function () {
 });
 
 Route::get('/admin', function () {
-    if (!Auth::check()) {
+    if (! Auth::check()) {
         return redirect('/');
     }
 
@@ -52,20 +51,25 @@ Route::view('/dashboard', 'welcome');
 Route::view('/admin/{any}', 'welcome')->where('any', '.*');
 Route::view('/login', 'welcome');
 Route::view('/register', 'welcome');
+Route::view('/forgot-password', 'welcome');
 Route::view('/check-in-out', 'welcome');
 
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/register', [AuthController::class, 'register'])->name('register');
+Route::post('/forgot-password/otp', [AuthController::class, 'sendResetOtp']);
+Route::post('/forgot-password/verify', [AuthController::class, 'verifyResetOtp']);
+Route::post('/forgot-password/reset', [AuthController::class, 'resetPasswordWithOtp']);
 
 Route::post('/logout', function () {
     Auth::logout();
+
     return redirect('/');
 })->name('logout');
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/security/validate-pin', [SecurityController::class, 'validatePin']);
     Route::post('/security/verify-otp', [SecurityController::class, 'verifyOtp']);
-    
+
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::post('/bookings', [BookingController::class, 'store']);
     Route::post('/bookings/return', [BookingController::class, 'returnItems']);
@@ -93,7 +97,7 @@ Route::middleware(['auth'])->prefix('api/admin')->group(function () {
     Route::patch('/users/{user}/role', [UserController::class, 'updateRole']);
     Route::patch('/users/{user}/approve', [UserController::class, 'approve']);
     Route::patch('/users/{user}/expiry', [UserController::class, 'updateExpiry']);
-    
+
     Route::post('/bundles', [BundleController::class, 'store']);
     Route::put('/bundles/{bundle}', [BundleController::class, 'update']);
     Route::delete('/bundles/{bundle}', [BundleController::class, 'destroy']);

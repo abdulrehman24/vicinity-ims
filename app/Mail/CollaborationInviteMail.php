@@ -4,7 +4,6 @@ namespace App\Mail;
 
 use App\Models\Booking;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
@@ -15,7 +14,9 @@ class CollaborationInviteMail extends Mailable
     use Queueable, SerializesModels;
 
     public $booking;
+
     public $password;
+
     public $email;
 
     /**
@@ -34,7 +35,7 @@ class CollaborationInviteMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'You have been invited to collaborate on ' . $this->booking->project_title,
+            subject: 'You have been invited to collaborate on '.$this->booking->project_title,
         );
     }
 

@@ -10,7 +10,7 @@ class UserController extends Controller
 {
     private function ensureSuperAdmin(): void
     {
-        if (!auth()->user() || auth()->user()->is_admin < 2) {
+        if (! auth()->user() || auth()->user()->is_admin < 2) {
             abort(403);
         }
     }
@@ -24,8 +24,8 @@ class UserController extends Controller
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', '%' . $search . '%')
-                    ->orWhere('email', 'like', '%' . $search . '%');
+                $q->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('email', 'like', '%'.$search.'%');
             });
         }
 
@@ -42,13 +42,13 @@ class UserController extends Controller
     public function approve(Request $request, User $user)
     {
         $this->ensureSuperAdmin();
-        
+
         $data = $request->validate([
             'is_approved' => ['required', 'boolean'],
         ]);
 
         $user->update(['is_approved' => $data['is_approved']]);
-        
+
         return response()->json([
             'id' => $user->id,
             'name' => $user->name,
@@ -105,4 +105,3 @@ class UserController extends Controller
         ]);
     }
 }
-

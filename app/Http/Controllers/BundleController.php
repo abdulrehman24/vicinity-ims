@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Bundle;
 use App\Models\BundleItem;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class BundleController extends Controller
 {
@@ -78,6 +78,7 @@ class BundleController extends Controller
     public function destroy(Bundle $bundle)
     {
         $bundle->delete();
+
         return response()->noContent();
     }
 }

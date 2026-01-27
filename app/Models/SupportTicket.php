@@ -21,4 +21,3 @@ class SupportTicket extends Model
         return $this->belongsTo(Equipment::class);
     }
 }
-

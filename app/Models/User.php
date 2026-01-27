@@ -30,6 +30,8 @@ class User extends Authenticatable
         'is_approved',
         'expires_at',
         'must_change_password',
+        'otp_code',
+        'otp_expires_at',
     ];
 
     /**
@@ -42,6 +44,7 @@ class User extends Authenticatable
         'remember_token',
         'two_factor_code',
         'pin',
+        'otp_code',
     ];
 
     /**
@@ -59,6 +62,7 @@ class User extends Authenticatable
             'is_approved' => 'boolean',
             'expires_at' => 'datetime',
             'must_change_password' => 'boolean',
+            'otp_expires_at' => 'datetime',
         ];
     }
 }

@@ -10,7 +10,7 @@ class SettingController extends Controller
 {
     private function ensureSuperAdmin(): void
     {
-        if (!auth()->user() || auth()->user()->is_admin < 2) {
+        if (! auth()->user() || auth()->user()->is_admin < 2) {
             abort(403);
         }
     }
@@ -41,7 +41,7 @@ class SettingController extends Controller
     {
         // Allow access if user is admin (check middleware or ensureSuperAdmin if strictly for super admins)
         // StockTake page is for admins, so this should be fine.
-        if (!auth()->user() || auth()->user()->is_admin < 1) {
+        if (! auth()->user() || auth()->user()->is_admin < 1) {
             abort(403);
         }
 
@@ -97,7 +97,7 @@ class SettingController extends Controller
 
         if ($request->hasFile('background_image')) {
             $path = $request->file('background_image')->store('login-backgrounds', 'public');
-            $backgroundUrl = asset('storage/' . $path);
+            $backgroundUrl = asset('storage/'.$path);
         }
 
         Setting::updateOrCreate(
@@ -121,7 +121,7 @@ class SettingController extends Controller
 
         if ($request->hasFile('favicon_image')) {
             $faviconPath = $request->file('favicon_image')->store('favicons', 'public');
-            $faviconUrl = asset('storage/' . $faviconPath);
+            $faviconUrl = asset('storage/'.$faviconPath);
             Setting::updateOrCreate(
                 ['key' => 'app_favicon_url'],
                 ['value' => $faviconUrl]

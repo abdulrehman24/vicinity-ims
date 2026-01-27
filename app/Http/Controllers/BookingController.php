@@ -2,18 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\BookingNotificationMail;
+use App\Mail\CollaborationInviteMail;
 use App\Models\Booking;
 use App\Models\Equipment;
-use App\Mail\BookingNotificationMail;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-
-use App\Models\User;
-use App\Mail\CollaborationInviteMail;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Hash;
 
 class BookingController extends Controller
 {
@@ -22,9 +21,9 @@ class BookingController extends Controller
         $bookings = Booking::with(['equipments', 'user'])
             ->orderBy('created_at', 'desc')
             ->get();
-            
+
         return response()->json([
-            'data' => $bookings
+            'data' => $bookings,
         ]);
     }
 
@@ -41,11 +40,11 @@ class BookingController extends Controller
             'collaborators.*' => [
                 function ($attribute, $value, $fail) {
                     if (is_string($value)) {
-                        if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                        if (! filter_var($value, FILTER_VALIDATE_EMAIL)) {
                             $fail('The '.$attribute.' must be a valid email address.');
                         }
                     } elseif (is_array($value)) {
-                        if (!isset($value['email']) || !filter_var($value['email'], FILTER_VALIDATE_EMAIL)) {
+                        if (! isset($value['email']) || ! filter_var($value['email'], FILTER_VALIDATE_EMAIL)) {
                             $fail('The '.$attribute.' must contain a valid email address.');
                         }
                     } else {
@@ -67,7 +66,7 @@ class BookingController extends Controller
             'end_date' => $validated['endDate'],
             'shift' => $validated['shift'],
             'collaborators' => $validated['collaborators'] ?? [],
-            'status' => 'active'
+            'status' => 'active',
         ]);
 
         foreach ($validated['items'] as $item) {
@@ -89,7 +88,7 @@ class BookingController extends Controller
 
         $booking->load(['equipments', 'user']);
 
-        if (!empty($validated['collaborators'])) {
+        if (! empty($validated['collaborators'])) {
             foreach ($validated['collaborators'] as $collaborator) {
                 $email = is_string($collaborator) ? $collaborator : $collaborator['email'];
                 // Auto-set expiry to 7 days from now
@@ -97,8 +96,8 @@ class BookingController extends Controller
 
                 try {
                     $user = User::where('email', $email)->first();
-                    
-                    if (!$user) {
+
+                    if (! $user) {
                         // Create new user for collaborator
                         $password = Str::random(10);
                         $user = User::create([
@@ -119,7 +118,7 @@ class BookingController extends Controller
                     }
 
                 } catch (\Throwable $e) {
-                    Log::error('Booking notification/invite email failed for ' . $email . ': ' . $e->getMessage());
+                    Log::error('Booking notification/invite email failed for '.$email.': '.$e->getMessage());
                 }
             }
         }
@@ -135,10 +134,10 @@ class BookingController extends Controller
 
         return response()->json([
             'message' => 'Booking created successfully',
-            'data' => $booking->load('equipments')
+            'data' => $booking->load('equipments'),
         ], 201);
     }
-    
+
     public function returnItems(Request $request)
     {
         $validated = $request->validate([
@@ -148,9 +147,9 @@ class BookingController extends Controller
             'items.*.problemNote' => 'nullable|string',
             'shootName' => 'required|string',
         ]);
-        
+
         $affectedBookings = [];
-        
+
         DB::beginTransaction();
         try {
             foreach ($validated['items'] as $itemData) {
@@ -197,13 +196,14 @@ class BookingController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Return error: ' . $e->getMessage());
+            Log::error('Return error: '.$e->getMessage());
+
             return response()->json(['message' => 'Failed to process returns'], 500);
         }
 
         $bookingIds = array_keys($affectedBookings);
 
-        if (!empty($bookingIds)) {
+        if (! empty($bookingIds)) {
             $bookings = Booking::with(['equipments', 'user'])
                 ->whereIn('id', $bookingIds)
                 ->get();
@@ -222,7 +222,7 @@ class BookingController extends Controller
 
         return response()->json([
             'message' => 'Items returned successfully',
-            'data' => $bookingIds
+            'data' => $bookingIds,
         ]);
     }
 }

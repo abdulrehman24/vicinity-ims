@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             // Change is_admin to integer (0: User, 1: Admin, 2: Super Admin)
             $table->tinyInteger('is_admin')->default(0)->change();
-            
+
             // Add security columns
             $table->string('pin')->nullable();
             $table->string('two_factor_code')->nullable();

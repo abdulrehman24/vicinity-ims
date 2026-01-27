@@ -11,7 +11,7 @@ class CategoryController extends Controller
 {
     private function ensureSuperAdmin(): void
     {
-        if (!auth()->user() || auth()->user()->is_admin < 2) {
+        if (! auth()->user() || auth()->user()->is_admin < 2) {
             abort(403);
         }
     }
@@ -29,8 +29,8 @@ class CategoryController extends Controller
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', '%' . $search . '%')
-                    ->orWhere('description', 'like', '%' . $search . '%');
+                $q->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('description', 'like', '%'.$search.'%');
             });
         }
 
@@ -84,7 +84,7 @@ class CategoryController extends Controller
     {
         $this->ensureSuperAdmin();
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:categories,name,' . $category->id],
+            'name' => ['required', 'string', 'max:255', 'unique:categories,name,'.$category->id],
             'description' => ['nullable', 'string', 'max:500'],
             'is_active' => ['boolean'],
         ]);

@@ -14,4 +14,3 @@ class Setting extends Model
         'value',
     ];
 }
-

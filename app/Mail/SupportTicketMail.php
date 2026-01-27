@@ -4,11 +4,11 @@ namespace App\Mail;
 
 use App\Models\SupportTicket;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Contracts\Queue\ShouldQueue;
 
 class SupportTicketMail extends Mailable implements ShouldQueue
 {
@@ -40,4 +40,3 @@ class SupportTicketMail extends Mailable implements ShouldQueue
         return [];
     }
 }
-

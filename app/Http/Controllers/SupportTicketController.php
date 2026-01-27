@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Mail\SupportTicketMail;
-use App\Models\Equipment;
 use App\Models\SupportTicket;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;

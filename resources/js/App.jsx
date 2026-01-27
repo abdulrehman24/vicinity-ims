@@ -13,6 +13,7 @@ import Records from './pages/Records';
 import ReportProblem from './pages/ReportProblem';
 import Login from './components/Login';
 import Register from './components/Register';
+import ForgotPassword from './components/ForgotPassword';
 import ChangePassword from './pages/ChangePassword';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminCategories from './pages/admin/AdminCategories';
@@ -50,6 +51,7 @@ function App() {
     return (
       <Routes>
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
