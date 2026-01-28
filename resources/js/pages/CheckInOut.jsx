@@ -46,7 +46,7 @@ function CheckInOut() {
 
 function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
   const [selectedItems, setSelectedItems] = useState([]); // Array of {id, qty}
-  const [dateRange, setDateRange] = useState(null);
+  const [selectedDates, setSelectedDates] = useState([]);
   const [shift, setShift] = useState('Full Day');
   const [formData, setFormData] = useState({ projTitle: '', quote: '', shootType: 'Commercial' });
   const [collaborators, setCollaborators] = useState([]);
@@ -55,17 +55,10 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
 
   // 1. Availability Logic for Multi-Unit & Shifts
   const requestedDates = useMemo(() => {
-    if (!dateRange) return [];
-
-    if (Array.isArray(dateRange)) {
-      const [start, end] = dateRange;
-      if (!start) return [];
-      const endDate = end || start;
-      return eachDayOfInterval({ start, end: endDate }).map(d => format(d, 'yyyy-MM-dd'));
-    }
-
-    return eachDayOfInterval({ start: dateRange, end: dateRange }).map(d => format(d, 'yyyy-MM-dd'));
-  }, [dateRange]);
+    return selectedDates
+      .map(d => format(d, 'yyyy-MM-dd'))
+      .sort();
+  }, [selectedDates]);
 
   const getAvailableQty = (item, dates, requestedShift) => {
     const relevantBookings = bookings.filter(b => {
@@ -115,7 +108,7 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
     const bundle = bundles?.find(b => b.id === parseInt(bundleId));
     if (!bundle) return;
 
-    if (!dateRange) {
+    if (selectedDates.length === 0) {
         toast.error("Please select dates first");
         return;
     }
@@ -179,13 +172,11 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
   };
 
   const handleBooking = () => {
-    const formattedDates = requestedDates.map(d => format(parseISO(d), 'dd/MM/yyyy'));
-
     const payload = {
       shootName: formData.projTitle,
       quotationNumber: formData.quote,
       shift,
-      dates: formattedDates,
+      dates: requestedDates,
       startDate: requestedDates[0],
       endDate: requestedDates[requestedDates.length - 1],
       user: 'Operations Team',
@@ -223,18 +214,13 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
   }, [equipment, searchTerm, selectedCategory]);
 
   const handleDayClick = (value) => {
-    // If no range selected, or we already have a range with different start/end dates, start new selection
-    if (!dateRange || (Array.isArray(dateRange) && dateRange.length === 2 && !isSameDay(dateRange[0], dateRange[1]))) {
-      setDateRange([value, value]);
+    // Check if already selected
+    const isSelected = selectedDates.some(d => isSameDay(d, value));
+    
+    if (isSelected) {
+      setSelectedDates(prev => prev.filter(d => !isSameDay(d, value)));
     } else {
-      // We have a single day selected (start == end), so extend the range
-      const start = Array.isArray(dateRange) ? dateRange[0] : dateRange;
-      
-      if (value < start) {
-        setDateRange([value, start]);
-      } else {
-        setDateRange([start, value]);
-      }
+      setSelectedDates(prev => [...prev, value]);
     }
   };
 
@@ -252,10 +238,12 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
             ))}
           </div>
           <Calendar
-            selectRange
             onClickDay={handleDayClick}
-            value={dateRange}
+            value={null}
             className="mini-calendar"
+            tileClassName={({ date }) => 
+              selectedDates.some(d => isSameDay(d, date)) ? 'react-calendar__tile--active' : null
+            }
           />
         </div>
 

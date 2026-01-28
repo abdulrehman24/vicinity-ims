@@ -99,6 +99,13 @@ export function InventoryProvider({ children, user }) {
       const flatBookings = [];
 
       response.data.data.forEach(b => {
+        let datesArray = [];
+        if (b.dates && Array.isArray(b.dates) && b.dates.length > 0) {
+            datesArray = b.dates.map(d => format(parseISO(d.date), 'yyyy-MM-dd'));
+        } else if (b.start_date && b.end_date) {
+            datesArray = eachDayOfInterval({ start: parseISO(b.start_date), end: parseISO(b.end_date) }).map(d => format(d, 'yyyy-MM-dd'));
+        }
+
         const common = {
           id: b.id,
           shootName: b.project_title,
@@ -107,10 +114,11 @@ export function InventoryProvider({ children, user }) {
           status: b.status,
           startDate: b.start_date,
           endDate: b.end_date,
-          dates: eachDayOfInterval({ start: parseISO(b.start_date), end: parseISO(b.end_date) }).map(d => format(d, 'yyyy-MM-dd')),
+          dates: datesArray,
           shift: b.shift,
           user: b.user || null,
           returnedAt: b.returned_at || null,
+          createdAt: b.created_at,
         };
 
         if (Array.isArray(b.equipments) && b.equipments.length > 0) {

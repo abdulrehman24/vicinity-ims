@@ -18,7 +18,7 @@ class BookingController extends Controller
 {
     public function index()
     {
-        $bookings = Booking::with(['equipments', 'user'])
+        $bookings = Booking::with(['equipments', 'user', 'dates'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -33,8 +33,8 @@ class BookingController extends Controller
             'shootName' => 'required|string',
             'quotationNumber' => 'nullable|string',
             'shootType' => 'nullable|string',
-            'startDate' => 'required|date',
-            'endDate' => 'required|date',
+            'dates' => 'required|array|min:1',
+            'dates.*' => 'required|date',
             'shift' => 'required|string',
             'collaborators' => 'nullable|array',
             'collaborators.*' => [
@@ -57,17 +57,25 @@ class BookingController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
+        $dates = collect($validated['dates'])->sort()->values();
+        $startDate = $dates->first();
+        $endDate = $dates->last();
+
         $booking = Booking::create([
             'user_id' => auth()->id() ?? 1,
             'project_title' => $validated['shootName'],
             'quotation_number' => $validated['quotationNumber'],
             'shoot_type' => $validated['shootType'] ?? 'Commercial',
-            'start_date' => $validated['startDate'],
-            'end_date' => $validated['endDate'],
+            'start_date' => $startDate,
+            'end_date' => $endDate,
             'shift' => $validated['shift'],
             'collaborators' => $validated['collaborators'] ?? [],
             'status' => 'active',
         ]);
+
+        foreach ($dates as $date) {
+            $booking->dates()->create(['date' => $date]);
+        }
 
         foreach ($validated['items'] as $item) {
             DB::table('booking_equipment')->insert([

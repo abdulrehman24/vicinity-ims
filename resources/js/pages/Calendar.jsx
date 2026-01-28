@@ -26,6 +26,47 @@ function CalendarPage() {
     return ids.size;
   }, [bookings]);
 
+  const stockByCategory = useMemo(() => {
+    const stock = {};
+    equipment.forEach(item => {
+      if (!stock[item.category]) {
+        stock[item.category] = 0;
+      }
+      stock[item.category] += (item.totalQuantity || 1);
+    });
+    return stock;
+  }, [equipment]);
+
+  const usageByDate = useMemo(() => {
+    const usage = {}; // dateStr -> { category: qty }
+
+    bookings.forEach(bItem => {
+      if (bItem.status === 'cancelled') return;
+
+      const item = equipment.find(e => e.id == bItem.equipmentId);
+      if (!item || !item.category) return;
+
+      const qty = bItem.quantity || 1;
+      const cat = item.category;
+
+      const addUsage = (dateStr) => {
+          if (!usage[dateStr]) usage[dateStr] = {};
+          if (!usage[dateStr][cat]) usage[dateStr][cat] = 0;
+          usage[dateStr][cat] += qty;
+      };
+
+      if (bItem.dates && Array.isArray(bItem.dates) && bItem.dates.length > 0) {
+          bItem.dates.forEach(d => addUsage(d));
+      } else if (bItem.startDate) {
+           try {
+               addUsage(format(parseISO(bItem.startDate), 'yyyy-MM-dd'));
+           } catch (e) {}
+      }
+    });
+    
+    return usage;
+  }, [bookings, equipment]);
+
   const currentMonthBookingCount = useMemo(() => {
     const ids = new Set();
     const monthPrefix = format(new Date(), 'yyyy-MM');
@@ -58,15 +99,20 @@ function CalendarPage() {
             shootName,
             quotationNumber,
             userName,
+            createdAt: booking.created_at || booking.createdAt,
             items: []
           };
         }
         projectMap[key].items.push(eqName);
       };
 
-      if (booking.startDate) {
+      if (booking.dates && Array.isArray(booking.dates) && booking.dates.length > 0) {
+        booking.dates.forEach(dateStr => {
+           addToMap(dateStr, 'checkout');
+        });
+      } else if (booking.startDate) {
         try {
-          // Ensure we are working with just the date part for grouping
+          // Fallback for legacy or malformed data
           const dateStr = format(parseISO(booking.startDate), 'yyyy-MM-dd');
           addToMap(dateStr, 'checkout');
         } catch (e) {
@@ -101,11 +147,39 @@ function CalendarPage() {
 
   const tileContent = ({ date, view }) => {
     if (view === 'month') {
+      const dateStr = format(date, 'yyyy-MM-dd');
       const hasEvent = events.some(ev => isSameDay(ev.date, date));
-      if (hasEvent) {
+      const dailyUsage = usageByDate[dateStr];
+
+      if (hasEvent || dailyUsage) {
         return (
           <div className="flex justify-center mt-1">
-            <div className="w-1.5 h-1.5 bg-[#ebc1b6] rounded-full shadow-sm"></div>
+            <div className={`w-1.5 h-1.5 rounded-full shadow-sm ${hasEvent ? 'bg-[#ebc1b6]' : 'bg-gray-300'}`}></div>
+            
+            {/* Tooltip */}
+            {dailyUsage && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-48 bg-[#4a5a67] text-white p-3 rounded-xl shadow-xl z-50 hidden group-hover:block pointer-events-none">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-[#ebc1b6] mb-2 border-b border-white/10 pb-1">
+                        Inventory Usage
+                    </div>
+                    <div className="space-y-1">
+                        {Object.entries(dailyUsage).map(([cat, qty]) => {
+                            const total = stockByCategory[cat] || 0;
+                            const pct = Math.min(100, Math.round((qty / total) * 100));
+                            const isHigh = pct > 80;
+                            return (
+                                <div key={cat} className="flex justify-between items-center text-[9px] font-bold">
+                                    <span className="truncate max-w-[60%]">{cat}</span>
+                                    <span className={isHigh ? 'text-red-300' : 'text-white/60'}>
+                                        {qty} / {total}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="absolute bottom-[-4px] left-1/2 -translate-x-1/2 w-2 h-2 bg-[#4a5a67] rotate-45"></div>
+                </div>
+            )}
           </div>
         );
       }
@@ -142,6 +216,11 @@ function CalendarPage() {
                 value={selectedDate} 
                 tileContent={tileContent}
                 className="custom-calendar-vicinity"
+                tileClassName={({ date }) => {
+                  const classes = ['group', 'relative']; // Enable group-hover on the tile
+                  if (isSameDay(date, selectedDate)) classes.push('react-calendar__tile--active');
+                  return classes.join(' ');
+                }}
               />
             </div>
           </div>
@@ -169,9 +248,17 @@ function CalendarPage() {
                         </span>
                       </div>
 
-                      <div className="flex items-center space-x-2 text-[9px] text-white/40 mb-3">
-                        <SafeIcon icon={FiUser} />
-                        <span>{event.userName}</span>
+                      <div className="flex flex-col space-y-1 mb-3">
+                        <div className="flex items-center space-x-2 text-[9px] text-white/40">
+                          <SafeIcon icon={FiUser} />
+                          <span>{event.userName}</span>
+                        </div>
+                        {event.createdAt && (
+                          <div className="flex items-center space-x-2 text-[9px] text-white/40">
+                            <SafeIcon icon={FiClock} />
+                            <span>Booked: {format(new Date(event.createdAt), 'MMM d, HH:mm')}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="border-t border-white/10 pt-3">
@@ -314,6 +401,8 @@ function CalendarPage() {
           color: #4a5a67 !important;
           border-radius: 1rem !important;
           transition: all 0.2s !important;
+          position: relative !important;
+          overflow: visible !important;
         }
         .custom-calendar-vicinity .react-calendar__tile:enabled:hover {
           background-color: #f8fafc !important;

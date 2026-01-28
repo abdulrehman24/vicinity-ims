@@ -18,22 +18,83 @@ function Records() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
 
+  const stockByCategory = useMemo(() => {
+    const stock = {};
+    equipment.forEach(item => {
+      if (!stock[item.category]) {
+        stock[item.category] = 0;
+      }
+      stock[item.category] += (item.totalQuantity || 1);
+    });
+    return stock;
+  }, [equipment]);
+
+  const usageByDate = useMemo(() => {
+    const usage = {}; // dateStr -> { category: qty }
+
+    bookings.forEach(bItem => {
+      // For records, we probably want to see historical usage too
+      // if (bItem.status === 'cancelled') return;
+
+      const item = equipment.find(e => e.id == bItem.equipmentId);
+      if (!item || !item.category) return;
+
+      const qty = bItem.quantity || 1;
+      const cat = item.category;
+
+      const addUsage = (dateStr) => {
+          if (!usage[dateStr]) usage[dateStr] = {};
+          if (!usage[dateStr][cat]) usage[dateStr][cat] = 0;
+          usage[dateStr][cat] += qty;
+      };
+
+      // Check dates array first, fallback to range
+      if (bItem.dates && Array.isArray(bItem.dates) && bItem.dates.length > 0) {
+          bItem.dates.forEach(d => {
+             // Handle if dates are objects or strings
+             const dateVal = typeof d === 'object' ? d.date : d;
+             addUsage(format(parseISO(dateVal), 'yyyy-MM-dd'));
+          });
+      } else if (bItem.startDate) {
+           try {
+               addUsage(format(parseISO(bItem.startDate), 'yyyy-MM-dd'));
+           } catch (e) {}
+      }
+    });
+    
+    return usage;
+  }, [bookings, equipment]);
+
   const records = useMemo(() => {
     const events = [];
     bookings.forEach(b => {
         const eqName = equipment.find(e => e.id === b.equipmentId)?.name || 'Unknown Equipment';
         const baseId = b.bookingEquipmentId ? `be-${b.bookingEquipmentId}` : `${b.id}-${b.equipmentId || 'unknown'}`;
-        // Checkout Event
-        events.push({
-            id: `out-${baseId}`,
-            type: 'checkout',
-            equipmentName: eqName,
-            shootName: b.shootName,
-            quotationNumber: b.quotationNumber,
-            user: b.user?.name || 'Operations',
-            timestamp: b.startDate, 
-            details: `Qty: ${b.quantity}, Shift: ${b.shift}`
-        });
+        
+        // Helper to add checkout event
+        const addCheckoutEvent = (dateStr, suffix = '') => {
+             events.push({
+                id: `out-${baseId}-${dateStr}${suffix}`,
+                type: 'checkout',
+                equipmentName: eqName,
+                shootName: b.shootName,
+                quotationNumber: b.quotationNumber,
+                user: b.user?.name || 'Operations',
+                timestamp: dateStr, // Use the specific date
+                createdAt: b.created_at || b.createdAt, 
+                details: `Qty: ${b.quantity}, Shift: ${b.shift}`
+            });
+        };
+
+        // Checkout Events: Iterate over all dates
+        if (b.dates && Array.isArray(b.dates) && b.dates.length > 0) {
+            b.dates.forEach((d, idx) => {
+                 const dateVal = typeof d === 'object' ? d.date : d;
+                 addCheckoutEvent(dateVal, `-${idx}`);
+            });
+        } else if (b.startDate) {
+             addCheckoutEvent(b.startDate);
+        }
         
         // Return Event
         if (b.status === 'returned') {
@@ -44,6 +105,7 @@ function Records() {
                 shootName: b.shootName,
                 user: b.user?.name || 'Operations',
                 timestamp: b.returnedAt || b.endDate,
+                createdAt: b.created_at || b.createdAt, // Add creation timestamp
                 details: 'Returned'
             });
         }
@@ -63,6 +125,7 @@ function Records() {
           shootName: r.shootName,
           quotationNumber: r.quotationNumber,
           date: r.timestamp,
+          createdAt: r.createdAt,
           type: r.type,
           user: r.user,
           items: []
@@ -100,11 +163,39 @@ function Records() {
 
   const tileContent = ({ date, view }) => {
     if (view === 'month') {
+      const dateStr = format(date, 'yyyy-MM-dd');
       const hasActivity = records.some(r => isSameDay(new Date(r.timestamp), date));
-      if (hasActivity) {
+      const dailyUsage = usageByDate[dateStr];
+
+      if (hasActivity || dailyUsage) {
         return (
           <div className="flex justify-center mt-1">
-            <div className="w-1 h-1 bg-[#ebc1b6] rounded-full" />
+            <div className={`w-1.5 h-1.5 rounded-full shadow-sm ${hasActivity ? 'bg-[#ebc1b6]' : 'bg-gray-300'}`} />
+
+             {/* Tooltip */}
+             {dailyUsage && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-48 bg-[#4a5a67] text-white p-3 rounded-xl shadow-xl z-50 hidden group-hover:block pointer-events-none">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-[#ebc1b6] mb-2 border-b border-white/10 pb-1">
+                        Inventory Usage
+                    </div>
+                    <div className="space-y-1">
+                        {Object.entries(dailyUsage).map(([cat, qty]) => {
+                            const total = stockByCategory[cat] || 0;
+                            const pct = Math.min(100, Math.round((qty / total) * 100));
+                            const isHigh = pct > 80;
+                            return (
+                                <div key={cat} className="flex justify-between items-center text-[9px] font-bold">
+                                    <span className="truncate max-w-[60%]">{cat}</span>
+                                    <span className={isHigh ? 'text-red-300' : 'text-white/60'}>
+                                        {qty} / {total}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="absolute bottom-[-4px] left-1/2 -translate-x-1/2 w-2 h-2 bg-[#4a5a67] rotate-45"></div>
+                </div>
+            )}
           </div>
         );
       }
@@ -180,6 +271,11 @@ function Records() {
                   value={selectedDate} 
                   tileContent={tileContent}
                   className="archive-calendar"
+                  tileClassName={({ date }) => {
+                    const classes = ['group', 'relative']; 
+                    if (isSameDay(date, selectedDate)) classes.push('react-calendar__tile--active');
+                    return classes.join(' ');
+                  }}
                 />
               </div>
             </div>
@@ -212,12 +308,17 @@ function Records() {
                         <h4 className="text-sm font-bold mb-1">{group.shootName}</h4>
                         {group.quotationNumber && <p className="text-[10px] font-medium text-white/60 mb-2">{group.quotationNumber}</p>}
                         
-                        <div className="flex items-center justify-between text-[9px] font-bold text-white/50 mb-3">
-                          <div className="flex items-center space-x-2">
+                        <div className="flex flex-col space-y-1 mb-3">
+                          <div className="flex items-center space-x-2 text-[9px] font-bold text-white/50">
                             <SafeIcon icon={FiIcons.FiUser} />
                             <span>{group.user || 'N/A'}</span>
                           </div>
-                          <span>{format(new Date(group.date), 'HH:mm')}</span>
+                          {group.createdAt && (
+                            <div className="flex items-center space-x-2 text-[9px] text-white/40">
+                              <SafeIcon icon={FiClock} />
+                              <span>Booked: {format(new Date(group.createdAt), 'MMM d, HH:mm')}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="border-t border-white/10 pt-3">
@@ -265,6 +366,8 @@ function Records() {
           color: #4a5a67 !important;
           border-radius: 1rem !important;
           transition: all 0.2s !important;
+          position: relative !important;
+          overflow: visible !important;
         }
         .archive-calendar .react-calendar__tile:enabled:hover {
           background-color: #f8fafc !important;
@@ -329,7 +432,13 @@ function RecordGroup({ group }) {
         <div className="flex items-center space-x-6 mt-4 md:mt-0 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 border-gray-50 justify-between md:justify-end">
           <div className="text-right">
             <p className="text-xs font-bold text-[#4a5a67]">{format(new Date(group.date), 'MMM d, yyyy')}</p>
-            <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">{format(new Date(group.date), 'HH:mm')}</p>
+            <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">
+                {group.createdAt && (
+                    <span className="block text-[9px] text-gray-300 mt-0.5">
+                        Booked: {format(new Date(group.createdAt), 'MMM d, HH:mm')}
+                    </span>
+                )}
+            </p>
           </div>
           <div className={`transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}>
              <SafeIcon icon={FiChevronDown} className="text-gray-400" />

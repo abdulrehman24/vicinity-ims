@@ -37,4 +37,9 @@ class Booking extends Model
             ->withPivot(['id', 'quantity', 'status', 'returned_at', 'return_condition', 'return_notes'])
             ->withTimestamps();
     }
+
+    public function dates()
+    {
+        return $this->hasMany(BookingDate::class);
+    }
 }
