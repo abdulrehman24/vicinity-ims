@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import SafeIcon from '../../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 
-const { FiSettings, FiTag, FiMenu, FiChevronLeft, FiHome, FiLogOut, FiAlertCircle, FiUsers, FiPackage } =
+const { FiSettings, FiTag, FiMenu, FiChevronLeft, FiHome, FiLogOut, FiAlertCircle, FiUsers, FiPackage, FiRefreshCw } =
   FiIcons;
 
 function AdminLayout({ onLogout }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -15,8 +17,30 @@ function AdminLayout({ onLogout }) {
     navigate('/');
   };
 
+  const handleResetDatabase = async () => {
+    if (window.confirm('Are you sure you want to reset the database? ALL DATA WILL BE LOST! This action cannot be undone.')) {
+      try {
+        setIsResetting(true);
+        await axios.post('/api/admin/reset-database');
+        alert('Database has been reset successfully. You will now be logged out.');
+        onLogout();
+      } catch (error) {
+        console.error('Failed to reset database:', error);
+        alert('Failed to reset database. Please check the console for details.');
+        setIsResetting(false);
+      }
+    }
+  };
+
   return (
     <div className="h-screen flex bg-[#fcfaf9]">
+      {isResetting && (
+        <div className="fixed inset-0 z-[9999] bg-[#4a5a67]/90 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#ebc1b6] border-t-transparent mb-4"></div>
+          <h2 className="text-2xl font-bold tracking-tight">Resetting Database...</h2>
+          <p className="text-white/60 mt-2">Please wait while we clear and re-seed the system.</p>
+        </div>
+      )}
       <aside
         className={`h-screen sticky top-0 bg-gradient-to-b from-[#4a5a67] to-[#2f3b44] text-white flex flex-col transition-all duration-300 shadow-xl ${
           collapsed ? 'w-20' : 'w-64'
@@ -182,6 +206,21 @@ function AdminLayout({ onLogout }) {
                   className={`text-lg ${collapsed ? '' : ''}`}
                 />
                 {!collapsed && <span>Back to IMS</span>}
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={handleResetDatabase}
+              className={`w-full flex items-center ${
+                collapsed ? 'justify-center' : 'justify-between'
+              } px-3 py-2 rounded-xl bg-orange-500/80 hover:bg-orange-500 text-xs font-semibold tracking-wide transition-all`}
+            >
+              <div className="flex items-center space-x-2">
+                <SafeIcon
+                  icon={FiRefreshCw}
+                  className="text-lg"
+                />
+                {!collapsed && <span>Reset DB</span>}
               </div>
             </button>
             <button

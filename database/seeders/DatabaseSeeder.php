@@ -17,20 +17,22 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         User::updateOrCreate(
-            ['email' => 'admin@example.com'],
+            ['email' => 'superadmin@example.com'],
             [
                 'name' => 'Admin User',
                 'password' => Hash::make('password'),
-                'is_admin' => 1,
+                'is_admin' => 2,
+                'is_approved' => 1,
             ]
         );
 
         User::updateOrCreate(
-            ['email' => 'superadmin@example.com'],
+            ['email' => 'kevin@vicinity.studio'],
             [
                 'name' => 'Super Admin User',
-                'password' => Hash::make('password'),
+                'password' => Hash::make('vicinity123#'),
                 'is_admin' => 2,
+                'is_approved' => 1,
             ]
         );
     }

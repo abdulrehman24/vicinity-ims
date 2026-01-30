@@ -97,6 +97,7 @@ Route::middleware(['auth'])->prefix('api/admin')->group(function () {
     Route::patch('/users/{user}/role', [UserController::class, 'updateRole']);
     Route::patch('/users/{user}/approve', [UserController::class, 'approve']);
     Route::patch('/users/{user}/expiry', [UserController::class, 'updateExpiry']);
+    Route::post('/reset-database', [SettingController::class, 'resetDatabase']);
 
     Route::post('/bundles', [BundleController::class, 'store']);
     Route::put('/bundles/{bundle}', [BundleController::class, 'update']);

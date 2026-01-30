@@ -15,6 +15,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
 import ChangePassword from './pages/ChangePassword';
+import UserProfile from './pages/UserProfile';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminCategories from './pages/admin/AdminCategories';
 import AdminSettings from './pages/admin/AdminSettings';
@@ -32,10 +33,11 @@ function App() {
   const handleLogout = async () => {
     try {
         await axios.post('/logout');
-        localStorage.removeItem('isAdmin');
-        window.location.href = '/';
     } catch (error) {
         console.error("Logout failed", error);
+    } finally {
+        localStorage.removeItem('isAdmin');
+        window.location.href = '/';
     }
   };
 
@@ -85,6 +87,7 @@ function App() {
               <Route path="/report" element={<ReportProblem />} />
               <Route path="/records" element={<Records />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/profile" element={<UserProfile user={user} />} />
               <Route path="/admin/*" element={adminElement}>
                 <Route index element={<Navigate to="/admin/categories" replace />} />
                 <Route path="categories" element={<AdminCategories />} />

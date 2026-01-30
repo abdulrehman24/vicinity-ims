@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 
 class SettingController extends Controller
 {
@@ -12,6 +14,21 @@ class SettingController extends Controller
     {
         if (! auth()->user() || auth()->user()->is_admin < 2) {
             abort(403);
+        }
+    }
+
+    public function resetDatabase()
+    {
+        $this->ensureSuperAdmin();
+
+        try {
+            // Clean storage/app/public directory before seeding
+            File::cleanDirectory(storage_path('app/public'));
+
+            Artisan::call('migrate:fresh', ['--seed' => true, '--force' => true]);
+            return response()->json(['message' => 'Database reset successfully']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to reset database: ' . $e->getMessage()], 500);
         }
     }
 

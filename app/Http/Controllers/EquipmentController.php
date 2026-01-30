@@ -7,6 +7,8 @@ use App\Models\Equipment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 
 class EquipmentController extends Controller
 {
@@ -26,7 +28,7 @@ class EquipmentController extends Controller
             'businessUnit' => 'required|string',
             'condition' => 'required|string',
             'location' => 'nullable|string',
-            'image' => 'nullable', // Base64 string expected
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240', // 10MB Max
             'purchaseDate' => 'nullable|date',
             'remarks' => 'nullable|string',
             'totalQuantity' => 'nullable|integer|min:1',
@@ -34,8 +36,8 @@ class EquipmentController extends Controller
 
         $equipmentData = $this->mapFrontendToBackend($data);
 
-        if (! empty($data['image'])) {
-            $path = $this->saveImage($data['image']);
+        if ($request->hasFile('image')) {
+            $path = $this->processAndSaveImage($request->file('image'));
             if ($path) {
                 $equipmentData['image_path'] = $path;
             }
@@ -59,7 +61,7 @@ class EquipmentController extends Controller
             'businessUnit' => 'sometimes|string',
             'condition' => 'sometimes|string',
             'location' => 'nullable|string',
-            'image' => 'nullable',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
             'purchaseDate' => 'nullable|date',
             'remarks' => 'nullable|string',
             'decommissionDate' => 'nullable|date',
@@ -70,22 +72,19 @@ class EquipmentController extends Controller
 
         $equipmentData = $this->mapFrontendToBackend($data);
 
-        // Handle image update
-        if (isset($data['image']) && $data['image'] !== $equipment->image_path) {
-            // Check if it's a new base64 string
-            if (str_starts_with($data['image'], 'data:image')) {
-                // Delete old image if exists
-                if ($equipment->image_path) {
-                    $oldPath = str_replace('/storage/', '', $equipment->image_path);
-                    if (Storage::disk('public')->exists($oldPath)) {
-                        Storage::disk('public')->delete($oldPath);
-                    }
+        // Handle image update via FormData
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($equipment->image_path) {
+                $oldPath = str_replace('/storage/', '', $equipment->image_path);
+                if (Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
                 }
+            }
 
-                $path = $this->saveImage($data['image']);
-                if ($path) {
-                    $equipmentData['image_path'] = $path;
-                }
+            $path = $this->processAndSaveImage($request->file('image'));
+            if ($path) {
+                $equipmentData['image_path'] = $path;
             }
         }
 
@@ -159,29 +158,23 @@ class EquipmentController extends Controller
         return $mapped;
     }
 
-    private function saveImage($base64Image)
+    private function processAndSaveImage($file)
     {
-        // Check if it's a valid base64 image string
-        if (! preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
-            return null;
-        }
+        $manager = new ImageManager(new Driver());
+        $image = $manager->read($file);
 
-        $data = substr($base64Image, strpos($base64Image, ',') + 1);
-        $type = strtolower($type[1]); // jpg, png, etc.
+        // Resize to max 1200px width, maintaining aspect ratio, preventing upsizing
+        $image->scaleDown(width: 1200);
 
-        if (! in_array($type, ['jpg', 'jpeg', 'gif', 'png', 'webp'])) {
-            return null;
-        }
+        // Encode to WebP with 75% quality
+        $encoded = $image->toWebp(quality: 75);
 
-        $data = base64_decode($data);
+        // Generate filename
+        $filename = 'equipment/' . Str::random(40) . '.webp';
 
-        if ($data === false) {
-            return null;
-        }
+        // Save to public disk
+        Storage::disk('public')->put($filename, (string) $encoded);
 
-        $filename = 'equipment/'.Str::random(40).'.'.$type;
-        Storage::disk('public')->put($filename, $data);
-
-        return '/storage/'.$filename;
+        return '/storage/' . $filename;
     }
 }

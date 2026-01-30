@@ -371,7 +371,11 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
     const file = acceptedFiles[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = () => setFormData(prev => ({ ...prev, image: reader.result }));
+      reader.onload = () => setFormData(prev => ({ 
+        ...prev, 
+        image: reader.result,
+        imageFile: file 
+      }));
       reader.readAsDataURL(file);
     }
   }, []);

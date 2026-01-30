@@ -9,7 +9,7 @@ import SecurityModal from './SecurityModal';
 const { 
   FiPackage, FiCamera, FiRefreshCw, FiCalendar, 
   FiClipboard, FiFileText, FiMenu, FiX, FiLogOut, 
-  FiShield, FiAlertOctagon 
+  FiShield, FiAlertOctagon, FiUser 
 } = FiIcons;
 
 // Updated navItems: Operations (Check In/Out) is now the root path
@@ -45,38 +45,43 @@ function Navbar({ onLogout, user }) {
     <nav className="fixed top-0 left-0 right-0 bg-[#4a5a67] shadow-xl z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link to="/" className="flex items-center space-x-2">
+          {/* Logo Section */}
+          <Link to="/" className="flex items-center space-x-2 flex-shrink-0">
             <SafeIcon icon={FiCamera} className="text-2xl text-[#ebc1b6]" />
             <span className="text-xl font-bold text-white tracking-tight">Vicinity IMS</span>
           </Link>
 
-          <div className="hidden md:flex items-center space-x-1">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`relative px-4 py-2 rounded-lg transition-all duration-300 ${
-                    isActive ? 'text-[#ebc1b6]' : 'text-gray-300 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2 relative z-10">
-                    <SafeIcon icon={item.icon} className="text-lg" />
-                    <span className="font-semibold text-sm">{item.label}</span>
-                  </div>
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="absolute inset-x-0 bottom-0 h-1 bg-[#ebc1b6] rounded-t-full"
-                    />
-                  )}
-                </Link>
-              );
-            })}
+          {/* Centered Navigation Links */}
+          <div className="hidden md:flex flex-1 justify-center items-center px-4">
+            <div className="flex items-center space-x-1">
+              {navItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`relative px-3 py-2 rounded-lg transition-all duration-300 ${
+                      isActive ? 'text-[#ebc1b6]' : 'text-gray-300 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2 relative z-10">
+                      <SafeIcon icon={item.icon} className="text-lg" />
+                      <span className="font-semibold text-sm">{item.label}</span>
+                    </div>
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeTab"
+                        className="absolute inset-x-0 bottom-0 h-1 bg-[#ebc1b6] rounded-t-full"
+                      />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
 
-            <div className="h-6 w-px bg-white/10 mx-4" />
-
+          {/* Right Side Actions */}
+          <div className="hidden md:flex items-center space-x-3 flex-shrink-0">
             {user?.is_admin > 0 && (
               <button
                 onClick={handleAdminToggle}
@@ -89,14 +94,23 @@ function Navbar({ onLogout, user }) {
               </button>
             )}
 
+            <Link
+              to="/profile"
+              className="p-2 text-gray-400 hover:text-[#ebc1b6] transition-colors"
+              title="My Profile"
+            >
+              <SafeIcon icon={FiUser} className="text-lg" />
+            </Link>
+
             <button
               onClick={onLogout}
-              className="ml-4 p-2 text-gray-400 hover:text-[#ebc1b6] transition-colors"
+              className="p-2 text-gray-400 hover:text-[#ebc1b6] transition-colors"
             >
               <SafeIcon icon={FiLogOut} className="text-lg" />
             </button>
           </div>
 
+          {/* Mobile Menu Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="md:hidden p-2 rounded-lg text-[#ebc1b6]"
@@ -133,7 +147,15 @@ function Navbar({ onLogout, user }) {
                   </Link>
                 );
               })}
-              <div className="pt-4 mt-4 border-t border-white/10">
+              <div className="pt-4 mt-4 border-t border-white/10 space-y-2">
+                <Link
+                  to="/profile"
+                  onClick={() => setIsOpen(false)}
+                  className="w-full flex items-center space-x-3 px-4 py-3 text-gray-400 hover:text-[#ebc1b6] transition-colors"
+                >
+                  <SafeIcon icon={FiUser} className="text-xl" />
+                  <span className="font-medium">My Profile</span>
+                </Link>
                 <button
                   onClick={onLogout}
                   className="w-full flex items-center space-x-3 px-4 py-3 text-gray-400 hover:text-[#ebc1b6] transition-colors"

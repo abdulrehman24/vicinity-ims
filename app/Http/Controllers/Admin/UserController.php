@@ -19,7 +19,7 @@ class UserController extends Controller
     {
         $this->ensureSuperAdmin();
 
-        $query = User::query()->orderBy('name')->orderBy('email');
+        $query = User::query()->where('id', '!=', auth()->id())->orderBy('name')->orderBy('email');
 
         if ($request->filled('search')) {
             $search = $request->input('search');

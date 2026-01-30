@@ -151,23 +151,58 @@ export function InventoryProvider({ children, user }) {
 
   const addEquipment = async (newItem) => {
     try {
-      const response = await axios.post('/equipment', newItem);
+      let response;
+      if (newItem.imageFile) {
+        const formData = new FormData();
+        Object.keys(newItem).forEach(key => {
+          if (key === 'imageFile') {
+            formData.append('image', newItem.imageFile);
+          } else if (key !== 'image') {
+            formData.append(key, newItem[key]);
+          }
+        });
+        response = await axios.post('/equipment', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      } else {
+        const { image, imageFile, ...rest } = newItem;
+        response = await axios.post('/equipment', rest);
+      }
+
       dispatch({ type: 'ADD_EQUIPMENT', payload: response.data.data });
       toast.success("Equipment added successfully");
     } catch (error) {
       console.error("Failed to add equipment", error);
-      toast.error("Failed to add equipment");
+      toast.error(error.response?.data?.message || "Failed to add equipment");
     }
   };
 
   const updateEquipment = async (updatedItem) => {
     try {
-      const response = await axios.put(`/equipment/${updatedItem.id}`, updatedItem);
+      let response;
+      if (updatedItem.imageFile) {
+        const formData = new FormData();
+        formData.append('_method', 'PUT');
+        Object.keys(updatedItem).forEach(key => {
+          if (key === 'imageFile') {
+            formData.append('image', updatedItem.imageFile);
+          } else if (key !== 'image') {
+            formData.append(key, updatedItem[key]);
+          }
+        });
+        response = await axios.post(`/equipment/${updatedItem.id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      } else {
+        const { image, imageFile, ...rest } = updatedItem;
+        response = await axios.put(`/equipment/${updatedItem.id}`, rest);
+      }
+
       dispatch({ type: 'UPDATE_EQUIPMENT', payload: response.data.data });
       toast.success("Equipment updated successfully");
     } catch (error) {
       console.error("Failed to update equipment", error);
-      toast.error("Failed to update equipment");
+      toast.error(error.response?.data?.message || "Failed to update equipment");
     }
   };
 
