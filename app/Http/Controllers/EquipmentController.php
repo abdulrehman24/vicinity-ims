@@ -10,6 +10,8 @@ use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
 
+use Illuminate\Support\Facades\Log;
+
 class EquipmentController extends Controller
 {
     public function index()
@@ -160,20 +162,31 @@ class EquipmentController extends Controller
 
     private function processAndSaveImage($file)
     {
+        $startTime = microtime(true);
+        Log::info('Image processing started for file: ' . $file->getClientOriginalName());
+
         $manager = new ImageManager(new Driver());
         $image = $manager->read($file);
+
+        Log::info('Image read completed in ' . round(microtime(true) - $startTime, 4) . 's');
 
         // Resize to max 1200px width, maintaining aspect ratio, preventing upsizing
         $image->scaleDown(width: 1200);
 
-        // Encode to WebP with 75% quality
-        $encoded = $image->toWebp(quality: 75);
+        Log::info('Image scaling completed in ' . round(microtime(true) - $startTime, 4) . 's');
+
+        // Encode to JPEG with 75% quality for better performance on limited resources
+        $encoded = $image->toJpeg(quality: 75);
+
+        Log::info('Image encoding completed in ' . round(microtime(true) - $startTime, 4) . 's');
 
         // Generate filename
-        $filename = 'equipment/' . Str::random(40) . '.webp';
+        $filename = 'equipment/' . Str::random(40) . '.jpg';
 
         // Save to public disk
         Storage::disk('public')->put($filename, (string) $encoded);
+
+        Log::info('Image saved to disk in ' . round(microtime(true) - $startTime, 4) . 's');
 
         return '/storage/' . $filename;
     }

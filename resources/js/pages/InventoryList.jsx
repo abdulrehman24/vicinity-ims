@@ -10,6 +10,7 @@ import * as FiIcons from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import AdminAuthModal from '../components/AdminAuthModal'; // Deprecated but keeping for reference if needed
 import SecurityModal from '../components/SecurityModal';
+import imageCompression from 'browser-image-compression';
 
 const { 
   FiSearch, FiPlus, FiEdit2, FiX, FiCamera, FiHash, FiMapPin, 
@@ -367,16 +368,42 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
 
   const isEditing = !!initialData;
 
-  const onDrop = useCallback((acceptedFiles) => {
+  const onDrop = useCallback(async (acceptedFiles) => {
     const file = acceptedFiles[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = () => setFormData(prev => ({ 
-        ...prev, 
-        image: reader.result,
-        imageFile: file 
-      }));
-      reader.readAsDataURL(file);
+      // Compress image before setting state
+      const options = {
+        maxSizeMB: 1, // Max 1MB
+        maxWidthOrHeight: 1920, // Max 1920px
+        useWebWorker: true,
+      };
+
+      try {
+        const compressedFile = await imageCompression(file, options);
+        
+        // Use compressed file for preview and upload
+        const reader = new FileReader();
+        reader.onload = () => setFormData(prev => ({ 
+          ...prev, 
+          image: reader.result,
+          imageFile: compressedFile 
+        }));
+        reader.readAsDataURL(compressedFile);
+        
+        // toast.success(`Image compressed: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      } catch (error) {
+        console.error('Image compression failed:', error);
+        toast.error('Image compression failed, using original file');
+        
+        // Fallback to original file
+        const reader = new FileReader();
+        reader.onload = () => setFormData(prev => ({ 
+          ...prev, 
+          image: reader.result,
+          imageFile: file 
+        }));
+        reader.readAsDataURL(file);
+      }
     }
   }, []);
 
