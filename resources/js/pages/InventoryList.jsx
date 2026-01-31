@@ -137,7 +137,13 @@ function InventoryList() {
 
       <AnimatePresence>
         {isModalOpen && (
-          <NewEntryModal onClose={() => setIsModalOpen(false)} onSubmit={(data) => { addEquipment(data); setIsModalOpen(false); }} />
+          <NewEntryModal 
+            onClose={() => setIsModalOpen(false)} 
+            onSubmit={async (data) => { 
+              await addEquipment(data); 
+              setIsModalOpen(false); 
+            }} 
+          />
         )}
 
         {/* <AdminAuthModal 
@@ -150,7 +156,10 @@ function InventoryList() {
           <NewEntryModal 
             initialData={editingItem}
             onClose={() => setEditingItem(null)} 
-            onSubmit={(data) => { updateEquipment({...data, id: editingItem.id}); setEditingItem(null); }} 
+            onSubmit={async (data) => { 
+              await updateEquipment({...data, id: editingItem.id}); 
+              setEditingItem(null); 
+            }} 
           />
         )}
         
@@ -336,6 +345,7 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate
 
 function NewEntryModal({ onClose, onSubmit, initialData }) {
   const [categories, setCategories] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState(initialData || {
     name: '',
     category: 'Camera Body',
@@ -413,10 +423,17 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
     multiple: false
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name) return;
-    onSubmit(formData);
+    
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } catch (error) {
+      console.error(error);
+      setIsSubmitting(false); // Only stop loading on error, as success unmounts component
+    }
   };
 
   return (
@@ -476,7 +493,20 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
             </div>
           </div>
           <div className="pt-8 mt-8 border-t border-gray-100 flex justify-end">
-            <button type="submit" className="bg-[#4a5a67] text-[#ebc1b6] px-12 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:shadow-xl transition-all"> {isEditing ? 'Update Equipment' : 'Register Equipment'} </button>
+            <button 
+              type="submit" 
+              disabled={isSubmitting}
+              className={`bg-[#4a5a67] text-[#ebc1b6] px-12 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:shadow-xl transition-all flex items-center space-x-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+            > 
+              {isSubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-[#ebc1b6] border-t-transparent rounded-full animate-spin"></div>
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <span>{isEditing ? 'Update Equipment' : 'Register Equipment'}</span>
+              )}
+            </button>
           </div>
         </form>
       </motion.div>
