@@ -383,9 +383,10 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
     if (file) {
       // Compress image before setting state
       const options = {
-        maxSizeMB: 1, // Max 1MB
-        maxWidthOrHeight: 1920, // Max 1920px
+        maxSizeMB: 0.2, // Aggressive compression: Max 200KB
+        maxWidthOrHeight: 1024, // Max 1024px
         useWebWorker: true,
+        initialQuality: 0.7,
       };
 
       try {
@@ -400,7 +401,7 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
         }));
         reader.readAsDataURL(compressedFile);
         
-        // toast.success(`Image compressed: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+        toast.success(`Image optimized: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
       } catch (error) {
         console.error('Image compression failed:', error);
         toast.error('Image compression failed, using original file');
