@@ -25,6 +25,10 @@ function CalendarPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const feedUrl = typeof window !== 'undefined' ? `${window.location.origin}/calendar/feed` : '';
+  const webcalUrl = feedUrl.replace(/^https?:\/\//, 'webcal://');
+  const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(feedUrl)}`;
+
   const activeBookingCount = useMemo(() => {
     const ids = new Set();
     bookings.forEach(b => {
@@ -347,37 +351,52 @@ function CalendarPage() {
                       <input 
                           type="text" 
                           readOnly 
-                          value={`${window.location.origin}/calendar/feed`}
+                          value={feedUrl}
                           className="flex-1 bg-transparent text-[10px] font-mono text-gray-600 focus:outline-none px-2"
                       />
                       <button 
                           onClick={handleCopyUrl}
                           className="p-2 bg-white rounded-lg shadow-sm text-[#4a5a67] hover:text-[#ebc1b6] transition-colors"
+                          title="Copy URL"
                       >
                           <SafeIcon icon={copied ? FiCheck : FiCopy} />
                       </button>
                   </div>
 
-                  <button 
-                    onClick={handleCopyUrl}
-                    className="w-full flex items-center justify-center space-x-3 py-4 bg-[#4a5a67] text-[#ebc1b6] rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:shadow-xl transition-all"
-                  >
-                    <SafeIcon icon={copied ? FiCheck : FiCopy} />
-                    <span>{copied ? 'Copied!' : 'Copy Subscription URL'}</span>
-                  </button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <a 
+                      href={googleUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center space-x-2 py-3 bg-[#4285F4] text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-md hover:shadow-lg transition-all"
+                    >
+                      <SafeIcon icon={FiCalendar} />
+                      <span>Google Cal</span>
+                    </a>
+                    <a 
+                      href={webcalUrl}
+                      className="flex items-center justify-center space-x-2 py-3 bg-[#4a5a67] text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-md hover:shadow-lg transition-all"
+                    >
+                      <SafeIcon icon={FiExternalLink} />
+                      <span>App / Outlook</span>
+                    </a>
+                  </div>
 
                   <button 
                     onClick={handleExport}
-                    className="w-full flex items-center justify-center space-x-3 py-4 border-2 border-[#4a5a67] text-[#4a5a67] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-all"
+                    className="w-full flex items-center justify-center space-x-3 py-3 border-2 border-[#4a5a67] text-[#4a5a67] rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-all"
                   >
                     <SafeIcon icon={FiDownload} />
-                    <span>Download Snapshot (.ics)</span>
+                    <span>Download .ics File</span>
                   </button>
                 </div>
 
-                <div className="text-center">
+                <div className="text-center space-y-2">
                   <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">
                     Compatible with: Google • Outlook • Apple • Proton
+                  </p>
+                  <p className="text-[8px] text-gray-400">
+                    Note: For Google Calendar, ensure your site is publicly accessible.
                   </p>
                 </div>
               </div>
