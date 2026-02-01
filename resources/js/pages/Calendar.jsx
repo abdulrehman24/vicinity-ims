@@ -26,7 +26,7 @@ function CalendarPage() {
 
   const feedUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/calendar/feed` : '';
   const webcalUrl = feedUrl.replace(/^https?:\/\//, 'webcal://');
-  const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(feedUrl)}`;
+  const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcalUrl)}`;
 
   const activeBookingCount = useMemo(() => {
     const ids = new Set();
