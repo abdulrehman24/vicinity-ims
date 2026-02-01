@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
 
 class AuthController extends Controller
 {
@@ -75,6 +79,62 @@ class AuthController extends Controller
             'message' => 'Logged in successfully.',
             'user' => Auth::user(),
         ]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = Auth::user();
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
+            'avatar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:5120'], // 5MB Max
+        ]);
+
+        $user->name = $data['name'];
+        $user->email = $data['email'];
+
+        if ($request->hasFile('avatar')) {
+            // Delete old avatar if exists
+            if ($user->avatar) {
+                $oldPath = str_replace('/storage/', '', $user->avatar);
+                if (Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
+            }
+
+            $path = $this->processAndSaveAvatar($request->file('avatar'));
+            if ($path) {
+                $user->avatar = $path;
+            }
+        }
+
+        $user->save();
+
+        return response()->json([
+            'message' => 'Profile updated successfully.',
+            'user' => $user,
+        ]);
+    }
+
+    private function processAndSaveAvatar($file)
+    {
+        $manager = new ImageManager(new Driver());
+        $image = $manager->read($file);
+
+        // Resize to max 500px width/height for avatar
+        $image->scaleDown(width: 500, height: 500);
+
+        // Encode to JPEG
+        $encoded = $image->toJpeg(quality: 80);
+
+        // Generate filename
+        $filename = 'avatars/' . Str::random(40) . '.jpg';
+
+        // Save to public disk
+        Storage::disk('public')->put($filename, (string) $encoded);
+
+        return '/storage/' . $filename;
     }
 
     public function changePassword(Request $request)

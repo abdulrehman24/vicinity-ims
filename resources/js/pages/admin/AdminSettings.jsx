@@ -16,6 +16,18 @@ function AdminSettings() {
   const [auditNextDate, setAuditNextDate] = useState('');
   const [auditSaving, setAuditSaving] = useState(false);
 
+  const [stockTakeEnabled, setStockTakeEnabled] = useState(false);
+  const [stockTakeDaysBefore, setStockTakeDaysBefore] = useState(30);
+  const [stockTakeDaysOverdue, setStockTakeDaysOverdue] = useState(3);
+  const [stockTakeFrequency, setStockTakeFrequency] = useState('weekly');
+  const [stockTakeEmails, setStockTakeEmails] = useState('');
+  const [stockTakeSaving, setStockTakeSaving] = useState(false);
+
+  const [notifyCreator, setNotifyCreator] = useState(true);
+  const [notifyAdmins, setNotifyAdmins] = useState(true);
+  const [notifyEmails, setNotifyEmails] = useState('');
+  const [notifySaving, setNotifySaving] = useState(false);
+
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -38,6 +50,22 @@ function AdminSettings() {
         if (auditRes.data) {
           setAuditInterval(auditRes.data.audit_interval_months || 6);
           setAuditNextDate(auditRes.data.audit_next_date || '');
+        }
+
+        const stockTakeRes = await axios.get('/api/admin/stock-take-settings');
+        if (stockTakeRes.data) {
+          setStockTakeEnabled(stockTakeRes.data.stock_take_reminder_enabled);
+          setStockTakeDaysBefore(stockTakeRes.data.stock_take_reminder_days_before);
+          setStockTakeDaysOverdue(stockTakeRes.data.stock_take_reminder_days_overdue);
+          setStockTakeFrequency(stockTakeRes.data.stock_take_reminder_frequency);
+          setStockTakeEmails(stockTakeRes.data.stock_take_notify_emails);
+        }
+
+        const notifyRes = await axios.get('/api/admin/notification-settings');
+        if (notifyRes.data) {
+          setNotifyCreator(notifyRes.data.booking_notify_creator);
+          setNotifyAdmins(notifyRes.data.booking_notify_admins);
+          setNotifyEmails(notifyRes.data.booking_notify_emails || '');
         }
       } catch (e) {
         toast.error('Failed to load settings');
@@ -63,6 +91,42 @@ function AdminSettings() {
       toast.error('Failed to update audit settings');
     } finally {
       setAuditSaving(false);
+    }
+  };
+
+  const handleStockTakeReminderSubmit = async (e) => {
+    e.preventDefault();
+    setStockTakeSaving(true);
+    try {
+      await axios.post('/api/admin/stock-take-settings', {
+        stock_take_reminder_enabled: stockTakeEnabled,
+        stock_take_reminder_days_before: stockTakeDaysBefore,
+        stock_take_reminder_days_overdue: stockTakeDaysOverdue,
+        stock_take_reminder_frequency: stockTakeFrequency,
+        stock_take_notify_emails: stockTakeEmails
+      });
+      toast.success('Stock take reminder settings updated');
+    } catch (e) {
+      toast.error('Failed to update stock take reminder settings');
+    } finally {
+      setStockTakeSaving(false);
+    }
+  };
+
+  const handleNotifySubmit = async (e) => {
+    e.preventDefault();
+    setNotifySaving(true);
+    try {
+      await axios.post('/api/admin/notification-settings', {
+        booking_notify_creator: notifyCreator,
+        booking_notify_admins: notifyAdmins,
+        booking_notify_emails: notifyEmails
+      });
+      toast.success('Notification settings updated');
+    } catch (e) {
+      toast.error('Failed to update notification settings');
+    } finally {
+      setNotifySaving(false);
     }
   };
 
@@ -261,6 +325,67 @@ function AdminSettings() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                Notifications
+              </p>
+              <h2 className="text-sm font-bold text-[#4a5a67]">
+                Booking Confirmation Recipients
+              </h2>
+            </div>
+          </div>
+          <form onSubmit={handleNotifySubmit} className="space-y-6">
+            <div className="space-y-4">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={notifyCreator}
+                  onChange={(e) => setNotifyCreator(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-300 text-[#ebc1b6] focus:ring-[#ebc1b6]"
+                />
+                <span className="text-sm font-bold text-[#4a5a67]">Send to Booking Creator</span>
+              </label>
+              
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={notifyAdmins}
+                  onChange={(e) => setNotifyAdmins(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-300 text-[#ebc1b6] focus:ring-[#ebc1b6]"
+                />
+                <span className="text-sm font-bold text-[#4a5a67]">Send to All Admins</span>
+              </label>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">
+                Additional Email Recipients
+              </label>
+              <textarea
+                value={notifyEmails}
+                onChange={(e) => setNotifyEmails(e.target.value)}
+                placeholder="email1@example.com, email2@example.com"
+                className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-sm text-[#4a5a67] min-h-[80px]"
+              />
+              <p className="mt-2 text-[11px] text-gray-400">
+                Comma-separated list of additional email addresses to receive booking confirmations.
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={notifySaving}
+                className="px-6 py-2 rounded-xl bg-[#4a5a67] text-[#ebc1b6] text-xs font-black uppercase tracking-[0.2em] shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+              >
+                {notifySaving ? 'Saving…' : 'Save Notification Settings'}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                 Stock Take
               </p>
               <h2 className="text-sm font-bold text-[#4a5a67]">
@@ -306,6 +431,110 @@ function AdminSettings() {
                 className="px-6 py-2 rounded-xl bg-[#4a5a67] text-[#ebc1b6] text-xs font-black uppercase tracking-[0.2em] shadow-md hover:shadow-lg transition-all disabled:opacity-50"
               >
                 {auditSaving ? 'Saving…' : 'Save Audit Settings'}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                Stock Take
+              </p>
+              <h2 className="text-sm font-bold text-[#4a5a67]">
+                Reminder Notifications
+              </h2>
+            </div>
+          </div>
+          <form onSubmit={handleStockTakeReminderSubmit} className="space-y-6">
+            <div className="space-y-4">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={stockTakeEnabled}
+                  onChange={(e) => setStockTakeEnabled(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-300 text-[#ebc1b6] focus:ring-[#ebc1b6]"
+                />
+                <span className="text-sm font-bold text-[#4a5a67]">Enable Reminders</span>
+              </label>
+            </div>
+
+            {stockTakeEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">
+                    Remind Before (Days)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="90"
+                    value={stockTakeDaysBefore}
+                    onChange={(e) => setStockTakeDaysBefore(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-sm text-[#4a5a67]"
+                  />
+                  <p className="mt-2 text-[11px] text-gray-400">
+                    Send reminders this many days before the audit is due.
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">
+                    Remind After (Days)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="90"
+                    value={stockTakeDaysOverdue}
+                    onChange={(e) => setStockTakeDaysOverdue(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-sm text-[#4a5a67]"
+                  />
+                  <p className="mt-2 text-[11px] text-gray-400">
+                    Send reminders this many days after the audit is overdue.
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">
+                    Reminder Frequency
+                  </label>
+                  <select
+                    value={stockTakeFrequency}
+                    onChange={(e) => setStockTakeFrequency(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-sm text-[#4a5a67]"
+                  >
+                    <option value="weekly">Weekly</option>
+                    <option value="daily">Daily</option>
+                  </select>
+                  <p className="mt-2 text-[11px] text-gray-400">
+                    How often to repeat the reminder within the active window.
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">
+                    Additional Recipients
+                  </label>
+                  <input
+                    type="text"
+                    value={stockTakeEmails}
+                    onChange={(e) => setStockTakeEmails(e.target.value)}
+                    placeholder="email@example.com"
+                    className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-sm text-[#4a5a67]"
+                  />
+                  <p className="mt-2 text-[11px] text-gray-400">
+                    Comma-separated emails. Admins are included by default.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={stockTakeSaving}
+                className="px-6 py-2 rounded-xl bg-[#4a5a67] text-[#ebc1b6] text-xs font-black uppercase tracking-[0.2em] shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+              >
+                {stockTakeSaving ? 'Saving…' : 'Save Reminder Settings'}
               </button>
             </div>
           </form>

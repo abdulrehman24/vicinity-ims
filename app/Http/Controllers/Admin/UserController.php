@@ -104,4 +104,17 @@ class UserController extends Controller
             'created_at' => $user->created_at,
         ]);
     }
+
+    public function destroy(User $user)
+    {
+        $this->ensureSuperAdmin();
+
+        if ($user->is_admin >= 2 || auth()->id() === $user->id) {
+            abort(403, 'Cannot delete yourself or another super admin');
+        }
+
+        $user->delete();
+
+        return response()->noContent();
+    }
 }

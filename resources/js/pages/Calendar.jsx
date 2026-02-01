@@ -8,13 +8,22 @@ import { downloadCalendarFeed } from '../utils/calendarUtils';
 import * as FiIcons from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
-const { FiCalendar, FiClock, FiUser, FiCamera, FiShare2, FiDownload, FiExternalLink, FiInfo, FiX } = FiIcons;
+const { FiCalendar, FiClock, FiUser, FiCamera, FiShare2, FiDownload, FiExternalLink, FiInfo, FiX, FiCopy, FiCheck } = FiIcons;
 import 'react-calendar/dist/Calendar.css';
 
 function CalendarPage() {
   const { bookings, equipment } = useInventory();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showSyncModal, setShowSyncModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyUrl = () => {
+    const url = `${window.location.origin}/calendar/feed`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    toast.success("Calendar URL copied to clipboard");
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const activeBookingCount = useMemo(() => {
     const ids = new Set();
@@ -326,37 +335,43 @@ function CalendarPage() {
                     <SafeIcon icon={FiInfo} className="text-[#4a5a67]" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-[#4a5a67] mb-1">How it works</h4>
+                    <h4 className="text-xs font-bold text-[#4a5a67] mb-1">Live Subscription</h4>
                     <p className="text-[10px] text-gray-500 leading-relaxed font-medium">
-                      Download the .ics file below to import all current bookings into your preferred calendar app. 
-                      In production, this provides a live subscription link.
+                      Copy the URL below and subscribe in your calendar app (Google Calendar: "Add from URL"). This keeps your schedule automatically updated.
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-3">
+                  <div className="flex items-center space-x-2 bg-gray-100 p-2 rounded-xl border border-gray-200">
+                      <input 
+                          type="text" 
+                          readOnly 
+                          value={`${window.location.origin}/calendar/feed`}
+                          className="flex-1 bg-transparent text-[10px] font-mono text-gray-600 focus:outline-none px-2"
+                      />
+                      <button 
+                          onClick={handleCopyUrl}
+                          className="p-2 bg-white rounded-lg shadow-sm text-[#4a5a67] hover:text-[#ebc1b6] transition-colors"
+                      >
+                          <SafeIcon icon={copied ? FiCheck : FiCopy} />
+                      </button>
+                  </div>
+
                   <button 
-                    onClick={handleExport}
+                    onClick={handleCopyUrl}
                     className="w-full flex items-center justify-center space-x-3 py-4 bg-[#4a5a67] text-[#ebc1b6] rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:shadow-xl transition-all"
                   >
-                    <SafeIcon icon={FiDownload} />
-                    <span>Download iCal Feed (.ics)</span>
+                    <SafeIcon icon={copied ? FiCheck : FiCopy} />
+                    <span>{copied ? 'Copied!' : 'Copy Subscription URL'}</span>
                   </button>
 
                   <button 
-                    onClick={() => {
-                      handleExport();
-                      window.open('https://calendar.google.com/calendar/r/settings/export', '_blank');
-                      toast((t) => (
-                        <span>
-                          <b>Step 2:</b> Upload the downloaded file to the <b>"Import"</b> section in Google Calendar.
-                        </span>
-                      ), { icon: 'ℹ️', duration: 5000 });
-                    }}
+                    onClick={handleExport}
                     className="w-full flex items-center justify-center space-x-3 py-4 border-2 border-[#4a5a67] text-[#4a5a67] rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 transition-all"
                   >
-                    <SafeIcon icon={FiExternalLink} />
-                    <span>Import to Google Calendar</span>
+                    <SafeIcon icon={FiDownload} />
+                    <span>Download Snapshot (.ics)</span>
                   </button>
                 </div>
 

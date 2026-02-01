@@ -15,16 +15,18 @@ class SupportTicketMail extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public SupportTicket $ticket;
+    public string $customSubject;
 
-    public function __construct(SupportTicket $ticket)
+    public function __construct(SupportTicket $ticket, string $subject = null)
     {
         $this->ticket = $ticket;
+        $this->customSubject = $subject ?? ('New Support Ticket: '.$this->ticket->ticket_code);
     }
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'New Support Ticket: '.$this->ticket->ticket_code,
+            subject: $this->customSubject,
         );
     }
 

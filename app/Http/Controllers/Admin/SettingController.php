@@ -154,4 +154,77 @@ class SettingController extends Controller
             'app_favicon_url' => $faviconUrl ?: null,
         ]);
     }
+
+    public function showNotificationSettings()
+    {
+        $this->ensureSuperAdmin();
+
+        $notifyCreator = Setting::where('key', 'booking_notify_creator')->value('value');
+        $notifyAdmins = Setting::where('key', 'booking_notify_admins')->value('value');
+        $notifyEmails = Setting::where('key', 'booking_notify_emails')->value('value');
+
+        return response()->json([
+            // Default to true if not set
+            'booking_notify_creator' => $notifyCreator === null ? true : $notifyCreator === '1',
+            'booking_notify_admins' => $notifyAdmins === null ? true : $notifyAdmins === '1',
+            'booking_notify_emails' => $notifyEmails ?? '',
+        ]);
+    }
+
+    public function updateNotificationSettings(Request $request)
+    {
+        $this->ensureSuperAdmin();
+
+        $data = $request->validate([
+            'booking_notify_creator' => ['required', 'boolean'],
+            'booking_notify_admins' => ['required', 'boolean'],
+            'booking_notify_emails' => ['nullable', 'string'],
+        ]);
+
+        Setting::updateOrCreate(['key' => 'booking_notify_creator'], ['value' => $data['booking_notify_creator'] ? '1' : '0']);
+        Setting::updateOrCreate(['key' => 'booking_notify_admins'], ['value' => $data['booking_notify_admins'] ? '1' : '0']);
+        Setting::updateOrCreate(['key' => 'booking_notify_emails'], ['value' => $data['booking_notify_emails'] ?? '']);
+
+        return response()->json($data);
+    }
+
+    public function showStockTakeSettings()
+    {
+        $this->ensureSuperAdmin();
+
+        $enabled = Setting::where('key', 'stock_take_reminder_enabled')->value('value');
+        $daysBefore = Setting::where('key', 'stock_take_reminder_days_before')->value('value');
+        $daysOverdue = Setting::where('key', 'stock_take_reminder_days_overdue')->value('value');
+        $frequency = Setting::where('key', 'stock_take_reminder_frequency')->value('value');
+        $emails = Setting::where('key', 'stock_take_notify_emails')->value('value');
+
+        return response()->json([
+            'stock_take_reminder_enabled' => $enabled === '1',
+            'stock_take_reminder_days_before' => $daysBefore ? (int)$daysBefore : 30,
+            'stock_take_reminder_days_overdue' => $daysOverdue ? (int)$daysOverdue : 3,
+            'stock_take_reminder_frequency' => $frequency ?: 'weekly',
+            'stock_take_notify_emails' => $emails ?? '',
+        ]);
+    }
+
+    public function updateStockTakeSettings(Request $request)
+    {
+        $this->ensureSuperAdmin();
+
+        $data = $request->validate([
+            'stock_take_reminder_enabled' => ['required', 'boolean'],
+            'stock_take_reminder_days_before' => ['required', 'integer', 'min:1'],
+            'stock_take_reminder_days_overdue' => ['required', 'integer', 'min:1'],
+            'stock_take_reminder_frequency' => ['required', 'in:daily,weekly'],
+            'stock_take_notify_emails' => ['nullable', 'string'],
+        ]);
+
+        Setting::updateOrCreate(['key' => 'stock_take_reminder_enabled'], ['value' => $data['stock_take_reminder_enabled'] ? '1' : '0']);
+        Setting::updateOrCreate(['key' => 'stock_take_reminder_days_before'], ['value' => (string)$data['stock_take_reminder_days_before']]);
+        Setting::updateOrCreate(['key' => 'stock_take_reminder_days_overdue'], ['value' => (string)$data['stock_take_reminder_days_overdue']]);
+        Setting::updateOrCreate(['key' => 'stock_take_reminder_frequency'], ['value' => $data['stock_take_reminder_frequency']]);
+        Setting::updateOrCreate(['key' => 'stock_take_notify_emails'], ['value' => $data['stock_take_notify_emails'] ?? '']);
+
+        return response()->json($data);
+    }
 }

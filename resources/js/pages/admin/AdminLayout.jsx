@@ -77,6 +77,27 @@ function AdminLayout({ onLogout }) {
               </p>
             )}
             <NavLink
+              to="/admin/dashboard"
+              className={({ isActive }) =>
+                `group relative flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-white text-[#4a5a67] shadow-sm'
+                    : 'text-gray-200 hover:bg-white/10 hover:text-white'
+                }`
+              }
+            >
+              <div
+                className={`absolute left-0 inset-y-1 w-1 rounded-full transition-opacity ${
+                  collapsed ? 'opacity-0' : 'opacity-100'
+                } ${location.pathname.startsWith('/admin/dashboard') ? 'bg-[#ebc1b6]' : 'bg-transparent'}`}
+              />
+              <SafeIcon
+                icon={FiHome}
+                className={`text-lg ${collapsed ? 'mx-auto' : 'mr-3'}`}
+              />
+              {!collapsed && <span>Dashboard</span>}
+            </NavLink>
+            <NavLink
               to="/admin/categories"
               className={({ isActive }) =>
                 `group relative flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-all ${
@@ -96,6 +117,27 @@ function AdminLayout({ onLogout }) {
                 className={`text-lg ${collapsed ? 'mx-auto' : 'mr-3'}`}
               />
               {!collapsed && <span>Categories</span>}
+            </NavLink>
+            <NavLink
+               to="/admin/inventory"
+              className={({ isActive }) =>
+                `group relative flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-white text-[#4a5a67] shadow-sm'
+                    : 'text-gray-200 hover:bg-white/10 hover:text-white'
+                }`
+              }
+            >
+              <div
+                className={`absolute left-0 inset-y-1 w-1 rounded-full transition-opacity ${
+                  collapsed ? 'opacity-0' : 'opacity-100'
+                } ${location.pathname.startsWith('/admin/inventory') ? 'bg-[#ebc1b6]' : 'bg-transparent'}`}
+              />
+              <SafeIcon
+                icon={FiPackage}
+                className={`text-lg ${collapsed ? 'mx-auto' : 'mr-3'}`}
+              />
+              {!collapsed && <span>Inventory</span>}
             </NavLink>
             <NavLink
               to="/admin/bundles"

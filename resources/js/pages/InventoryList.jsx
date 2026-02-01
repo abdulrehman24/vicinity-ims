@@ -15,7 +15,7 @@ import imageCompression from 'browser-image-compression';
 const { 
   FiSearch, FiPlus, FiEdit2, FiX, FiCamera, FiHash, FiMapPin, 
   FiCheck, FiUpload, FiBriefcase, FiAlertTriangle, FiShield, 
-  FiCalendar, FiFileText, FiTool, FiWrench 
+  FiCalendar, FiFileText, FiTool, FiWrench, FiFilter 
 } = FiIcons;
 
 function InventoryList() {
@@ -31,6 +31,11 @@ function InventoryList() {
 
   const [decommissioningItem, setDecommissioningItem] = useState(null);
   const [repairingItem, setRepairingItem] = useState(null);
+
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set(equipment.map(item => item.category).filter(Boolean));
+    return Array.from(cats).sort();
+  }, [equipment]);
 
   const fuse = useMemo(() => new Fuse(equipment, {
     keys: ['name', 'serialNumber', 'category', 'equipmentType', 'businessUnit'],
@@ -118,6 +123,23 @@ function InventoryList() {
         <div className="relative flex-1">
           <SafeIcon icon={FiSearch} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" placeholder="Search assets..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none transition-all font-medium text-[#4a5a67]" />
+        </div>
+        
+        <div className="relative w-full md:w-64">
+          <SafeIcon icon={FiFilter} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <select 
+            value={selectedCategory} 
+            onChange={(e) => setSelectedCategory(e.target.value)} 
+            className="w-full pl-12 pr-10 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none transition-all font-medium text-[#4a5a67] appearance-none cursor-pointer"
+          >
+            <option value="">All Categories</option>
+            {uniqueCategories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+          </div>
         </div>
       </div>
 
@@ -401,7 +423,6 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
         }));
         reader.readAsDataURL(compressedFile);
         
-        toast.success(`Image optimized: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
       } catch (error) {
         console.error('Image compression failed:', error);
         toast.error('Image compression failed, using original file');

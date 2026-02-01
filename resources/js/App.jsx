@@ -17,6 +17,8 @@ import ForgotPassword from './components/ForgotPassword';
 import ChangePassword from './pages/ChangePassword';
 import UserProfile from './pages/UserProfile';
 import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminInventory from './pages/admin/AdminInventory';
 import AdminCategories from './pages/admin/AdminCategories';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminTickets from './pages/admin/AdminTickets';
@@ -89,8 +91,10 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/profile" element={<UserProfile user={user} />} />
               <Route path="/admin/*" element={adminElement}>
-                <Route index element={<Navigate to="/admin/categories" replace />} />
+                <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="dashboard" element={<AdminDashboard />} />
                 <Route path="categories" element={<AdminCategories />} />
+                <Route path="inventory" element={<AdminInventory />} />
                 <Route path="tickets" element={<AdminTickets />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="settings" element={<AdminSettings />} />

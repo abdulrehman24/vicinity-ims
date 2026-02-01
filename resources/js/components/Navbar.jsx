@@ -9,7 +9,7 @@ import SecurityModal from './SecurityModal';
 const { 
   FiPackage, FiCamera, FiRefreshCw, FiCalendar, 
   FiClipboard, FiFileText, FiMenu, FiX, FiLogOut, 
-  FiShield, FiAlertOctagon, FiUser 
+  FiShield, FiAlertOctagon, FiUser, FiSettings 
 } = FiIcons;
 
 // Updated navItems: Operations (Check In/Out) is now the root path
@@ -43,7 +43,7 @@ function Navbar({ onLogout, user }) {
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-[#4a5a67] shadow-xl z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[95%] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo Section */}
           <Link to="/" className="flex items-center space-x-2 flex-shrink-0">
@@ -66,7 +66,7 @@ function Navbar({ onLogout, user }) {
                   >
                     <div className="flex items-center space-x-2 relative z-10">
                       <SafeIcon icon={item.icon} className="text-lg" />
-                      <span className="font-semibold text-sm">{item.label}</span>
+                      <span className="font-semibold text-sm whitespace-nowrap">{item.label}</span>
                     </div>
                     {isActive && (
                       <motion.div
@@ -83,15 +83,24 @@ function Navbar({ onLogout, user }) {
           {/* Right Side Actions */}
           <div className="hidden md:flex items-center space-x-3 flex-shrink-0">
             {user?.is_admin > 0 && (
-              <button
-                onClick={handleAdminToggle}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-                  isAdmin ? 'bg-red-500 text-white shadow-lg' : 'bg-white/5 text-gray-400 hover:text-white'
-                }`}
-              >
-                <SafeIcon icon={FiShield} />
-                <span>{isAdmin ? 'Admin Active' : 'Enable Admin'}</span>
-              </button>
+              <>
+                <Link
+                  to="/admin"
+                  className="flex items-center space-x-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all bg-white/5 text-gray-400 hover:text-white hover:bg-white/10"
+                >
+                  <SafeIcon icon={FiSettings} />
+                  <span>Panel</span>
+                </Link>
+                <button
+                  onClick={handleAdminToggle}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                    isAdmin ? 'bg-red-500 text-white shadow-lg' : 'bg-white/5 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <SafeIcon icon={FiShield} />
+                  <span>{isAdmin ? 'Admin Active' : 'Enable Admin'}</span>
+                </button>
+              </>
             )}
 
             <Link

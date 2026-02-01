@@ -4,8 +4,9 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
+import imageCompression from 'browser-image-compression';
 
-const { FiUser, FiLock, FiMail, FiShield, FiSave } = FiIcons;
+const { FiUser, FiLock, FiMail, FiShield, FiSave, FiCamera } = FiIcons;
 
 function UserProfile({ user }) {
   // If user is not passed as prop, we might need to get it from context or window, 
@@ -18,6 +19,73 @@ function UserProfile({ user }) {
     confirmPassword: ''
   });
   const [loading, setLoading] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+  const fileInputRef = React.useRef(null);
+  const [previewUrl, setPreviewUrl] = useState(currentUser?.avatar || null);
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit before compression
+      toast.error('Image size must be less than 10MB');
+      return;
+    }
+
+    // Compression options
+    const options = {
+      maxSizeMB: 0.5, // Compress to ~500KB
+      maxWidthOrHeight: 800,
+      useWebWorker: true,
+      initialQuality: 0.8,
+    };
+
+    setAvatarLoading(true);
+    let fileToUpload = file;
+
+    try {
+      // Create preview immediately with original file
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewUrl(objectUrl);
+
+      // Compress
+      try {
+        const compressedFile = await imageCompression(file, options);
+        fileToUpload = compressedFile;
+        // console.log(`Compressed: ${(compressedFile.size / 1024).toFixed(2)}KB`);
+      } catch (compressionError) {
+        console.error('Compression failed, using original:', compressionError);
+        // Continue with original file if compression fails
+      }
+
+      // Upload
+      const formData = new FormData();
+      formData.append('avatar', fileToUpload);
+      formData.append('name', currentUser.name);
+      formData.append('email', currentUser.email);
+
+      const response = await axios.post('/profile/update', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      toast.success('Profile picture updated');
+      if (window.user) {
+        window.user.avatar = response.data.user.avatar;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to update profile picture');
+      setPreviewUrl(currentUser?.avatar || null); // Revert on error
+    } finally {
+      setAvatarLoading(false);
+    }
+  };
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
@@ -67,9 +135,32 @@ function UserProfile({ user }) {
         {/* User Info Card */}
         <div className="md:col-span-1">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-[#4a5a67]">
-              <SafeIcon icon={FiUser} className="text-4xl" />
+            <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
+              <div className="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-[#4a5a67] overflow-hidden border-4 border-white shadow-lg">
+                {previewUrl ? (
+                  <img src={previewUrl} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <SafeIcon icon={FiUser} className="text-4xl" />
+                )}
+              </div>
+              <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity mb-4">
+                 <SafeIcon icon={FiCamera} className="text-white text-2xl" />
+              </div>
+              {avatarLoading && (
+                 <div className="absolute inset-0 bg-white/50 rounded-full flex items-center justify-center mb-4">
+                    <div className="w-8 h-8 border-4 border-[#ebc1b6] border-t-transparent rounded-full animate-spin"></div>
+                 </div>
+              )}
             </div>
+            
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/*"
+              onChange={handleFileChange}
+            />
+
             <h2 className="text-xl font-bold text-[#4a5a67]">{currentUser?.name}</h2>
             <p className="text-sm text-gray-400 font-medium mb-4">{currentUser?.email}</p>
             

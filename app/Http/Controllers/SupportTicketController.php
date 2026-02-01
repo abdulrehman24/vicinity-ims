@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\SupportTicketMail;
 use App\Models\SupportTicket;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -45,14 +46,7 @@ class SupportTicketController extends Controller
             'status' => 'open',
         ]);
 
-        try {
-            $to = config('mail.support_address') ?? config('mail.from.address');
-            if ($to) {
-                Mail::to($to)->queue(new SupportTicketMail($ticket->load('equipment')));
-            }
-        } catch (\Throwable $e) {
-            Log::error('Support ticket email failed: '.$e->getMessage());
-        }
+        $this->notifyUsers($ticket->load('equipment'), 'New Support Ticket: '.$ticket->ticket_code);
 
         return response()->json([
             'message' => 'Support ticket created',
@@ -66,10 +60,44 @@ class SupportTicketController extends Controller
             'status' => 'required|string|in:open,in_progress,resolved',
         ]);
 
+        $oldStatus = $ticket->status;
         $ticket->status = $validated['status'];
         $ticket->save();
 
+        if ($oldStatus !== $ticket->status) {
+            $statusLabel = str_replace('_', ' ', ucfirst($ticket->status));
+            $this->notifyUsers($ticket->load('equipment'), 'Support Ticket Update: '.$ticket->ticket_code.' is now '.$statusLabel);
+        }
+
         return response()->json($ticket->load('equipment'));
+    }
+
+    protected function notifyUsers(SupportTicket $ticket, string $subject)
+    {
+        try {
+            // Get all approved users
+            $recipients = User::where('is_approved', true)->pluck('email')->toArray();
+
+            // Add support address if configured
+            $supportAddress = config('mail.support_address');
+            if ($supportAddress) {
+                $recipients[] = $supportAddress;
+            } else {
+                 $fromAddress = config('mail.from.address');
+                 if ($fromAddress) $recipients[] = $fromAddress;
+            }
+
+            // Filter unique and valid emails
+            $recipients = array_unique(array_filter($recipients, function ($email) {
+                return filter_var($email, FILTER_VALIDATE_EMAIL);
+            }));
+
+            foreach ($recipients as $email) {
+                Mail::to($email)->queue(new SupportTicketMail($ticket, $subject));
+            }
+        } catch (\Throwable $e) {
+            Log::error('Support ticket notification failed: '.$e->getMessage());
+        }
     }
 
     protected function generateTicketCode(): string

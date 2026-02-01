@@ -119,6 +119,26 @@ function AdminUsers() {
     }
   };
 
+  const handleDeleteUser = async (user) => {
+    if (!window.confirm(`Are you sure you want to delete user ${user.email}? This action cannot be undone.`)) {
+        return;
+    }
+    
+    setUpdatingId(user.id);
+    try {
+        await axios.delete(`/api/admin/users/${user.id}`);
+        setUsers((current) => current.filter((u) => u.id !== user.id));
+        setTotal((prev) => prev - 1);
+        toast.success(`User ${user.email} deleted successfully`);
+    } catch (e) {
+        console.error(e);
+        toast.error(e.response?.data?.message || 'Failed to delete user');
+    } finally {
+        setUpdatingId(null);
+        setOpenMenuId(null);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -274,6 +294,16 @@ function AdminUsers() {
                                className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 uppercase tracking-wider"
                              >
                                Remove Admin
+                             </button>
+                          )}
+
+                          {!isProtected && (
+                             <button
+                               onClick={() => handleDeleteUser(user)}
+                               disabled={updatingId === user.id}
+                               className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 uppercase tracking-wider border-t border-gray-100"
+                             >
+                               Delete User
                              </button>
                           )}
                         </div>

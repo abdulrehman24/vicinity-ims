@@ -6,6 +6,7 @@ use App\Mail\BookingNotificationMail;
 use App\Mail\CollaborationInviteMail;
 use App\Models\Booking;
 use App\Models\Equipment;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -132,12 +133,50 @@ class BookingController extends Controller
         }
 
         try {
-            $operationsAddress = config('mail.operations_address') ?? config('mail.from.address');
+            // Notification Logic based on Admin Settings
+            $notifyCreator = Setting::where('key', 'booking_notify_creator')->value('value');
+            $notifyAdmins = Setting::where('key', 'booking_notify_admins')->value('value');
+            $notifyEmails = Setting::where('key', 'booking_notify_emails')->value('value');
+
+            // Default to true if not set (User + All Admins)
+            $shouldNotifyCreator = $notifyCreator === null ? true : $notifyCreator === '1';
+            $shouldNotifyAdmins = $notifyAdmins === null ? true : $notifyAdmins === '1';
+
+            $recipients = [];
+
+            // 1. Notify Creator (User)
+            if ($shouldNotifyCreator && auth()->user()) {
+                $recipients[] = auth()->user()->email;
+            }
+
+            // 2. Notify All Admins
+            if ($shouldNotifyAdmins) {
+                $adminEmails = User::where('is_admin', '>=', 1)->pluck('email')->toArray();
+                $recipients = array_merge($recipients, $adminEmails);
+            }
+
+            // 3. Notify Additional Emails
+            if ($notifyEmails) {
+                $additionalEmails = array_map('trim', explode(',', $notifyEmails));
+                $recipients = array_merge($recipients, $additionalEmails);
+            }
+
+            // 4. Fallback/Operations Address (Legacy)
+            $operationsAddress = config('mail.operations_address');
             if ($operationsAddress) {
-                Mail::to($operationsAddress)->queue(new BookingNotificationMail($booking));
+                $recipients[] = $operationsAddress;
+            }
+
+            // Filter unique and valid emails
+            $recipients = array_unique(array_filter($recipients, function ($email) {
+                return filter_var($email, FILTER_VALIDATE_EMAIL);
+            }));
+
+            foreach ($recipients as $recipient) {
+                Mail::to($recipient)->queue(new BookingNotificationMail($booking));
             }
         } catch (\Throwable $e) {
-            Log::error('Operations booking email failed: '.$e->getMessage());
+            Log::error('Booking notification emails failed: '.$e->getMessage());
         }
 
         return response()->json([

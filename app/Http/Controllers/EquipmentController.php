@@ -3,14 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\EquipmentResource;
+use App\Mail\EquipmentNotificationMail;
 use App\Models\Equipment;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
-
-use Illuminate\Support\Facades\Log;
 
 class EquipmentController extends Controller
 {
@@ -47,6 +49,8 @@ class EquipmentController extends Controller
 
         $equipment = Equipment::create($equipmentData);
 
+        $this->notifyUsers($equipment, 'created');
+
         return new EquipmentResource($equipment);
     }
 
@@ -55,20 +59,17 @@ class EquipmentController extends Controller
         $equipment = Equipment::findOrFail($id);
 
         $data = $request->validate([
-            'name' => 'sometimes|string',
-            'category' => 'sometimes|string',
+            'name' => 'required|string',
+            'category' => 'required|string',
             'equipmentType' => 'nullable|string',
             'serialNumber' => 'nullable|string',
-            'status' => 'sometimes|string',
-            'businessUnit' => 'sometimes|string',
-            'condition' => 'sometimes|string',
+            'status' => 'required|string',
+            'businessUnit' => 'required|string',
+            'condition' => 'required|string',
             'location' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
             'purchaseDate' => 'nullable|date',
             'remarks' => 'nullable|string',
-            'decommissionDate' => 'nullable|date',
-            'decommissionReason' => 'nullable|string',
-            'repairStartDate' => 'nullable|date',
             'totalQuantity' => 'nullable|integer|min:1',
         ]);
 
@@ -92,6 +93,10 @@ class EquipmentController extends Controller
 
         $equipment->update($equipmentData);
 
+        if ($equipment->wasChanged('status') && $equipment->status === 'decommissioned') {
+            $this->notifyUsers($equipment, 'decommissioned');
+        }
+
         return new EquipmentResource($equipment);
     }
 
@@ -109,6 +114,25 @@ class EquipmentController extends Controller
         $equipment->delete();
 
         return response()->json(null, 204);
+    }
+
+    private function notifyUsers(Equipment $equipment, string $action)
+    {
+        try {
+            // Get all approved users
+            $recipients = User::where('is_approved', true)->pluck('email')->toArray();
+
+            // Filter unique and valid emails
+            $recipients = array_unique(array_filter($recipients, function ($email) {
+                return filter_var($email, FILTER_VALIDATE_EMAIL);
+            }));
+
+            foreach ($recipients as $email) {
+                Mail::to($email)->queue(new EquipmentNotificationMail($equipment, $action));
+            }
+        } catch (\Throwable $e) {
+            Log::error('Equipment notification failed: '.$e->getMessage());
+        }
     }
 
     private function mapFrontendToBackend($data)
@@ -162,31 +186,21 @@ class EquipmentController extends Controller
 
     private function processAndSaveImage($file)
     {
-        $startTime = microtime(true);
-        Log::info('Image processing started for file: ' . $file->getClientOriginalName());
 
         $manager = new ImageManager(new Driver());
         $image = $manager->read($file);
 
-        Log::info('Image read completed in ' . round(microtime(true) - $startTime, 4) . 's');
-
         // Resize to max 1200px width, maintaining aspect ratio, preventing upsizing
         $image->scaleDown(width: 1200);
 
-        Log::info('Image scaling completed in ' . round(microtime(true) - $startTime, 4) . 's');
-
         // Encode to JPEG with 75% quality for better performance on limited resources
         $encoded = $image->toJpeg(quality: 75);
-
-        Log::info('Image encoding completed in ' . round(microtime(true) - $startTime, 4) . 's');
 
         // Generate filename
         $filename = 'equipment/' . Str::random(40) . '.jpg';
 
         // Save to public disk
         Storage::disk('public')->put($filename, (string) $encoded);
-
-        Log::info('Image saved to disk in ' . round(microtime(true) - $startTime, 4) . 's');
 
         return '/storage/' . $filename;
     }
