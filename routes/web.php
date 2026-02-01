@@ -84,7 +84,6 @@ Route::middleware(['auth'])->group(function () {
 Route::resource('equipment', EquipmentController::class);
 
 Route::get('/api/login-settings', [SettingController::class, 'publicLoginSettings']);
-Route::get('/calendar/feed', [CalendarController::class, 'feed']);
 
 Route::middleware(['auth'])->prefix('api/admin')->group(function () {
     Route::get('/categories', [CategoryController::class, 'index']);

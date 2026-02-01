@@ -4,7 +4,6 @@ import Calendar from 'react-calendar';
 import SafeIcon from '../common/SafeIcon';
 import { useInventory } from '../context/InventoryContext';
 import { format, isSameDay, parseISO } from 'date-fns';
-import { downloadCalendarFeed } from '../utils/calendarUtils';
 import * as FiIcons from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -18,14 +17,14 @@ function CalendarPage() {
   const [copied, setCopied] = useState(false);
 
   const handleCopyUrl = () => {
-    const url = `${window.location.origin}/calendar/feed`;
+    const url = `${window.location.origin}/api/calendar/feed`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     toast.success("Calendar URL copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const feedUrl = typeof window !== 'undefined' ? `${window.location.origin}/calendar/feed` : '';
+  const feedUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/calendar/feed` : '';
   const webcalUrl = feedUrl.replace(/^https?:\/\//, 'webcal://');
   const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(feedUrl)}`;
 
@@ -150,12 +149,8 @@ function CalendarPage() {
   }, [events, selectedDate]);
 
   const handleExport = () => {
-    if (bookings.length === 0) {
-      toast.error("No bookings found to export");
-      return;
-    }
-    downloadCalendarFeed(bookings);
-    toast.success("Calendar feed generated");
+    window.location.href = feedUrl;
+    toast.success("Downloading calendar feed...");
   };
 
   const tileContent = ({ date, view }) => {
