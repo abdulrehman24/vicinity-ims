@@ -1,23 +1,52 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import Calendar from 'react-calendar';
 import SafeIcon from '../common/SafeIcon';
 import { useInventory } from '../context/InventoryContext';
 import { shifts, categories } from '../data/inventoryData';
 import * as FiIcons from 'react-icons/fi';
-import { format, parseISO, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, parseISO, eachDayOfInterval, isSameDay, isBefore, startOfDay } from 'date-fns';
 import toast from 'react-hot-toast';
 import CollaboratorList from '../components/CollaboratorList';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const { 
   FiZap, FiLogIn, FiLogOut, FiPackage, FiBox, FiCalendar, FiClock,
   FiCheck, FiX, FiAlertTriangle, FiInfo, FiLayers, FiSearch, FiChevronRight,
-  FiPlus, FiMinus, FiFileText, FiCheckSquare, FiSquare
+  FiPlus, FiMinus, FiFileText, FiCheckSquare, FiSquare, FiTrash2, FiEdit2
 } = FiIcons;
 
 function CheckInOut() {
-  const { equipment, bookings, bundles, checkOutEquipment, batchCheckIn, isAdmin } = useInventory();
+  const { equipment, bookings, bundles, checkOutEquipment, batchCheckIn, isAdmin, replaceBooking } = useInventory();
   const [activeTab, setActiveTab] = useState('in');
+  const [projectToEdit, setProjectToEdit] = useState(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.editProject) {
+      handleEditRequest(location.state.editProject);
+      // Clear state to avoid re-triggering on refresh/nav? 
+      // Actually, standard behavior is fine, but maybe good to clear.
+      // window.history.replaceState({}, document.title) // optional
+    }
+  }, [location.state]);
+
+  const handleEditRequest = (project) => {
+    setProjectToEdit(project);
+    setActiveTab('in');
+  };
+
+  const handleManualOutConfirm = async (payload) => {
+    if (projectToEdit) {
+      // Editing mode
+      await replaceBooking(projectToEdit.bookingIds, payload);
+      setProjectToEdit(null);
+    } else {
+      // Normal checkout
+      checkOutEquipment(payload);
+    }
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 max-w-7xl mx-auto">
@@ -29,22 +58,55 @@ function CheckInOut() {
       </div>
 
       <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl mb-10 w-fit">
-        <TabButton active={activeTab === 'in'} onClick={() => setActiveTab('in')} icon={FiLogIn} label="Check Out" />
-        <TabButton active={activeTab === 'out'} onClick={() => setActiveTab('out')} icon={FiLogOut} label="Check In" />
+        <TabButton 
+          active={activeTab === 'in'} 
+          onClick={() => {
+            setActiveTab('in');
+            setProjectToEdit(null); // Reset if manually switching
+          }} 
+          icon={FiLogIn} 
+          label={projectToEdit ? "Edit Booking" : "Check Out"} 
+        />
+        <TabButton 
+          active={activeTab === 'out'} 
+          onClick={() => {
+            setActiveTab('out');
+            setProjectToEdit(null);
+          }} 
+          icon={FiLogOut} 
+          label="Check In" 
+        />
       </div>
 
       <AnimatePresence mode="wait">
         {activeTab === 'in' ? (
-          <ManualOutForm key="in" equipment={equipment} bookings={bookings} bundles={bundles} onConfirm={checkOutEquipment} />
+          <ManualOutForm 
+            key="in" 
+            equipment={equipment} 
+            bookings={bookings} 
+            bundles={bundles} 
+            onConfirm={handleManualOutConfirm}
+            editingProject={projectToEdit}
+            onCancelEdit={() => {
+              setProjectToEdit(null);
+              setActiveTab('out');
+            }}
+          />
         ) : (
-          <GroupReturnView key="out" equipment={equipment} bookings={bookings} onConfirm={batchCheckIn} />
+          <GroupReturnView 
+            key="out" 
+            equipment={equipment} 
+            bookings={bookings} 
+            onConfirm={batchCheckIn}
+            onEditRequest={handleEditRequest} 
+          />
         )}
       </AnimatePresence>
     </motion.div>
   );
 }
 
-function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
+function ManualOutForm({ equipment, bookings, bundles, onConfirm, editingProject, onCancelEdit }) {
   const [selectedItems, setSelectedItems] = useState([]); // Array of {id, qty}
   const [selectedDates, setSelectedDates] = useState([]);
   const [shift, setShift] = useState('Full Day');
@@ -52,6 +114,60 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
   const [collaborators, setCollaborators] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+
+  // Pre-fill form if editing
+  React.useEffect(() => {
+    if (editingProject) {
+        setFormData({
+            projTitle: editingProject.shootName,
+            quote: editingProject.quotationNumber,
+            shootType: editingProject.shootType || 'Commercial'
+        });
+        setShift(editingProject.shift || 'Full Day');
+        
+        // Populate dates
+        if (editingProject.startDate && editingProject.endDate) {
+            const start = parseISO(editingProject.startDate);
+            const end = parseISO(editingProject.endDate);
+            const dates = eachDayOfInterval({ start, end });
+            setSelectedDates(dates);
+        }
+
+        // Populate items
+        const items = editingProject.items.map(i => {
+            const eq = equipment.find(e => e.id === i.equipmentId || e.id === i.id);
+            if (eq) {
+                return {
+                    id: eq.id,
+                    qty: i.quantity || i.qty || 1,
+                    name: eq.name,
+                    image: eq.image
+                };
+            }
+            return {
+                id: i.equipmentId || i.id,
+                qty: i.quantity || i.qty || 1,
+                name: i.equipmentName || i.name || 'Unknown',
+                image: i.image
+            };
+        });
+        
+        // Aggregate items by ID to set Qty correctly if multiple units of same item
+        const aggregatedItems = items.reduce((acc, curr) => {
+            const existing = acc.find(i => i.id === curr.id);
+            if (existing) {
+                existing.qty += 1;
+            } else {
+                acc.push({ ...curr, qty: 1 });
+            }
+            return acc;
+        }, []);
+
+        setSelectedItems(aggregatedItems);
+        setCollaborators(editingProject.collaborators || []);
+    }
+  }, [editingProject]);
+
 
   // 1. Availability Logic for Multi-Unit & Shifts
   const requestedDates = useMemo(() => {
@@ -169,6 +285,10 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
       }
       return i;
     }));
+  };
+
+  const removeItem = (id) => {
+    setSelectedItems(prev => prev.filter(i => i.id !== id));
   };
 
   const handleBooking = () => {
@@ -356,10 +476,19 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
                         <img src={item.image} className="w-10 h-10 rounded-xl object-cover" alt="" />
                         <p className="text-xs font-bold text-[#4a5a67]">{item.name}</p>
                       </div>
-                      <div className="flex items-center space-x-3 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
-                        <button onClick={() => updateQty(item.id, -1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiMinus} /></button>
-                        <span className="text-sm font-black text-[#4a5a67] w-4 text-center">{item.qty}</span>
-                        <button onClick={() => updateQty(item.id, 1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiPlus} /></button>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-3 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
+                          <button onClick={() => updateQty(item.id, -1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiMinus} /></button>
+                          <span className="text-sm font-black text-[#4a5a67] w-4 text-center">{item.qty}</span>
+                          <button onClick={() => updateQty(item.id, 1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiPlus} /></button>
+                        </div>
+                        <button 
+                          onClick={() => removeItem(item.id)} 
+                          className="p-2 text-gray-300 hover:text-red-400 transition-colors"
+                          title="Remove Item"
+                        >
+                          <SafeIcon icon={FiTrash2} />
+                        </button>
                       </div>
                     </div>
                   );
@@ -396,8 +525,16 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
               disabled={selectedItems.length === 0 || !formData.projTitle || requestedDates.length === 0}
               className="w-full py-5 bg-[#4a5a67] text-[#ebc1b6] rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-lg disabled:opacity-30 transition-all hover:scale-[1.01]"
             >
-              Confirm Deployment
+              {editingProject ? 'Update Booking' : 'Confirm Deployment'}
             </button>
+            {editingProject && (
+                 <button 
+                   onClick={onCancelEdit}
+                   className="w-full py-3 bg-transparent text-gray-400 font-bold text-[10px] uppercase tracking-widest hover:text-[#4a5a67] mt-2"
+                 >
+                   Cancel Edit
+                 </button>
+            )}
           </div>
         </div>
       </div>
@@ -405,9 +542,11 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm }) {
   );
 }
 
-function GroupReturnView({ equipment, bookings, onConfirm }) {
+function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
+  const { cancelBooking } = useInventory();
   const [returnStates, setReturnStates] = useState({}); // { itemId: { isDamaged: bool, note: str } }
   const [selectedProjectKeys, setSelectedProjectKeys] = useState([]);
+  const [deleteModal, setDeleteModal] = useState(null);
 
   const projectKey = (project) => `${project.shootName}-${project.quotationNumber}`;
 
@@ -421,9 +560,15 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
             quotationNumber: b.quotationNumber,
             startDate: b.startDate,
             endDate: b.endDate,
-            items: [] 
+            items: [],
+            bookingIds: new Set(),
+            shift: b.shift, // Capture these
+            collaborators: b.collaborators,
+            shootType: b.shoot_type || b.shootType
         };
       }
+      projects[key].bookingIds.add(b.id);
+
       const eq = equipment.find(e => e.id === b.equipmentId);
       if (eq) {
           projects[key].items.push({
@@ -432,7 +577,7 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
           });
       }
     });
-    return Object.values(projects);
+    return Object.values(projects).map(p => ({ ...p, bookingIds: Array.from(p.bookingIds) }));
   }, [bookings, equipment]);
 
   const toggleDamage = (itemId) => {
@@ -460,6 +605,19 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
     const projectsToReturn = activeProjects.filter(p => selectedProjectKeys.includes(projectKey(p)));
     if (projectsToReturn.length === 0) return;
 
+    // Validation: Check if any selected project is not yet started
+    const today = startOfDay(new Date());
+    const invalidProjects = projectsToReturn.filter(p => {
+        if (!p.startDate) return false;
+        const start = startOfDay(parseISO(p.startDate));
+        return isBefore(today, start);
+    });
+
+    if (invalidProjects.length > 0) {
+        toast.error(`Cannot return "${invalidProjects[0].shootName}" before its start date (${format(parseISO(invalidProjects[0].startDate), 'MMM d')})`);
+        return;
+    }
+
     projectsToReturn.forEach(project => {
       const itemsToReturn = project.items.map(item => ({
         bookingEquipmentId: item.bookingEquipmentId,
@@ -479,24 +637,82 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
     toast.success('Selected projects returned successfully');
   };
 
+  const handleCancelProject = (project, e) => {
+    e.stopPropagation();
+    setDeleteModal({ project });
+  };
+
+  const confirmCancelProject = async () => {
+    if (!deleteModal) return;
+    const { project } = deleteModal;
+    
+    const promises = project.bookingIds.map(id => cancelBooking(id));
+    await Promise.all(promises);
+    setSelectedProjectKeys(prev => prev.filter(k => k !== projectKey(project)));
+  };
+
+  const handleEditProject = (project, e) => {
+    e.stopPropagation();
+    onEditRequest(project);
+  };
+
+  // REMOVED handleSaveEdit
+
   return (
+    <>
+      <ConfirmationModal 
+        isOpen={!!deleteModal}
+        onClose={() => setDeleteModal(null)}
+        onConfirm={confirmCancelProject}
+        title="Cancel Booking"
+        message={`Are you sure you want to cancel "${deleteModal?.project?.shootName}"? This will release all allocated equipment.`}
+        confirmText="Yes, Cancel Booking"
+        isDangerous={true}
+      />
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       <div className="lg:col-span-4 space-y-4">
         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Active Projects</label>
-        {activeProjects.map(p => (
+        {activeProjects.map(p => {
+          const isStarted = !p.startDate || !isBefore(startOfDay(new Date()), startOfDay(parseISO(p.startDate)));
+          
+          return (
           <div
             key={projectKey(p)}
-            onClick={() => toggleProjectSelection(p)}
-            className={`w-full text-left p-6 rounded-3xl border transition-all cursor-pointer ${
-              selectedProjectKeys.includes(projectKey(p)) ? 'bg-[#4a5a67] text-white shadow-xl' : 'bg-white border-gray-100 hover:border-[#ebc1b6]'
-            }`}
-          >
+            onClick={() => isStarted && toggleProjectSelection(p)}
+            className={`w-full text-left p-6 rounded-3xl border transition-all cursor-pointer group relative ${
+              selectedProjectKeys.includes(projectKey(p)) 
+                ? 'bg-[#4a5a67] text-white shadow-xl' 
+                : isStarted 
+                    ? 'bg-white border-gray-100 hover:border-[#ebc1b6]' 
+                    : 'bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed'
+              }`}
+            >
+            {!isStarted && (
+                <div className="absolute top-2 right-6 z-10">
+                    <span className="bg-gray-200 text-gray-500 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider">Future Booking</span>
+                </div>
+            )}
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="font-bold text-sm mb-1">{p.shootName}</h3>
+                <h3 className="font-bold text-sm mb-1 pr-16">{p.shootName}</h3>
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-50">{p.quotationNumber}</p>
               </div>
-              
+              <div className="absolute top-6 right-6 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                    onClick={(e) => handleEditProject(p, e)}
+                    className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-white/20 text-white' : 'hover:bg-gray-100 text-gray-400'}`}
+                    title="Edit Booking"
+                >
+                    <SafeIcon icon={FiEdit2} />
+                </button>
+                <button 
+                    onClick={(e) => handleCancelProject(p, e)}
+                    className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-red-500/20 text-red-300' : 'hover:bg-red-50 text-red-400'}`}
+                    title="Cancel Booking"
+                >
+                    <SafeIcon icon={FiTrash2} />
+                </button>
+              </div>
             </div>
             <div className="flex items-center justify-between mt-4">
               <div className="flex items-center space-x-2">
@@ -521,7 +737,8 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="lg:col-span-8">
@@ -611,9 +828,12 @@ function GroupReturnView({ equipment, bookings, onConfirm }) {
         )}
       </div>
     </div>
+    </>
   );
 }
 
+export default CheckInOut;
+  
 function InputGroup({ label, children }) {
   return (
     <div className="space-y-2">
@@ -631,5 +851,3 @@ function TabButton({ active, onClick, icon, label }) {
     </button>
   );
 }
-
-export default CheckInOut;

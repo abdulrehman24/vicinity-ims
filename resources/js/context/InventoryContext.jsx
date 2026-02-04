@@ -241,6 +241,53 @@ export function InventoryProvider({ children, user }) {
       }
   };
 
+  const cancelBooking = async (id) => {
+      try {
+          await axios.post(`/bookings/${id}/cancel`);
+          toast.success("Booking cancelled");
+          fetchBookings();
+          fetchEquipment();
+      } catch (error) {
+          console.error("Cancel failed", error);
+          toast.error(error.response?.data?.message || "Failed to cancel booking");
+      }
+  };
+
+  const batchCancel = async (ids) => {
+    try {
+        await Promise.all(ids.map(id => axios.post(`/bookings/${id}/cancel`)));
+        toast.success("Bookings cancelled successfully");
+        fetchBookings();
+        fetchEquipment();
+    } catch (error) {
+        console.error("Batch cancel failed", error);
+        toast.error("Failed to cancel some bookings");
+        fetchBookings();
+    }
+  };
+
+  const updateBooking = async (id, data) => {
+      try {
+          await axios.put(`/bookings/${id}`, data);
+          toast.success("Booking updated");
+          fetchBookings();
+      } catch (error) {
+          console.error("Update failed", error);
+          toast.error(error.response?.data?.message || "Failed to update booking");
+      }
+  };
+
+  const replaceBooking = async (ids, payload) => {
+    try {
+        await axios.post('/bookings/replace', { ids, ...payload });
+        toast.success("Booking updated successfully");
+        fetchBookings();
+    } catch (error) {
+        console.error("Replace failed", error);
+        toast.error(error.response?.data?.message || "Failed to update booking");
+    }
+  };
+
   const reportProblem = async (report) => {
     try {
       const response = await axios.post('/support-tickets', report);
@@ -262,6 +309,17 @@ export function InventoryProvider({ children, user }) {
     toast.success("Stock take saved");
   };
 
+  const fetchEquipmentLogs = async (equipmentId) => {
+    try {
+        const response = await axios.get(`/equipment/${equipmentId}/logs`);
+        return response.data.data;
+    } catch (error) {
+        console.error("Failed to fetch logs", error);
+        toast.error("Failed to fetch equipment logs");
+        return [];
+    }
+  };
+
   return (
     <InventoryContext.Provider value={{ 
         ...state, 
@@ -270,10 +328,15 @@ export function InventoryProvider({ children, user }) {
         deleteEquipment,
         checkOutEquipment, 
         batchCheckIn, 
+        cancelBooking,
+        batchCancel,
+        updateBooking,
+        replaceBooking,
         reportProblem, 
         toggleAdmin,
         addStockTake,
-        fetchBundles
+        fetchBundles,
+        fetchEquipmentLogs
     }}>
       {children}
     </InventoryContext.Provider>

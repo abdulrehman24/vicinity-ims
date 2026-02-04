@@ -5,11 +5,12 @@ import { useInventory } from '../context/InventoryContext';
 import Fuse from 'fuse.js';
 import * as FiIcons from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import { format, parseISO } from 'date-fns';
 
 const { 
   FiSearch, FiAlertTriangle, FiCheck, FiInfo, FiCamera, 
   FiBox, FiMessageSquare, FiSend, FiZap, FiTool, FiEye, 
-  FiPackage, FiActivity, FiShield, FiUser 
+  FiPackage, FiActivity, FiShield, FiUser, FiClock, FiX
 } = FiIcons;
 
 const issueTypes = [
@@ -22,15 +23,28 @@ const issueTypes = [
 ];
 
 function ReportProblem() {
-  const { equipment, reportProblem, updateEquipment } = useInventory();
+  const { equipment, reportProblem, updateEquipment, fetchEquipmentLogs } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
+  const [showLogs, setShowLogs] = useState(false);
+  const [logs, setLogs] = useState([]);
   const [report, setReport] = useState({
     issueType: 'mechanical',
     severity: 'minor',
     description: '',
-    reportedBy: ''
+    reportedBy: '',
+    status: 'maintenance'
   });
+
+  // Update suggested status when item is selected
+  React.useEffect(() => {
+    if (selectedItem) {
+        setReport(prev => ({
+            ...prev,
+            status: selectedItem.status === 'available' ? 'maintenance' : selectedItem.status
+        }));
+    }
+  }, [selectedItem]);
 
   const fuse = useMemo(() => new Fuse(equipment, {
     keys: ['name', 'serialNumber', 'category', 'currentBooking.shootName'],
@@ -42,18 +56,25 @@ function ReportProblem() {
     return fuse.search(searchTerm).map(r => r.item);
   }, [searchTerm, equipment, fuse]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedItem || !report.description || !report.reportedBy) {
       toast.error("Please provide your name and issue details");
       return;
     }
 
-    reportProblem({
+    await reportProblem({
       equipmentId: selectedItem.id,
       equipmentName: selectedItem.name,
       ...report
     });
+
+    if (report.status && report.status !== selectedItem.status) {
+        await updateEquipment({
+            ...selectedItem,
+            status: report.status
+        });
+    }
 
     // Reset workflow
     setSelectedItem(null);
@@ -61,9 +82,18 @@ function ReportProblem() {
       issueType: 'mechanical',
       severity: 'minor',
       description: '',
-      reportedBy: ''
+      reportedBy: '',
+      status: 'maintenance'
     });
     setSearchTerm('');
+  };
+
+  const handleShowLogs = async () => {
+    if (selectedItem) {
+        const data = await fetchEquipmentLogs(selectedItem.id);
+        setLogs(data);
+        setShowLogs(true);
+    }
   };
 
   const handleResolve = async () => {
@@ -84,6 +114,73 @@ function ReportProblem() {
       animate={{ opacity: 1, y: 0 }} 
       className="p-8 max-w-7xl mx-auto min-h-screen"
     >
+      <AnimatePresence>
+        {showLogs && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                <motion.div 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0 }} 
+                    onClick={() => setShowLogs(false)} 
+                    className="absolute inset-0 bg-[#4a5a67]/90 backdrop-blur-md" 
+                />
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }} 
+                    animate={{ opacity: 1, scale: 1, y: 0 }} 
+                    exit={{ opacity: 0, scale: 0.9, y: 20 }} 
+                    className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden max-h-[80vh] flex flex-col" 
+                >
+                    <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-[#4a5a67] text-white">
+                        <div>
+                            <h2 className="text-xl font-black uppercase tracking-widest">Equipment Logs</h2>
+                            <p className="text-[10px] font-bold text-[#ebc1b6] uppercase tracking-widest mt-1">{selectedItem?.name}</p>
+                        </div>
+                        <button onClick={() => setShowLogs(false)} className="text-white/40 hover:text-white transition-colors">
+                            <SafeIcon icon={FiX} className="text-2xl" />
+                        </button>
+                    </div>
+                    <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
+                        <div className="relative border-l-2 border-gray-100 ml-3 space-y-8 pl-8 py-2">
+                            {logs.length > 0 ? logs.map((log, idx) => (
+                                <div key={log.id} className="relative">
+                                    <div className={`absolute -left-[41px] top-1 w-5 h-5 rounded-full border-4 border-white shadow-sm ${log.action === 'status_change' ? 'bg-[#ebc1b6]' : 'bg-[#4a5a67]'}`} />
+                                    <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:border-[#ebc1b6] transition-all group">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                                {format(parseISO(log.created_at), 'MMM dd, yyyy • HH:mm')}
+                                            </span>
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-[#4a5a67] bg-white px-2 py-1 rounded-full shadow-sm">
+                                                {log.user_name || 'System'}
+                                            </span>
+                                        </div>
+                                        <h3 className="font-bold text-[#4a5a67] text-sm mb-1 uppercase tracking-wide">
+                                            {log.action.replace('_', ' ')}
+                                        </h3>
+                                        {log.previous_status && (
+                                            <div className="flex items-center space-x-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
+                                                <span>{log.previous_status}</span>
+                                                <span>→</span>
+                                                <span className={log.new_status === 'available' ? 'text-green-500' : 'text-[#ebc1b6]'}>{log.new_status}</span>
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-gray-500 leading-relaxed font-medium">
+                                            {log.description}
+                                        </p>
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="text-center py-10 text-gray-400">
+                                    <SafeIcon icon={FiClock} className="text-2xl mx-auto mb-2 opacity-30" />
+                                    <p className="text-[10px] font-bold uppercase tracking-widest">No history available</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+        )}
+      </AnimatePresence>
+
       <div className="flex justify-between items-center mb-10">
         <div>
           <h1 className="text-4xl font-black text-[#4a5a67] uppercase tracking-tight mb-2">Technical Support</h1>
@@ -173,11 +270,18 @@ function ReportProblem() {
                       <p className="text-[10px] font-black text-[#ebc1b6] uppercase tracking-[0.2em] mt-1">{selectedItem.serialNumber}</p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex flex-col items-end">
                     <p className="text-[10px] font-black uppercase text-white/40 mb-1">Current Status</p>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedItem.status === 'available' ? 'bg-green-500/20 text-green-400' : 'bg-[#ebc1b6]/20 text-[#ebc1b6]'}`}>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${selectedItem.status === 'available' ? 'bg-green-500/20 text-green-400' : 'bg-[#ebc1b6]/20 text-[#ebc1b6]'} mb-2`}>
                       {selectedItem.status.replace('_', ' ')}
                     </span>
+                    <button 
+                        onClick={handleShowLogs}
+                        className="flex items-center space-x-1 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors"
+                    >
+                        <SafeIcon icon={FiActivity} className="text-xs" />
+                        <span>See Logs</span>
+                    </button>
                   </div>
                 </div>
 
@@ -235,8 +339,28 @@ function ReportProblem() {
                     </section>
                   </div>
 
-                  <section className="space-y-4">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">4. Select Issue Category</label>
+                    <section className="space-y-4">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">4. Update Equipment Status</label>
+                      <div className="flex space-x-2">
+                        {[
+                            { value: 'available', label: 'Active', color: 'bg-green-500', text: 'text-white' },
+                            { value: 'maintenance', label: 'Maintenance', color: 'bg-[#ebc1b6]', text: 'text-[#4a5a67]' },
+                            { value: 'decommissioned', label: 'Decommissioned', color: 'bg-red-500', text: 'text-white' }
+                        ].map(status => (
+                          <button 
+                            key={status.value} 
+                            type="button" 
+                            onClick={() => setReport({ ...report, status: status.value })} 
+                            className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${report.status === status.value ? `${status.color} ${status.text} shadow-lg` : 'bg-gray-50 text-gray-400'}`}
+                          >
+                            {status.label}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section className="space-y-4">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">5. Select Issue Category</label>
                     <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                       {issueTypes.map(type => (
                         <button 
@@ -253,7 +377,7 @@ function ReportProblem() {
                   </section>
 
                   <section className="space-y-4">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">5. Technical Observations</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">6. Technical Observations</label>
                     <div className="relative">
                       <SafeIcon icon={FiMessageSquare} className="absolute left-4 top-4 text-gray-300" />
                       <textarea 

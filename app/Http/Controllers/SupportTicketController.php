@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\SupportTicketMail;
+use App\Models\EquipmentLog;
 use App\Models\SupportTicket;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -47,6 +48,15 @@ class SupportTicketController extends Controller
         ]);
 
         $this->notifyUsers($ticket->load('equipment'), 'New Support Ticket: '.$ticket->ticket_code);
+
+        // Log the incident
+        EquipmentLog::create([
+            'equipment_id' => $validated['equipmentId'],
+            'user_id' => auth()->id(),
+            'user_name' => $validated['reportedBy'],
+            'action' => 'maintenance_report',
+            'description' => "Ticket #{$ticketCode} ({$validated['severity']}): {$validated['description']}",
+        ]);
 
         return response()->json([
             'message' => 'Support ticket created',

@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import Calendar from 'react-calendar';
 import SafeIcon from '../common/SafeIcon';
+import ConfirmationModal from '../components/ConfirmationModal';
 import { useInventory } from '../context/InventoryContext';
 import { format, isSameDay, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 import * as FiIcons from 'react-icons/fi';
@@ -9,14 +11,30 @@ import 'react-calendar/dist/Calendar.css';
 
 const { 
   FiSearch, FiCalendar, FiList, FiClock, FiCamera, 
-  FiLogIn, FiLogOut, FiAlertTriangle, FiFilter, FiDownload, FiChevronDown, FiChevronUp 
+  FiLogIn, FiLogOut, FiAlertTriangle, FiFilter, FiDownload, FiChevronDown, FiChevronUp,
+  FiEdit2, FiXCircle
 } = FiIcons;
 
 function Records() {
-  const { bookings, equipment } = useInventory();
+  const { bookings, equipment, cancelBooking, batchCancel } = useInventory();
   const [view, setView] = useState('list'); // 'list' or 'calendar'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const navigate = useNavigate();
+
+  const handleCancelRequest = (group) => {
+    setModalConfig({
+        isOpen: true,
+        title: 'Cancel Booking',
+        message: `Are you sure you want to cancel the booking for "${group.shootName}"? This action cannot be undone.`,
+        isDangerous: true,
+        confirmText: 'Yes, Cancel',
+        onConfirm: async () => {
+            await batchCancel(group.bookingIds);
+        }
+    });
+  };
 
   const stockByCategory = useMemo(() => {
     const stock = {};
@@ -115,26 +133,66 @@ function Records() {
 
   const groupedRecords = useMemo(() => {
     const groups = {};
-    records.forEach(r => {
-      const dateStr = format(new Date(r.timestamp), 'yyyy-MM-dd');
-      const key = `${r.shootName}|${r.quotationNumber}|${dateStr}|${r.type}`;
+    
+    // Helper to get date object
+    const getDateObj = (d) => typeof d === 'object' ? d.date : d;
+
+    bookings.forEach(b => {
+      // Group by Shoot Name + Quotation Number
+      const key = `${b.shootName}|${b.quotationNumber || 'NoQuote'}`;
       
       if (!groups[key]) {
         groups[key] = {
-          id: key,
-          shootName: r.shootName,
-          quotationNumber: r.quotationNumber,
-          date: r.timestamp,
-          createdAt: r.createdAt,
-          type: r.type,
-          user: r.user,
-          items: []
+            id: key,
+            shootName: b.shootName,
+            quotationNumber: b.quotationNumber,
+            dates: [], 
+            bookingIds: new Set(),
+            items: [],
+            status: b.status,
+            user: b.user?.name || b.user || 'Operations',
+            createdAt: b.createdAt || b.created_at,
+            shift: b.shift
         };
       }
-      groups[key].items.push(r);
+      
+      groups[key].bookingIds.add(b.id);
+      
+      const eqName = equipment.find(e => e.id === b.equipmentId)?.name || 'Unknown Equipment';
+      groups[key].items.push({
+          ...b,
+          equipmentName: eqName
+      });
+      
+      // Collect dates
+      if (b.dates && Array.isArray(b.dates) && b.dates.length > 0) {
+          b.dates.forEach(d => groups[key].dates.push(getDateObj(d)));
+      } else if (b.startDate) {
+          groups[key].dates.push(b.startDate);
+          if (b.endDate) groups[key].dates.push(b.endDate);
+      }
     });
-    return Object.values(groups).sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [records]);
+
+    return Object.values(groups).map(g => {
+        // Sort dates and find range
+        const uniqueDates = [...new Set(g.dates)].sort();
+        const startDate = uniqueDates.length > 0 ? uniqueDates[0] : null;
+        const endDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
+        
+        // Determine overall status
+        // If any item is 'out', status is 'out'. If all 'returned', 'returned'.
+        // If 'cancelled', 'cancelled'.
+        // This is a simplification.
+        
+        return {
+            ...g,
+            bookingIds: Array.from(g.bookingIds),
+            startDate,
+            endDate,
+            date: startDate || g.createdAt // For sorting
+        };
+    }).sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [bookings, equipment]);
 
   const filteredRecords = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -251,7 +309,12 @@ function Records() {
 
             <div className="grid grid-cols-1 gap-4">
               {filteredRecords.map((group) => (
-                <RecordGroup key={group.id} group={group} />
+                <RecordGroup 
+                    key={group.id} 
+                    group={group} 
+                    onEdit={() => navigate('/', { state: { editProject: group } })}
+                    onCancel={() => handleCancelRequest(group)}
+                />
               ))}
               {filteredRecords.length === 0 && <EmptyState />}
             </div>
@@ -383,13 +446,27 @@ function Records() {
           color: #4a5a67 !important;
         }
       `}</style>
+      
+      <ConfirmationModal 
+        isOpen={modalConfig.isOpen}
+        onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={modalConfig.onConfirm}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        confirmText={modalConfig.confirmText}
+        isDangerous={modalConfig.isDangerous}
+      />
     </div>
   );
 }
 
-function RecordGroup({ group }) {
+function RecordGroup({ group, onEdit, onCancel }) {
   const [expanded, setExpanded] = useState(false);
-  const isCheckout = group.type === 'checkout';
+  
+  // Determine display status/color
+  const isReturned = group.items.every(i => i.status === 'returned');
+  const isCancelled = group.items.every(i => i.status === 'cancelled');
+  const isPartial = !isReturned && !isCancelled; // Simplified
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:border-[#ebc1b6] transition-all group-card">
@@ -398,8 +475,8 @@ function RecordGroup({ group }) {
          onClick={() => setExpanded(!expanded)}
        >
         <div className="flex items-center space-x-6 w-full md:w-auto">
-          <div className={`p-4 rounded-xl shrink-0 ${isCheckout ? 'bg-[#ebc1b622] text-[#4a5a67]' : 'bg-green-50 text-green-600'}`}>
-            <SafeIcon icon={isCheckout ? FiLogOut : FiLogIn} className="text-xl" />
+          <div className={`p-4 rounded-xl shrink-0 ${isReturned ? 'bg-green-50 text-green-600' : isCancelled ? 'bg-red-50 text-red-600' : 'bg-[#ebc1b622] text-[#4a5a67]'}`}>
+            <SafeIcon icon={isReturned ? FiLogIn : isCancelled ? FiXCircle : FiLogOut} className="text-xl" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-3 mb-1">
@@ -413,7 +490,9 @@ function RecordGroup({ group }) {
             <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
               <div className="flex items-center space-x-1">
                 <SafeIcon icon={FiCamera} />
-                <span className="truncate max-w-[150px]">{group.type === 'checkout' ? 'Deployment' : 'Return'}</span>
+                <span className="truncate max-w-[150px]">
+                    {isReturned ? 'Returned' : isCancelled ? 'Cancelled' : 'Deployed'}
+                </span>
               </div>
               {group.user && (
                 <div className="flex items-center space-x-1">
@@ -431,7 +510,11 @@ function RecordGroup({ group }) {
         
         <div className="flex items-center space-x-6 mt-4 md:mt-0 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 border-gray-50 justify-between md:justify-end">
           <div className="text-right">
-            <p className="text-xs font-bold text-[#4a5a67]">{format(new Date(group.date), 'MMM d, yyyy')}</p>
+            <p className="text-xs font-bold text-[#4a5a67]">
+                {group.startDate && format(new Date(group.startDate), 'MMM d')}
+                {group.endDate && group.endDate !== group.startDate && ` - ${format(new Date(group.endDate), 'MMM d, yyyy')}`}
+                {!group.endDate && group.startDate && `, ${format(new Date(group.startDate), 'yyyy')}`}
+            </p>
             <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">
                 {group.createdAt && (
                     <span className="block text-[9px] text-gray-300 mt-0.5">
@@ -440,8 +523,29 @@ function RecordGroup({ group }) {
                 )}
             </p>
           </div>
-          <div className={`transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}>
-             <SafeIcon icon={FiChevronDown} className="text-gray-400" />
+          
+          <div className="flex items-center space-x-2" onClick={e => e.stopPropagation()}>
+             {!isCancelled && !isReturned && (
+                <>
+                    <button 
+                        onClick={onEdit}
+                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-[#4a5a67] transition-colors"
+                        title="Edit Booking"
+                    >
+                        <SafeIcon icon={FiEdit2} />
+                    </button>
+                    <button 
+                        onClick={onCancel}
+                        className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
+                        title="Cancel Booking"
+                    >
+                        <SafeIcon icon={FiXCircle} />
+                    </button>
+                </>
+             )}
+             <div className={`transition-transform duration-300 ${expanded ? 'rotate-180' : ''} ml-2`}>
+                <SafeIcon icon={FiChevronDown} className="text-gray-400" />
+             </div>
           </div>
         </div>
        </div>
@@ -455,8 +559,8 @@ function RecordGroup({ group }) {
               className="bg-gray-50 border-t border-gray-100"
             >
                <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                 {group.items.map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
+                 {group.items.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
                       <div className="flex items-center space-x-3 overflow-hidden">
                         <div className="w-1.5 h-1.5 bg-[#ebc1b6] rounded-full shrink-0" />
                         <span className="text-xs font-bold text-[#4a5a67] truncate">{item.equipmentName}</span>

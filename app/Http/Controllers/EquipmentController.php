@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\EquipmentResource;
 use App\Mail\EquipmentNotificationMail;
 use App\Models\Equipment;
+use App\Models\EquipmentLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -91,10 +92,23 @@ class EquipmentController extends Controller
             }
         }
 
+        $originalStatus = $equipment->getOriginal('status');
         $equipment->update($equipmentData);
 
-        if ($equipment->wasChanged('status') && $equipment->status === 'decommissioned') {
-            $this->notifyUsers($equipment, 'decommissioned');
+        if ($equipment->wasChanged('status')) {
+            EquipmentLog::create([
+                'equipment_id' => $equipment->id,
+                'user_id' => auth()->id(),
+                'user_name' => auth()->user() ? auth()->user()->name : 'System',
+                'action' => 'status_change',
+                'previous_status' => $originalStatus,
+                'new_status' => $equipment->status,
+                'description' => $equipment->remarks ?? 'Status updated',
+            ]);
+
+            if ($equipment->status === 'decommissioned') {
+                $this->notifyUsers($equipment, 'decommissioned');
+            }
         }
 
         return new EquipmentResource($equipment);

@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\EquipmentLogController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BundleController;
 use App\Http\Controllers\CalendarController;
@@ -75,10 +76,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::post('/bookings', [BookingController::class, 'store']);
     Route::post('/bookings/return', [BookingController::class, 'returnItems']);
+    Route::post('/bookings/replace', [BookingController::class, 'replace']);
+    Route::post('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
+    Route::put('/bookings/{booking}', [BookingController::class, 'update']);
     Route::post('/support-tickets', [SupportTicketController::class, 'store']);
     Route::post('/change-password', [AuthController::class, 'changePassword']);
     Route::post('/profile/update', [AuthController::class, 'updateProfile']);
     Route::get('/api/bundles', [BundleController::class, 'index']);
+    Route::get('/equipment/{equipment}/logs', [EquipmentLogController::class, 'index']);
 });
 
 Route::resource('equipment', EquipmentController::class);
