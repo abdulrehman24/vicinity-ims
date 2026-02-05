@@ -19,7 +19,7 @@ const {
 } = FiIcons;
 
 function InventoryList() {
-  const { equipment, addEquipment, updateEquipment, isAdmin, toggleAdmin } = useInventory();
+  const { equipment, categories, addEquipment, updateEquipment, isAdmin, toggleAdmin } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,9 +33,8 @@ function InventoryList() {
   const [repairingItem, setRepairingItem] = useState(null);
 
   const uniqueCategories = useMemo(() => {
-    const cats = new Set(equipment.map(item => item.category).filter(Boolean));
-    return Array.from(cats).sort();
-  }, [equipment]);
+    return Array.isArray(categories) ? categories : [];
+  }, [categories]);
 
   const fuse = useMemo(() => new Fuse(equipment, {
     keys: ['name', 'serialNumber', 'category', 'equipmentType', 'businessUnit'],
@@ -366,11 +365,11 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate
 }
 
 function NewEntryModal({ onClose, onSubmit, initialData }) {
-  const [categories, setCategories] = useState([]);
+  const { categories } = useInventory();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState(initialData || {
     name: '',
-    category: 'Camera Body',
+    category: categories.length > 0 ? categories[0] : 'Camera Body',
     equipmentType: 'Camera',
     serialNumber: '',
     status: 'available',
@@ -383,20 +382,10 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
   });
 
   useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const response = await axios.get('/api/admin/categories');
-        const list = (response.data.data || []).filter(c => c.is_active);
-        if (!initialData && list.length > 0) {
-          setFormData(prev => ({ ...prev, category: list[0].name }));
-        }
-        setCategories(list);
-      } catch (e) {
-        setCategories([]);
-      }
-    };
-    loadCategories();
-  }, [initialData]);
+    if (!initialData && categories.length > 0 && !formData.category) {
+       setFormData(prev => ({ ...prev, category: categories[0] }));
+    }
+  }, [categories, initialData]);
 
   const isEditing = !!initialData;
 
@@ -499,9 +488,9 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   >
-                    {categories.map(c => (
-                      <option key={c.id} value={c.name}>
-                        {c.name}
+                    {categories.map((cat, index) => (
+                      <option key={index} value={cat}>
+                        {cat}
                       </option>
                     ))}
                   </select>

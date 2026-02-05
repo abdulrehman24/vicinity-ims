@@ -4,9 +4,8 @@ import { useLocation } from 'react-router-dom';
 import Calendar from 'react-calendar';
 import SafeIcon from '../common/SafeIcon';
 import { useInventory } from '../context/InventoryContext';
-import { shifts, categories } from '../data/inventoryData';
 import * as FiIcons from 'react-icons/fi';
-import { format, parseISO, eachDayOfInterval, isSameDay, isBefore, startOfDay } from 'date-fns';
+import { format, parseISO, eachDayOfInterval, isSameDay, isBefore, startOfDay, differenceInDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import CollaboratorList from '../components/CollaboratorList';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -18,7 +17,7 @@ const {
 } = FiIcons;
 
 function CheckInOut() {
-  const { equipment, bookings, bundles, checkOutEquipment, batchCheckIn, isAdmin, replaceBooking } = useInventory();
+  const { equipment, bookings, bundles, categories, checkOutEquipment, batchCheckIn, isAdmin, replaceBooking } = useInventory();
   const [activeTab, setActiveTab] = useState('in');
   const [projectToEdit, setProjectToEdit] = useState(null);
   const location = useLocation();
@@ -37,14 +36,30 @@ function CheckInOut() {
     setActiveTab('in');
   };
 
-  const handleManualOutConfirm = async (payload) => {
+  const handleManualOutConfirm = async (payloadOrPayloads) => {
+    const payloads = Array.isArray(payloadOrPayloads) ? payloadOrPayloads : [payloadOrPayloads];
+
     if (projectToEdit) {
       // Editing mode
-      await replaceBooking(projectToEdit.bookingIds, payload);
+      const [first, ...rest] = payloads;
+      
+      // 1. Replace existing bookings with the first group
+      // This will cancel the old 'ids' and create a new booking for 'first' payload
+      await replaceBooking(projectToEdit.bookingIds, first);
+      
+      // 2. Create new bookings for any remaining groups (if user split a contiguous booking into disjoint ones)
+      if (rest.length > 0) {
+        for (const p of rest) {
+            await checkOutEquipment(p);
+        }
+      }
+
       setProjectToEdit(null);
     } else {
       // Normal checkout
-      checkOutEquipment(payload);
+      for (const p of payloads) {
+        await checkOutEquipment(p);
+      }
     }
   };
 
@@ -85,6 +100,7 @@ function CheckInOut() {
             equipment={equipment} 
             bookings={bookings} 
             bundles={bundles} 
+            categories={categories}
             onConfirm={handleManualOutConfirm}
             editingProject={projectToEdit}
             onCancelEdit={() => {
@@ -106,7 +122,30 @@ function CheckInOut() {
   );
 }
 
-function ManualOutForm({ equipment, bookings, bundles, onConfirm, editingProject, onCancelEdit }) {
+const groupDates = (dates) => {
+  if (!dates || dates.length === 0) return [];
+  
+  const sorted = [...dates].sort();
+  const groups = [];
+  let currentGroup = [sorted[0]];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = parseISO(currentGroup[currentGroup.length - 1]);
+    const curr = parseISO(sorted[i]);
+    const diff = differenceInDays(curr, prev);
+    
+    if (diff === 1) {
+      currentGroup.push(sorted[i]);
+    } else {
+      groups.push(currentGroup);
+      currentGroup = [sorted[i]];
+    }
+  }
+  groups.push(currentGroup);
+  return groups;
+};
+
+function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, editingProject, onCancelEdit }) {
   const [selectedItems, setSelectedItems] = useState([]); // Array of {id, qty}
   const [selectedDates, setSelectedDates] = useState([]);
   const [shift, setShift] = useState('Full Day');
@@ -126,7 +165,11 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm, editingProject
         setShift(editingProject.shift || 'Full Day');
         
         // Populate dates
-        if (editingProject.startDate && editingProject.endDate) {
+        if (editingProject.dates && Array.isArray(editingProject.dates) && editingProject.dates.length > 0) {
+            // Prefer explicit dates array if available (handles disjoint dates correctly)
+            const dates = editingProject.dates.map(d => typeof d === 'string' ? parseISO(d) : d);
+            setSelectedDates(dates);
+        } else if (editingProject.startDate && editingProject.endDate) {
             const start = parseISO(editingProject.startDate);
             const end = parseISO(editingProject.endDate);
             const dates = eachDayOfInterval({ start, end });
@@ -224,11 +267,6 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm, editingProject
     const bundle = bundles?.find(b => b.id === parseInt(bundleId));
     if (!bundle) return;
 
-    if (selectedDates.length === 0) {
-        toast.error("Please select dates first");
-        return;
-    }
-
     const newItems = [...selectedItems];
     let addedCount = 0;
     let unavailableCount = 0;
@@ -292,13 +330,15 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm, editingProject
   };
 
   const handleBooking = () => {
-    const payload = {
+    const dateGroups = groupDates(requestedDates);
+
+    const payloads = dateGroups.map(group => ({
       shootName: formData.projTitle,
       quotationNumber: formData.quote,
       shift,
-      dates: requestedDates,
-      startDate: requestedDates[0],
-      endDate: requestedDates[requestedDates.length - 1],
+      dates: group,
+      startDate: group[0],
+      endDate: group[group.length - 1],
       user: 'Operations Team',
       collaborators: collaborators.map(c => {
         if (typeof c === 'string') return { email: c, expiryDate: null };
@@ -308,9 +348,9 @@ function ManualOutForm({ equipment, bookings, bundles, onConfirm, editingProject
         equipmentId: item.id,
         quantity: item.qty,
       })),
-    };
+    }));
 
-    onConfirm(payload);
+    onConfirm(payloads);
     setSelectedItems([]);
     setFormData({ projTitle: '', quote: '', shootType: 'Commercial' });
   };
@@ -548,12 +588,12 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
   const [selectedProjectKeys, setSelectedProjectKeys] = useState([]);
   const [deleteModal, setDeleteModal] = useState(null);
 
-  const projectKey = (project) => `${project.shootName}-${project.quotationNumber}`;
+  const projectKey = (project) => `${project.shootName}|${project.quotationNumber || ''}|${project.startDate}|${project.endDate}`;
 
   const activeProjects = useMemo(() => {
     const projects = {};
     bookings.filter(b => b.status === 'active').forEach(b => {
-      const key = `${b.shootName}-${b.quotationNumber}`;
+      const key = `${b.shootName}|${b.quotationNumber || ''}|${b.startDate}|${b.endDate}`;
       if (!projects[key]) {
         projects[key] = { 
             shootName: b.shootName, 

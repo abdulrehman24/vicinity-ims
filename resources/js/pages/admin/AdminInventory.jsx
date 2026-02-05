@@ -6,7 +6,8 @@ import toast from 'react-hot-toast';
 import imageCompression from 'browser-image-compression';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
-import { categories, equipmentTypes, businessUnits } from '../../data/inventoryData';
+import { equipmentTypes, businessUnits } from '../../data/inventoryData';
+import { useInventory } from '../../context/InventoryContext';
 
 const { FiPlus, FiTrash2, FiEdit2, FiSearch, FiImage, FiX, FiUpload, FiCamera, FiHash, FiMapPin, FiCheck, FiAlertTriangle, FiTool } = FiIcons;
 
@@ -29,7 +30,7 @@ function InputField({ label, icon, value, onChange, placeholder, required = fals
   );
 }
 
-function NewEntryModal({ onClose, onSubmit, initialData }) {
+function NewEntryModal({ onClose, onSubmit, initialData, categories = [] }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState(initialData || {
     name: '',
@@ -237,6 +238,7 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
 }
 
 function AdminInventory() {
+  const { categories } = useInventory();
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -498,6 +500,7 @@ function AdminInventory() {
           <NewEntryModal 
              onClose={() => setIsModalOpen(false)} 
              onSubmit={handleSave} 
+             categories={categories}
           />
         )}
         {editingItem && (
@@ -505,6 +508,7 @@ function AdminInventory() {
              initialData={editingItem}
              onClose={() => setEditingItem(null)} 
              onSubmit={handleSave} 
+             categories={categories}
           />
         )}
       </AnimatePresence>

@@ -84,6 +84,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/profile/update', [AuthController::class, 'updateProfile']);
     Route::get('/api/bundles', [BundleController::class, 'index']);
     Route::get('/equipment/{equipment}/logs', [EquipmentLogController::class, 'index']);
+    Route::get('/stock-takes', [App\Http\Controllers\StockTakeController::class, 'index']);
+    Route::post('/stock-takes', [App\Http\Controllers\StockTakeController::class, 'store']);
 });
 
 Route::resource('equipment', EquipmentController::class);

@@ -7,6 +7,7 @@ const InventoryContext = createContext();
 
 const initialState = {
   equipment: [],
+  categories: [],
   bundles: [],
   bookings: [],
   records: [],
@@ -18,6 +19,8 @@ function inventoryReducer(state, action) {
   switch (action.type) {
     case 'SET_EQUIPMENT':
       return { ...state, equipment: action.payload };
+    case 'SET_CATEGORIES':
+      return { ...state, categories: action.payload };
     case 'ADD_EQUIPMENT':
       return { ...state, equipment: [...state.equipment, action.payload] };
     case 'UPDATE_EQUIPMENT':
@@ -75,6 +78,7 @@ export function InventoryProvider({ children, user }) {
 
   useEffect(() => {
     fetchEquipment();
+    fetchCategories();
     fetchBookings();
     fetchBundles();
   }, []);
@@ -90,6 +94,17 @@ export function InventoryProvider({ children, user }) {
     } catch (error) {
       console.error("Failed to fetch equipment", error);
       toast.error("Failed to load inventory");
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get('/api/admin/categories');
+      const list = (response.data.data || []).filter(c => c.is_active).map(c => c.name);
+      dispatch({ type: 'SET_CATEGORIES', payload: list });
+    } catch (error) {
+      console.error("Failed to fetch categories", error);
+      // Fallback or empty? Let's leave it empty so components can fallback or show empty
     }
   };
 
@@ -204,6 +219,10 @@ export function InventoryProvider({ children, user }) {
       console.error("Failed to update equipment", error);
       toast.error(error.response?.data?.message || "Failed to update equipment");
     }
+  };
+
+  const updateLocalEquipment = (updatedItem) => {
+    dispatch({ type: 'UPDATE_EQUIPMENT', payload: updatedItem });
   };
 
   const deleteEquipment = async (id) => {
@@ -325,6 +344,7 @@ export function InventoryProvider({ children, user }) {
         ...state, 
         addEquipment, 
         updateEquipment, 
+        updateLocalEquipment,
         deleteEquipment,
         checkOutEquipment, 
         batchCheckIn, 

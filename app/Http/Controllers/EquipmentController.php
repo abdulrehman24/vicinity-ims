@@ -6,6 +6,7 @@ use App\Http\Resources\EquipmentResource;
 use App\Mail\EquipmentNotificationMail;
 use App\Models\Equipment;
 use App\Models\EquipmentLog;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -37,9 +38,16 @@ class EquipmentController extends Controller
             'purchaseDate' => 'nullable|date',
             'remarks' => 'nullable|string',
             'totalQuantity' => 'nullable|integer|min:1',
+            'nextAuditDate' => 'nullable|date',
         ]);
 
         $equipmentData = $this->mapFrontendToBackend($data);
+
+        // Calculate next_audit_date if not provided
+        if (!isset($equipmentData['next_audit_date'])) {
+            $auditInterval = Setting::where('key', 'audit_interval_months')->value('value') ?? 6;
+            $equipmentData['next_audit_date'] = now()->addMonths((int)$auditInterval);
+        }
 
         if ($request->hasFile('image')) {
             $path = $this->processAndSaveImage($request->file('image'));
@@ -72,6 +80,7 @@ class EquipmentController extends Controller
             'purchaseDate' => 'nullable|date',
             'remarks' => 'nullable|string',
             'totalQuantity' => 'nullable|integer|min:1',
+            'nextAuditDate' => 'nullable|date',
         ]);
 
         $equipmentData = $this->mapFrontendToBackend($data);
@@ -193,6 +202,9 @@ class EquipmentController extends Controller
         }
         if (isset($data['totalQuantity'])) {
             $mapped['total_quantity'] = $data['totalQuantity'];
+        }
+        if (isset($data['nextAuditDate'])) {
+            $mapped['next_audit_date'] = $data['nextAuditDate'];
         }
 
         return $mapped;

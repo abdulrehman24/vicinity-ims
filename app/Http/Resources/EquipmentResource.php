@@ -31,6 +31,7 @@ class EquipmentResource extends JsonResource
             'decommissionDate' => $this->decommission_date ? $this->decommission_date->format('Y-m-d') : null,
             'decommissionReason' => $this->decommission_reason,
             'repairStartDate' => $this->repair_start_date ? $this->repair_start_date->format('Y-m-d') : null,
+            'nextAuditDate' => $this->next_audit_date ? $this->next_audit_date->format('Y-m-d') : null,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
