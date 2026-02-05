@@ -99,7 +99,7 @@ export function InventoryProvider({ children, user }) {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get('/api/admin/categories');
+      const response = await axios.get('/api/admin/categories', { params: { length: 1000 } });
       const list = (response.data.data || []).filter(c => c.is_active).map(c => c.name);
       dispatch({ type: 'SET_CATEGORIES', payload: list });
     } catch (error) {
