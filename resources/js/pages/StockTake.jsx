@@ -9,7 +9,7 @@ import * as FiIcons from 'react-icons/fi';
 import axios from 'axios';
 import imageCompression from 'browser-image-compression';
 
-const { FiUpload, FiCamera, FiCheck, FiX, FiSave, FiImage, FiMapPin, FiInfo, FiLayers, FiShield, FiLock, FiClock, FiAlertCircle, FiSearch } = FiIcons;
+const { FiUpload, FiCamera, FiCheck, FiX, FiSave, FiImage, FiMapPin, FiInfo, FiLayers, FiShield, FiLock, FiClock, FiAlertCircle, FiSearch, FiFilter } = FiIcons;
 
 function StockTake() {
   const { equipment, stockTakes, addStockTake, updateEquipment, updateLocalEquipment, isAdmin } = useInventory();
@@ -20,6 +20,7 @@ function StockTake() {
   const [isSaving, setIsSaving] = useState(false);
   const [verifiedAssets, setVerifiedAssets] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
 
   useEffect(() => {
       if (isAdmin) {
@@ -99,6 +100,35 @@ function StockTake() {
     // Sort by name for consistency
     return filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [equipmentToAudit, verifiedAssets, searchTerm]);
+
+  // Get all unique categories for filter
+  const allCategories = useMemo(() => {
+    const cats = new Set(equipment.map(item => item.category || 'Uncategorized'));
+    return ['All', ...Array.from(cats).sort()];
+  }, [equipment]);
+
+  // Group items by category
+  const groupedSidebarItems = useMemo(() => {
+    const groups = {};
+    sidebarItems.forEach(item => {
+      const cat = item.category || 'Uncategorized';
+      
+      // Filter by category if selected
+      if (selectedCategory !== 'All' && cat !== selectedCategory) {
+        return;
+      }
+
+      if (!groups[cat]) {
+        groups[cat] = [];
+      }
+      groups[cat].push(item);
+    });
+
+    return Object.keys(groups).sort().map(category => ({
+      category,
+      items: groups[category]
+    }));
+  }, [sidebarItems, selectedCategory]);
 
   // Audit Reminder Logic
   const auditStatus = useMemo(() => {
@@ -407,6 +437,19 @@ function StockTake() {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         <div className="xl:col-span-4 space-y-6">
           <div className="space-y-4">
+            <div className="relative">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full bg-white border border-gray-100 text-[#4a5a67] text-xs font-bold rounded-2xl px-4 py-3 appearance-none cursor-pointer focus:ring-2 focus:ring-[#ebc1b6] focus:border-[#ebc1b6] transition-all shadow-sm"
+              >
+                {allCategories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              <SafeIcon icon={FiFilter} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+
             <div className="flex items-center space-x-2 bg-gray-50 p-3 rounded-2xl border border-gray-100">
                 <SafeIcon icon={FiSearch} className="text-gray-400 ml-1" />
                 <input 
@@ -417,52 +460,64 @@ function StockTake() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
             </div>
-            <div className="space-y-2 max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar">
-              {sidebarItems.map((item) => {
-                if (item.isVerified) {
-                   return (
-                      <div key={item.id} className="w-full text-left p-3 rounded-2xl border border-green-100 bg-green-50/30 flex items-center space-x-3 opacity-80 hover:opacity-100 transition-opacity">
-                          <div className="relative shrink-0">
-                              <img 
-                                src={item.auditRecord?.image_path || item.image} 
-                                alt={item.name} 
-                                className="w-10 h-10 rounded-xl object-cover border border-white/50 shadow-sm" 
-                              />
-                              <div className="absolute -bottom-1 -right-1 bg-green-500 text-white rounded-full p-0.5 border border-white shadow-sm">
-                                  <SafeIcon icon={FiCheck} className="text-[8px]" />
-                              </div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                              <h3 className="font-bold text-xs truncate text-[#4a5a67]">{item.name}</h3>
-                              <div className="flex items-center justify-between mt-0.5">
-                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                                  {item.serialNumber}
-                                </p>
-                                <p className="text-[9px] font-mono text-gray-400 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded-md border border-gray-100">
-                                    <SafeIcon icon={FiClock} className="text-[8px]" />
-                                    {format(parseISO(item.auditRecord?.created_at), 'h:mm a')}
-                                </p>
-                              </div>
-                          </div>
-                      </div>
-                   );
-                }
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar">
+              {groupedSidebarItems.map((group) => (
+                <div key={group.category}>
+                  <div className="sticky top-0 bg-gray-50/95 backdrop-blur-sm z-10 py-2 mb-2 border-b border-gray-200/50">
+                    <h3 className="text-[10px] font-black text-[#4a5a67] uppercase tracking-widest px-1 flex justify-between items-center">
+                      <span>{group.category}</span>
+                      <span className="bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded text-[9px]">{group.items.length}</span>
+                    </h3>
+                  </div>
+                  <div className="space-y-2">
+                    {group.items.map((item) => {
+                      if (item.isVerified) {
+                         return (
+                            <div key={item.id} className="w-full text-left p-3 rounded-2xl border border-green-100 bg-green-50/30 flex items-center space-x-3 opacity-80 hover:opacity-100 transition-opacity">
+                                <div className="relative shrink-0">
+                                    <img 
+                                      src={item.auditRecord?.image_path || item.image} 
+                                      alt={item.name} 
+                                      className="w-10 h-10 rounded-xl object-cover border border-white/50 shadow-sm" 
+                                    />
+                                    <div className="absolute -bottom-1 -right-1 bg-green-500 text-white rounded-full p-0.5 border border-white shadow-sm">
+                                        <SafeIcon icon={FiCheck} className="text-[8px]" />
+                                    </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="font-bold text-xs truncate text-[#4a5a67]">{item.name}</h3>
+                                    <div className="flex items-center justify-between mt-0.5">
+                                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                                        {item.serialNumber}
+                                      </p>
+                                      <p className="text-[9px] font-mono text-gray-400 flex items-center gap-1 bg-white px-1.5 py-0.5 rounded-md border border-gray-100">
+                                          <SafeIcon icon={FiClock} className="text-[8px]" />
+                                          {format(parseISO(item.auditRecord?.created_at), 'h:mm a')}
+                                      </p>
+                                    </div>
+                                </div>
+                            </div>
+                         );
+                      }
 
-                return (
-                  <button key={item.id} onClick={() => handleEquipmentSelect(item.id)} className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedEquipment.includes(item.id) ? 'bg-[#ebc1b6] border-[#ebc1b6] text-[#4a5a67] shadow-md' : 'bg-white border-gray-100 hover:border-[#ebc1b6] text-[#4a5a67]'}`} >
-                    <div className="flex items-center space-x-3">
-                      <img src={item.image} alt={item.name} className="w-10 h-10 rounded-xl object-cover border border-white/20" />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-xs truncate">{item.name}</h3>
-                        <p className={`text-[9px] font-black uppercase tracking-widest mt-0.5 ${selectedEquipment.includes(item.id) ? 'text-[#4a5a67]/60' : 'text-gray-400'}`}>
-                          {item.serialNumber} • {item.location}
-                        </p>
-                      </div>
-                      {selectedEquipment.includes(item.id) && <SafeIcon icon={FiCheck} className="text-sm" />}
-                    </div>
-                  </button>
-                );
-              })}
+                      return (
+                        <button key={item.id} onClick={() => handleEquipmentSelect(item.id)} className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedEquipment.includes(item.id) ? 'bg-[#ebc1b6] border-[#ebc1b6] text-[#4a5a67] shadow-md' : 'bg-white border-gray-100 hover:border-[#ebc1b6] text-[#4a5a67]'}`} >
+                          <div className="flex items-center space-x-3">
+                            <img src={item.image} alt={item.name} className="w-10 h-10 rounded-xl object-cover border border-white/20" />
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-bold text-xs truncate">{item.name}</h3>
+                              <p className={`text-[9px] font-black uppercase tracking-widest mt-0.5 ${selectedEquipment.includes(item.id) ? 'text-[#4a5a67]/60' : 'text-gray-400'}`}>
+                                {item.serialNumber} • {item.location}
+                              </p>
+                            </div>
+                            {selectedEquipment.includes(item.id) && <SafeIcon icon={FiCheck} className="text-sm" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
               {sidebarItems.length === 0 && (
                  <div className="p-8 text-center border border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
                      <SafeIcon icon={FiSearch} className="mx-auto text-2xl text-gray-300 mb-2" />
@@ -506,7 +561,7 @@ function StockTake() {
                               </div>
                               <div>
                                 <h3 className="text-xs font-black text-[#4a5a67] uppercase tracking-widest">{item.name}</h3>
-                                <p className="text-[10px] font-bold text-gray-400">{item.serialNumber}</p>
+                                <p className="text-[10px] font-bold text-gray-400">{item.category} • {item.serialNumber}</p>
                               </div>
                             </div>
                             <button onClick={() => handleEquipmentSelect(equipmentId)} className="text-gray-300 hover:text-red-500">
@@ -550,7 +605,7 @@ function StockTake() {
                           <img src={item.image} alt={item.name} className="w-12 h-12 rounded-xl object-cover border border-white shadow-sm" />
                           <div>
                             <h3 className="text-xs font-black text-[#4a5a67] uppercase tracking-widest">{item.name}</h3>
-                            <p className="text-[10px] font-bold text-gray-400">{item.serialNumber}</p>
+                            <p className="text-[10px] font-bold text-gray-400">{item.category} • {item.serialNumber}</p>
                           </div>
                         </div>
                         <button onClick={() => handleEquipmentSelect(equipmentId)} className="text-gray-300 hover:text-red-500">

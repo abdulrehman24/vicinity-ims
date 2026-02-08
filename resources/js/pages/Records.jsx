@@ -138,6 +138,9 @@ function Records() {
     const getDateObj = (d) => typeof d === 'object' ? d.date : d;
 
     bookings.forEach(b => {
+      // Skip cancelled bookings from records view
+      if (b.status === 'cancelled') return;
+
       // Group by Shoot Name + Quotation Number
       const key = `${b.shootName}|${b.quotationNumber || 'NoQuote'}`;
       
@@ -387,12 +390,16 @@ function Records() {
                         <div className="border-t border-white/10 pt-3">
                           <p className="text-[9px] font-bold text-white/60 mb-2">{group.items.length} Items</p>
                           <ul className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">
-                             {group.items.map((item, idx) => (
-                               <li key={idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2">
-                                 <div className="w-1 h-1 bg-white/20 rounded-full" />
-                                 <span>{item.equipmentName}</span>
-                               </li>
-                             ))}
+                             {(() => {
+                                const counts = {};
+                                group.items.forEach(i => counts[i.equipmentName] = (counts[i.equipmentName] || 0) + 1);
+                                return Object.entries(counts).sort((a,b) => a[0].localeCompare(b[0])).map(([name, count], idx) => (
+                                   <li key={idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2">
+                                      <div className="w-1 h-1 bg-white/20 rounded-full" />
+                                      <span>{name}</span>
+                                    </li>
+                                ));
+                             })()}
                           </ul>
                         </div>
                       </div>
@@ -463,6 +470,26 @@ function Records() {
 function RecordGroup({ group, onEdit, onCancel }) {
   const [expanded, setExpanded] = useState(false);
   
+  // Aggregate items by name to prevent duplicates
+  const aggregatedItems = useMemo(() => {
+    const counts = {};
+    const firstItems = {};
+    
+    group.items.forEach(item => {
+       const name = item.equipmentName;
+       if (!counts[name]) {
+           counts[name] = 0;
+           firstItems[name] = item;
+       }
+       counts[name]++;
+    });
+    
+    return Object.values(firstItems).map(item => ({
+        ...item,
+        displayQuantity: counts[item.equipmentName]
+    })).sort((a, b) => a.equipmentName.localeCompare(b.equipmentName));
+  }, [group.items]);
+  
   // Determine display status/color
   const isReturned = group.items.every(i => i.status === 'returned');
   const isCancelled = group.items.every(i => i.status === 'cancelled');
@@ -502,7 +529,7 @@ function RecordGroup({ group, onEdit, onCancel }) {
               )}
               <div className="flex items-center space-x-1 text-[#4a5a67]">
                 <div className="w-1.5 h-1.5 bg-[#4a5a67] rounded-full" />
-                <span>{group.items.length} Items</span>
+                <span>{aggregatedItems.length} Items</span>
               </div>
             </div>
           </div>
@@ -559,15 +586,17 @@ function RecordGroup({ group, onEdit, onCancel }) {
               className="bg-gray-50 border-t border-gray-100"
             >
                <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                 {group.items.map((item, idx) => (
+                 {aggregatedItems.map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
                       <div className="flex items-center space-x-3 overflow-hidden">
                         <div className="w-1.5 h-1.5 bg-[#ebc1b6] rounded-full shrink-0" />
                         <span className="text-xs font-bold text-[#4a5a67] truncate">{item.equipmentName}</span>
                       </div>
-                      {item.type === 'problem_report' && (
-                         <SafeIcon icon={FiAlertTriangle} className="text-red-500 text-xs" />
-                      )}
+                      <div className="flex items-center space-x-2">
+                           {item.type === 'problem_report' && (
+                              <SafeIcon icon={FiAlertTriangle} className="text-red-500 text-xs" />
+                           )}
+                       </div>
                     </div>
                  ))}
                </div>

@@ -89,7 +89,10 @@ export function InventoryProvider({ children, user }) {
 
   const fetchEquipment = async () => {
     try {
-      const response = await axios.get('/equipment');
+      const response = await axios.get('/equipment', {
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+        params: { _t: new Date().getTime() }
+      });
       dispatch({ type: 'SET_EQUIPMENT', payload: response.data.data });
     } catch (error) {
       console.error("Failed to fetch equipment", error);
@@ -110,7 +113,10 @@ export function InventoryProvider({ children, user }) {
 
   const fetchBookings = async () => {
     try {
-      const response = await axios.get('/bookings');
+      const response = await axios.get('/bookings', {
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+        params: { _t: new Date().getTime() }
+      });
       const flatBookings = [];
 
       response.data.data.forEach(b => {
@@ -341,7 +347,8 @@ export function InventoryProvider({ children, user }) {
 
   return (
     <InventoryContext.Provider value={{ 
-        ...state, 
+        ...state,
+        user, 
         addEquipment, 
         updateEquipment, 
         updateLocalEquipment,

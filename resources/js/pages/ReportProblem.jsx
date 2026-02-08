@@ -23,7 +23,7 @@ const issueTypes = [
 ];
 
 function ReportProblem() {
-  const { equipment, reportProblem, updateEquipment, fetchEquipmentLogs } = useInventory();
+  const { equipment, reportProblem, updateEquipment, fetchEquipmentLogs, user } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [showLogs, setShowLogs] = useState(false);
@@ -98,6 +98,12 @@ function ReportProblem() {
 
   const handleResolve = async () => {
     if (!selectedItem) return;
+
+    // Check admin permissions (is_admin 1 or 2)
+    if (!user || (user.is_admin !== 1 && user.is_admin !== 2)) {
+        toast.error("Only admins can return items to inventory");
+        return;
+    }
     
     await updateEquipment({
       ...selectedItem,
@@ -297,13 +303,19 @@ function ReportProblem() {
                                 <br/>If repairs are finished, you can return it to the active inventory immediately.
                             </p>
                         </div>
-                        <button 
-                            onClick={handleResolve}
-                            className="bg-[#4a5a67] text-[#ebc1b6] px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:bg-[#3d4b56] hover:shadow-xl transition-all flex items-center space-x-3 mt-4"
-                        >
-                            <span>Return to Inventory</span>
-                            <SafeIcon icon={FiCheck} />
-                        </button>
+                        {(user?.is_admin === 1 || user?.is_admin === 2) ? (
+                            <button 
+                                onClick={handleResolve}
+                                className="bg-[#4a5a67] text-[#ebc1b6] px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:bg-[#3d4b56] hover:shadow-xl transition-all flex items-center space-x-3 mt-4"
+                            >
+                                <span>Return to Inventory</span>
+                                <SafeIcon icon={FiCheck} />
+                            </button>
+                        ) : (
+                            <div className="bg-amber-50 text-amber-600 px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider mt-4 border border-amber-100">
+                                Equipment Under Maintenance
+                            </div>
+                        )}
                     </div>
                 ) : (
                 <form onSubmit={handleSubmit} className="p-8 space-y-8">

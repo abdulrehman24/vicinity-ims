@@ -94,6 +94,8 @@ function CalendarPage() {
     const projectMap = {};
 
     bookings.forEach(booking => {
+      if (booking.status === 'cancelled') return;
+
       const eqName = booking.equipmentName
         ? booking.equipmentName
         : equipment.find(item => item.id === booking.equipmentId)?.name || 'Unknown Equipment';
@@ -270,9 +272,9 @@ function CalendarPage() {
                       </div>
 
                       <div className="border-t border-white/10 pt-3">
-                        <p className="text-[9px] font-bold text-white/60 mb-2">{event.items.length} Items</p>
+                        <p className="text-[9px] font-bold text-white/60 mb-2">{[...new Set(event.items)].length} Items</p>
                         <ul className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                           {event.items.map((item, idx) => (
+                           {[...new Set(event.items)].sort().map((item, idx) => (
                              <li key={idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2">
                                <div className="w-1 h-1 bg-white/20 rounded-full" />
                                <span>{item}</span>

@@ -77,6 +77,26 @@ class SupportTicketController extends Controller
         if ($oldStatus !== $ticket->status) {
             $statusLabel = str_replace('_', ' ', ucfirst($ticket->status));
             $this->notifyUsers($ticket->load('equipment'), 'Support Ticket Update: '.$ticket->ticket_code.' is now '.$statusLabel);
+
+            // Reactivate equipment if resolved
+            if ($ticket->status === 'resolved' && $ticket->equipment) {
+                $equipment = $ticket->equipment;
+                if ($equipment->status !== 'available') {
+                    $originalStatus = $equipment->status;
+                    $equipment->update(['status' => 'available']);
+
+                    // Log the change
+                    EquipmentLog::create([
+                        'equipment_id' => $equipment->id,
+                        'user_id' => auth()->id(),
+                        'user_name' => auth()->user() ? auth()->user()->name : 'System',
+                        'action' => 'status_change',
+                        'previous_status' => $originalStatus,
+                        'new_status' => 'available',
+                        'description' => "Ticket {$ticket->ticket_code} resolved",
+                    ]);
+                }
+            }
         }
 
         return response()->json($ticket->load('equipment'));
