@@ -25,6 +25,10 @@ class EquipmentController extends Controller
 
     public function store(Request $request)
     {
+        if ($request->has('nextAuditDate') && !$request->input('nextAuditDate')) {
+            $request->merge(['nextAuditDate' => null]);
+        }
+
         $data = $request->validate([
             'name' => 'required|string',
             'category' => 'required|string',
@@ -68,6 +72,10 @@ class EquipmentController extends Controller
     {
         $equipment = Equipment::findOrFail($id);
 
+        if ($request->has('nextAuditDate') && !$request->input('nextAuditDate')) {
+            $request->merge(['nextAuditDate' => null]);
+        }
+
         $data = $request->validate([
             'name' => 'required|string',
             'category' => 'required|string',
@@ -86,6 +94,11 @@ class EquipmentController extends Controller
         ]);
 
         $equipmentData = $this->mapFrontendToBackend($data);
+
+        if (!isset($equipmentData['next_audit_date'])) {
+            $auditInterval = Setting::where('key', 'audit_interval_months')->value('value') ?? 6;
+            $equipmentData['next_audit_date'] = now()->addMonths((int)$auditInterval);
+        }
 
         // Handle image update via FormData
         if ($request->hasFile('image')) {
