@@ -97,7 +97,10 @@ function NewEntryModal({ onClose, onSubmit, initialData, categories = [] }) {
     
     setIsSubmitting(true);
     try {
-      await onSubmit(formData);
+      const ok = await onSubmit(formData);
+      if (!ok) {
+        setIsSubmitting(false);
+      }
     } catch (error) {
       console.error(error);
       setIsSubmitting(false);
@@ -336,10 +339,11 @@ function AdminInventory() {
         setIsModalOpen(false);
       }
       loadInventory();
+      return true;
     } catch (e) {
       console.error(e);
-      toast.error('Failed to save item');
-      throw e; // Propagate error to Modal to stop loading state
+      toast.error(e.response?.data?.message || 'Failed to save item');
+      return false;
     }
   };
 

@@ -233,6 +233,7 @@ function InventoryList() {
               if (ok) {
                 setIsModalOpen(false); 
               }
+              return ok;
             }} 
           />
         )}
@@ -252,6 +253,7 @@ function InventoryList() {
               if (ok) {
                 setEditingItem(null); 
               }
+              return ok;
             }} 
           />
         )}
@@ -519,7 +521,10 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
     
     setIsSubmitting(true);
     try {
-      await onSubmit(formData);
+      const ok = await onSubmit(formData);
+      if (!ok) {
+        setIsSubmitting(false);
+      }
     } catch (error) {
       console.error(error);
       setIsSubmitting(false); // Only stop loading on error, as success unmounts component
