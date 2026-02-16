@@ -18,6 +18,7 @@ class Equipment extends Model
         'image_path',
         'purchase_date',
         'remarks',
+        'description',
         'decommission_date',
         'decommission_reason',
         'repair_start_date',

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import axios from 'axios';
+import * as FiIcons from 'react-icons/fi';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Dashboard from './pages/Dashboard';
@@ -25,12 +26,16 @@ import AdminTickets from './pages/admin/AdminTickets';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminBundles from './pages/admin/AdminBundles';
 import { InventoryProvider } from './context/InventoryContext';
+import SafeIcon from './common/SafeIcon';
 import './App.css';
+
+const { FiAlertTriangle, FiRefreshCw, FiClock } = FiIcons;
 
 function App() {
   const [user, setUser] = useState(window.user || null);
   const [loading, setLoading] = useState(false);
   const location = useLocation();
+  const [showSessionModal, setShowSessionModal] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -42,6 +47,56 @@ function App() {
         window.location.href = '/';
     }
   };
+
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        const status = error.response?.status;
+        if (user && (status === 419 || status === 401)) {
+          setShowSessionModal(true);
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const lifetimeMinutes = window.sessionLifetimeMinutes || 120;
+    const issuedAtMs = window.sessionIssuedAt || Date.now();
+    const now = Date.now();
+    const expiryAt = issuedAtMs + lifetimeMinutes * 60 * 1000;
+
+    if (expiryAt <= now) {
+      handleLogout();
+      return;
+    }
+
+    const warningOffsetMs = 5 * 60 * 1000;
+    const timeUntilExpiry = expiryAt - now;
+    const timeUntilWarning = Math.max(0, timeUntilExpiry - warningOffsetMs);
+
+    const warningTimer = setTimeout(() => {
+      setShowSessionModal(true);
+    }, timeUntilWarning);
+
+    const logoutTimer = setTimeout(() => {
+      handleLogout();
+    }, timeUntilExpiry);
+
+    return () => {
+      clearTimeout(warningTimer);
+      clearTimeout(logoutTimer);
+    };
+  }, [user]);
 
   if (loading) {
     return (
@@ -108,6 +163,59 @@ function App() {
           </AnimatePresence>
         </main>
         {!isAdminRoute && <Footer />}
+
+        {showSessionModal && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[#4a5a67]/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="bg-[#4a5a67] p-6 text-center text-white relative">
+                <div className="inline-flex p-3 bg-[#ebc1b6] rounded-2xl mb-3 shadow-lg">
+                  <SafeIcon icon={FiAlertTriangle} className="text-xl text-[#4a5a67]" />
+                </div>
+                <h2 className="text-lg font-black uppercase tracking-widest">Session Timeout</h2>
+                <p className="text-[10px] font-bold text-[#ebc1b6] uppercase tracking-[0.2em] mt-1">
+                  Refresh required to continue
+                </p>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="flex items-start space-x-3">
+                  <SafeIcon icon={FiClock} className="mt-1 text-gray-400" />
+                  <p className="text-sm text-[#4a5a67] text-left">
+                    Your session has likely expired due to inactivity or a security timeout.
+                    Please refresh the page to continue. Any unsaved changes may be lost.
+                  </p>
+                </div>
+                <div className="flex justify-end space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowSessionModal(false)}
+                    className="px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-gray-500 bg-gray-100 hover:bg-gray-200"
+                  >
+                    Later
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="px-5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest bg-[#4a5a67] text-[#ebc1b6] flex items-center space-x-2 shadow-md hover:shadow-lg"
+                  >
+                    <SafeIcon icon={FiRefreshCw} />
+                    <span>Refresh Now</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     </InventoryProvider>
   );

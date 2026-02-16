@@ -29,14 +29,15 @@ class EquipmentController extends Controller
             'name' => 'required|string',
             'category' => 'required|string',
             'equipmentType' => 'nullable|string',
-            'serialNumber' => 'nullable|string',
+            'serialNumber' => 'nullable|string|unique:equipment,serial_number',
             'status' => 'required|string',
             'businessUnit' => 'required|string',
             'condition' => 'required|string',
             'location' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240', // 10MB Max
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
             'purchaseDate' => 'nullable|date',
             'remarks' => 'nullable|string',
+            'description' => 'nullable|string',
             'totalQuantity' => 'nullable|integer|min:1',
             'nextAuditDate' => 'nullable|date',
         ]);
@@ -71,7 +72,7 @@ class EquipmentController extends Controller
             'name' => 'required|string',
             'category' => 'required|string',
             'equipmentType' => 'nullable|string',
-            'serialNumber' => 'nullable|string',
+            'serialNumber' => 'nullable|string|unique:equipment,serial_number,' . $equipment->id,
             'status' => 'required|string',
             'businessUnit' => 'required|string',
             'condition' => 'required|string',
@@ -79,6 +80,7 @@ class EquipmentController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
             'purchaseDate' => 'nullable|date',
             'remarks' => 'nullable|string',
+            'description' => 'nullable|string',
             'totalQuantity' => 'nullable|integer|min:1',
             'nextAuditDate' => 'nullable|date',
         ]);
@@ -190,6 +192,9 @@ class EquipmentController extends Controller
         }
         if (isset($data['remarks'])) {
             $mapped['remarks'] = $data['remarks'];
+        }
+        if (isset($data['description'])) {
+            $mapped['description'] = $data['description'];
         }
         if (isset($data['decommissionDate'])) {
             $mapped['decommission_date'] = $data['decommissionDate'];

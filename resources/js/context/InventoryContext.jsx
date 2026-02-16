@@ -192,9 +192,11 @@ export function InventoryProvider({ children, user }) {
 
       dispatch({ type: 'ADD_EQUIPMENT', payload: response.data.data });
       toast.success("Equipment added successfully");
+      return true;
     } catch (error) {
       console.error("Failed to add equipment", error);
       toast.error(error.response?.data?.message || "Failed to add equipment");
+      return false;
     }
   };
 
@@ -221,9 +223,11 @@ export function InventoryProvider({ children, user }) {
 
       dispatch({ type: 'UPDATE_EQUIPMENT', payload: response.data.data });
       toast.success("Equipment updated successfully");
+      return true;
     } catch (error) {
       console.error("Failed to update equipment", error);
       toast.error(error.response?.data?.message || "Failed to update equipment");
+      return false;
     }
   };
 

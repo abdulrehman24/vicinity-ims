@@ -26,7 +26,8 @@ function InventoryList() {
   const [adminAuthOpen, setAdminAuthOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [showDecommissioned, setShowDecommissioned] = useState(false);
-  
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
   const [editingItem, setEditingItem] = useState(null);
 
   const [decommissioningItem, setDecommissioningItem] = useState(null);
@@ -52,6 +53,27 @@ function InventoryList() {
     }
     return result;
   }, [searchTerm, selectedCategory, equipment, fuse, showDecommissioned]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, selectedCategory, showDecommissioned]);
+
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
+
+  const startIndex = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endIndex = Math.min(totalItems, page * pageSize);
 
   const handleDecommissionConfirm = (id, data) => {
     updateEquipment({
@@ -143,7 +165,7 @@ function InventoryList() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {filtered.map(item => (
+        {paginated.map(item => (
           <AssetCard 
             key={item.id} 
             item={item} 
@@ -156,13 +178,61 @@ function InventoryList() {
         ))}
       </div>
 
+      <div className="flex flex-col md:flex-row items-center justify-between mt-8 gap-4">
+        <p className="text-xs text-gray-500">
+          {totalItems === 0 ? 'No assets found' : `Showing ${startIndex}-${endIndex} of ${totalItems} assets`}
+        </p>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Per Page</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(parseInt(e.target.value) || 12);
+                setPage(1);
+              }}
+              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-[#4a5a67] outline-none"
+            >
+              <option value={6}>6</option>
+              <option value={12}>12</option>
+              <option value={24}>24</option>
+              <option value={48}>48</option>
+              <option value={96}>96</option>
+            </select>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-gray-200 text-[#4a5a67] bg-white hover:bg-gray-50 transition-all ${page <= 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              Prev
+            </button>
+            <span className="text-xs text-gray-500">
+              Page {totalItems === 0 ? 0 : page} of {totalItems === 0 ? 0 : totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages || totalItems === 0}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-gray-200 text-[#4a5a67] bg-white hover:bg-gray-50 transition-all ${page >= totalPages || totalItems === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+
       <AnimatePresence>
         {isModalOpen && (
           <NewEntryModal 
             onClose={() => setIsModalOpen(false)} 
             onSubmit={async (data) => { 
-              await addEquipment(data); 
-              setIsModalOpen(false); 
+              const ok = await addEquipment(data); 
+              if (ok) {
+                setIsModalOpen(false); 
+              }
             }} 
           />
         )}
@@ -178,8 +248,10 @@ function InventoryList() {
             initialData={editingItem}
             onClose={() => setEditingItem(null)} 
             onSubmit={async (data) => { 
-              await updateEquipment({...data, id: editingItem.id}); 
-              setEditingItem(null); 
+              const ok = await updateEquipment({...data, id: editingItem.id}); 
+              if (ok) {
+                setEditingItem(null); 
+              }
             }} 
           />
         )}
@@ -311,6 +383,12 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate
         <h3 className="text-lg font-bold text-[#4a5a67] mb-1">{item.name}</h3>
         <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">{item.category}</p>
         
+        {item.description && (
+          <p className="text-[11px] text-gray-600 mb-3 leading-snug line-clamp-3">
+            {item.description}
+          </p>
+        )}
+        
         {item.status === 'decommissioned' && item.decommissionReason && (
           <div className="mt-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
             <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Graveyard Record</p>
@@ -367,19 +445,20 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate
 function NewEntryModal({ onClose, onSubmit, initialData }) {
   const { categories } = useInventory();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState(initialData || {
-    name: '',
-    category: categories.length > 0 ? categories[0] : 'Camera Body',
-    equipmentType: 'Camera',
-    serialNumber: '',
-    status: 'available',
-    businessUnit: 'Studio',
-    condition: 'excellent',
-    location: '',
-    image: '',
-    purchaseDate: new Date().toISOString().split('T')[0],
-    totalQuantity: 1
-  });
+  const [formData, setFormData] = useState(() => ({
+    name: initialData?.name || '',
+    category: initialData?.category || (categories.length > 0 ? categories[0] : 'Camera Body'),
+    equipmentType: initialData?.equipmentType || 'Camera',
+    serialNumber: initialData?.serialNumber || '',
+    status: initialData?.status || 'available',
+    businessUnit: initialData?.businessUnit || 'Studio',
+    condition: initialData?.condition || 'excellent',
+    location: initialData?.location || '',
+    image: initialData?.image || '',
+    description: initialData?.description || '',
+    purchaseDate: initialData?.purchaseDate || new Date().toISOString().split('T')[0],
+    totalQuantity: initialData?.totalQuantity || 1
+  }));
 
   useEffect(() => {
     if (!initialData && categories.length > 0 && !formData.category) {
@@ -500,6 +579,15 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
               <div className="grid grid-cols-2 gap-4 mt-4">
                  <InputField label="Quantity" icon={FiHash} value={formData.totalQuantity} onChange={(v) => setFormData({ ...formData, totalQuantity: parseInt(v) || 1 })} placeholder="1" />
                  <InputField label="Location" icon={FiMapPin} value={formData.location} onChange={(v) => setFormData({ ...formData, location: v })} placeholder="e.g. Studio A" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="List what's included in this package..."
+                  className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none font-bold text-xs text-[#4a5a67] min-h-[80px] resize-none"
+                />
               </div>
             </div>
           </div>

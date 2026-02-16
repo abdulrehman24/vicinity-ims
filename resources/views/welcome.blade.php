@@ -16,6 +16,8 @@
     @vite(['resources/js/main.jsx'])
     <script>
         window.user = @json(auth()->user());
+        window.sessionLifetimeMinutes = {{ config('session.lifetime') }};
+        window.sessionIssuedAt = {{ now()->timestamp * 1000 }};
     </script>
 </head>
 <body class="bg-gray-900">

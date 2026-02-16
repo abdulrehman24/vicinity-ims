@@ -45,6 +45,7 @@ function NewEntryModal({ onClose, onSubmit, initialData, categories = [] }) {
     imageFile: null,
     purchaseDate: new Date().toISOString().split('T')[0],
     remarks: '',
+    description: '',
     totalQuantity: 1
   });
 
@@ -181,6 +182,15 @@ function NewEntryModal({ onClose, onSubmit, initialData, categories = [] }) {
                  <InputField label="Quantity" icon={FiHash} value={formData.totalQuantity} onChange={(v) => setFormData({ ...formData, totalQuantity: parseInt(v) || 1 })} placeholder="1" type="number" />
                  <InputField label="Location" icon={FiMapPin} value={formData.location} onChange={(v) => setFormData({ ...formData, location: v })} placeholder="e.g. Studio A" />
               </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="List what's included in this package..."
+                  className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none font-bold text-xs text-[#4a5a67] min-h-[80px] resize-none"
+                />
+              </div>
               
                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -300,6 +310,7 @@ function AdminInventory() {
     formData.append('location', formDataObj.location || '');
     formData.append('purchaseDate', formDataObj.purchaseDate || '');
     formData.append('remarks', formDataObj.remarks || '');
+    formData.append('description', formDataObj.description || '');
     formData.append('totalQuantity', formDataObj.totalQuantity || 1);
 
     if (formDataObj.imageFile) {
