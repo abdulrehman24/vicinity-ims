@@ -220,6 +220,10 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
   }, [selectedDates]);
 
   const getAvailableQty = (item, dates, requestedShift) => {
+    const maintenance = item.maintenanceQuantity || 0;
+    const total = item.totalQuantity || 0;
+    const effectiveTotal = Math.max(0, total - maintenance);
+
     const relevantBookings = bookings.filter(b => {
       if (b.status === 'returned') return false;
       return b.equipmentId === item.id;
@@ -227,7 +231,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
 
     if (!dates || dates.length === 0) {
       const totalBooked = relevantBookings.reduce((acc, curr) => acc + (curr.quantity || 1), 0);
-      return Math.max(0, item.totalQuantity - totalBooked);
+      return Math.max(0, effectiveTotal - totalBooked);
     }
 
     let bookedMax = 0;
@@ -245,7 +249,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
       if (totalBooked > bookedMax) bookedMax = totalBooked;
     });
 
-    return Math.max(0, item.totalQuantity - bookedMax);
+    return Math.max(0, effectiveTotal - bookedMax);
   };
 
   const toggleItem = (item) => {
@@ -469,7 +473,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
                     <div className="flex items-center space-x-3">
                       <img src={item.image} className="w-8 h-8 rounded-lg object-cover" alt="" />
                       <div>
-                        <p className="text-[11px] font-bold truncate">{item.name}</p>
+                        <p className="text-[11px] font-bold">{item.name}</p>
                         <p className="text-[8px] font-black uppercase opacity-50">{avail} Available</p>
                       </div>
                     </div>

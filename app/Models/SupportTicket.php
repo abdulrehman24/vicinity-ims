@@ -14,6 +14,7 @@ class SupportTicket extends Model
         'description',
         'reported_by',
         'status',
+        'quantity',
     ];
 
     public function equipment()

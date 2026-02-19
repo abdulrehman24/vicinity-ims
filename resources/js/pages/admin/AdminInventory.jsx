@@ -261,6 +261,7 @@ function AdminInventory() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
 
   const loadInventory = async () => {
     setLoading(true);
@@ -281,15 +282,24 @@ function AdminInventory() {
 
   // Filter and Paginate
   const filteredData = useMemo(() => {
-    if (!search) return inventory;
-    const lowerSearch = search.toLowerCase();
-    return inventory.filter(item => 
-      item.name?.toLowerCase().includes(lowerSearch) ||
-      item.serialNumber?.toLowerCase().includes(lowerSearch) ||
-      item.category?.toLowerCase().includes(lowerSearch) ||
-      item.businessUnit?.toLowerCase().includes(lowerSearch)
-    );
-  }, [inventory, search]);
+    let data = inventory;
+
+    if (search) {
+      const lowerSearch = search.toLowerCase();
+      data = data.filter(item => 
+        item.name?.toLowerCase().includes(lowerSearch) ||
+        item.serialNumber?.toLowerCase().includes(lowerSearch) ||
+        item.category?.toLowerCase().includes(lowerSearch) ||
+        item.businessUnit?.toLowerCase().includes(lowerSearch)
+      );
+    }
+
+    if (categoryFilter) {
+      data = data.filter(item => item.category === categoryFilter);
+    }
+
+    return data;
+  }, [inventory, search, categoryFilter]);
 
   const paginatedData = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -313,7 +323,9 @@ function AdminInventory() {
     formData.append('location', formDataObj.location || '');
     formData.append('purchaseDate', formDataObj.purchaseDate || '');
     formData.append('remarks', formDataObj.remarks || '');
-    formData.append('description', formDataObj.description || '');
+
+    const cleanedDescription = (formDataObj.description || '').trim();
+    formData.append('description', cleanedDescription === '' ? '' : formDataObj.description);
     formData.append('totalQuantity', formDataObj.totalQuantity || 1);
 
     if (formDataObj.imageFile) {
@@ -396,6 +408,19 @@ function AdminInventory() {
                 className="pl-9 pr-3 py-2 rounded-lg border border-gray-200 text-sm text-[#4a5a67] bg-gray-50 focus:bg-white focus:border-[#ebc1b6] outline-none w-64"
               />
             </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setPage(1);
+                setCategoryFilter(e.target.value);
+              }}
+              className="px-2 py-2 rounded-lg border border-gray-200 text-xs uppercase tracking-widest bg-gray-50 text-gray-500 focus:bg-white focus:border-[#ebc1b6] outline-none"
+            >
+              <option value="">All Categories</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
             <select
               value={pageSize}
               onChange={(e) => {

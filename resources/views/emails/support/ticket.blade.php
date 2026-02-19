@@ -35,6 +35,15 @@
                     <div>{{ $ticket->equipment->serialNumber ?? 'N/A' }}</div>
                 </td>
             </tr>
+            @if($ticket->quantity)
+                <tr>
+                    <td style="width:50%;padding:6px 0;font-size:12px;color:#6b7280;">
+                        <div style="font-weight:700;color:#4a5a67;">Units Affected</div>
+                        <div>{{ $ticket->quantity }}</div>
+                    </td>
+                    <td></td>
+                </tr>
+            @endif
         @endif
     </table>
 
@@ -56,4 +65,3 @@
         Please triage this ticket and update status in Vicinity IMS once resolved.
     </div>
 @endsection
-

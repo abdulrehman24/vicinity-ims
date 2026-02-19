@@ -87,11 +87,13 @@ function InventoryList() {
   };
 
   const handleRepairConfirm = (id, data) => {
+    const item = equipment.find(e => e.id === id);
     updateEquipment({
       id,
       status: 'maintenance',
       remarks: data.reason,
-      repairStartDate: data.date
+      repairStartDate: data.date,
+      maintenanceQuantity: item ? item.totalQuantity : undefined
     });
     setRepairingItem(null);
     toast.success("Asset sent to service bay");
@@ -390,6 +392,19 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate
             {item.description}
           </p>
         )}
+
+        {item.totalQuantity > 1 && (
+          <div className="mb-3 flex items-center justify-between text-[11px]">
+            <span className="font-bold text-[#4a5a67]">
+              {(item.totalQuantity || 0) - (item.maintenanceQuantity || 0)}/{item.totalQuantity || 0} units available
+            </span>
+            {item.maintenanceQuantity > 0 && (
+              <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-full">
+                {item.maintenanceQuantity} in repair
+              </span>
+            )}
+          </div>
+        )}
         
         {item.status === 'decommissioned' && item.decommissionReason && (
           <div className="mt-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
@@ -521,7 +536,15 @@ function NewEntryModal({ onClose, onSubmit, initialData }) {
     
     setIsSubmitting(true);
     try {
-      const ok = await onSubmit(formData);
+      const payload = {
+        ...formData,
+        description: (() => {
+          const cleaned = (formData.description || '').trim();
+          return cleaned === '' ? '' : formData.description;
+        })(),
+      };
+
+      const ok = await onSubmit(payload);
       if (!ok) {
         setIsSubmitting(false);
       }

@@ -43,6 +43,7 @@ class EquipmentController extends Controller
             'remarks' => 'nullable|string',
             'description' => 'nullable|string',
             'totalQuantity' => 'nullable|integer|min:1',
+            'maintenanceQuantity' => 'nullable|integer|min:0',
             'nextAuditDate' => 'nullable|date',
         ]);
 
@@ -90,6 +91,7 @@ class EquipmentController extends Controller
             'remarks' => 'nullable|string',
             'description' => 'nullable|string',
             'totalQuantity' => 'nullable|integer|min:1',
+            'maintenanceQuantity' => 'nullable|integer|min:0',
             'nextAuditDate' => 'nullable|date',
         ]);
 
@@ -176,52 +178,56 @@ class EquipmentController extends Controller
     private function mapFrontendToBackend($data)
     {
         $mapped = [];
-        if (isset($data['name'])) {
+
+        if (array_key_exists('name', $data)) {
             $mapped['name'] = $data['name'];
         }
-        if (isset($data['category'])) {
+        if (array_key_exists('category', $data)) {
             $mapped['category'] = $data['category'];
         }
-        if (isset($data['equipmentType'])) {
+        if (array_key_exists('equipmentType', $data)) {
             $mapped['equipment_type'] = $data['equipmentType'];
         }
-        if (isset($data['serialNumber'])) {
+        if (array_key_exists('serialNumber', $data)) {
             $mapped['serial_number'] = $data['serialNumber'];
         }
-        if (isset($data['status'])) {
+        if (array_key_exists('status', $data)) {
             $mapped['status'] = $data['status'];
         }
-        if (isset($data['businessUnit'])) {
+        if (array_key_exists('businessUnit', $data)) {
             $mapped['business_unit'] = $data['businessUnit'];
         }
-        if (isset($data['condition'])) {
+        if (array_key_exists('condition', $data)) {
             $mapped['condition'] = $data['condition'];
         }
-        if (isset($data['location'])) {
+        if (array_key_exists('location', $data)) {
             $mapped['location'] = $data['location'];
         }
-        if (isset($data['purchaseDate'])) {
+        if (array_key_exists('purchaseDate', $data)) {
             $mapped['purchase_date'] = $data['purchaseDate'];
         }
-        if (isset($data['remarks'])) {
+        if (array_key_exists('remarks', $data)) {
             $mapped['remarks'] = $data['remarks'];
         }
-        if (isset($data['description'])) {
+        if (array_key_exists('description', $data)) {
             $mapped['description'] = $data['description'];
         }
-        if (isset($data['decommissionDate'])) {
+        if (array_key_exists('decommissionDate', $data)) {
             $mapped['decommission_date'] = $data['decommissionDate'];
         }
-        if (isset($data['decommissionReason'])) {
+        if (array_key_exists('decommissionReason', $data)) {
             $mapped['decommission_reason'] = $data['decommissionReason'];
         }
-        if (isset($data['repairStartDate'])) {
+        if (array_key_exists('repairStartDate', $data)) {
             $mapped['repair_start_date'] = $data['repairStartDate'];
         }
-        if (isset($data['totalQuantity'])) {
+        if (array_key_exists('totalQuantity', $data)) {
             $mapped['total_quantity'] = $data['totalQuantity'];
         }
-        if (isset($data['nextAuditDate'])) {
+        if (array_key_exists('maintenanceQuantity', $data)) {
+            $mapped['maintenance_quantity'] = $data['maintenanceQuantity'];
+        }
+        if (array_key_exists('nextAuditDate', $data)) {
             $mapped['next_audit_date'] = $data['nextAuditDate'];
         }
 

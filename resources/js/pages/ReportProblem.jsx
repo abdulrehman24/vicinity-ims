@@ -28,12 +28,17 @@ function ReportProblem() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [showLogs, setShowLogs] = useState(false);
   const [logs, setLogs] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnMax, setReturnMax] = useState(1);
+  const [returnQty, setReturnQty] = useState(1);
   const [report, setReport] = useState({
     issueType: 'mechanical',
     severity: 'minor',
     description: '',
     reportedBy: '',
-    status: 'maintenance'
+    status: 'maintenance',
+    quantity: 1
   });
 
   // Update suggested status when item is selected
@@ -56,36 +61,82 @@ function ReportProblem() {
     return fuse.search(searchTerm).map(r => r.item);
   }, [searchTerm, equipment, fuse]);
 
+  const handleReturnUpdate = async (updates) => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      await updateEquipment(updates);
+      setSelectedItem(null);
+      setSearchTerm('');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (!selectedItem || !report.description || !report.reportedBy) {
       toast.error("Please provide your name and issue details");
       return;
     }
 
-    await reportProblem({
-      equipmentId: selectedItem.id,
-      equipmentName: selectedItem.name,
-      ...report
-    });
+    if (selectedItem.totalQuantity > 1 && report.status === 'maintenance') {
+      const currentMaintenance = selectedItem.maintenanceQuantity || 0;
+      const maxMovable = Math.max(0, (selectedItem.totalQuantity || 0) - currentMaintenance);
+      const requested = report.quantity || 1;
 
-    if (report.status && report.status !== selectedItem.status) {
-        await updateEquipment({
-            ...selectedItem,
-            status: report.status
-        });
+      if (requested < 1 || requested > maxMovable) {
+        toast.error(`Please enter a quantity between 1 and ${maxMovable}`);
+        return;
+      }
     }
 
-    // Reset workflow
-    setSelectedItem(null);
-    setReport({
-      issueType: 'mechanical',
-      severity: 'minor',
-      description: '',
-      reportedBy: '',
-      status: 'maintenance'
-    });
-    setSearchTerm('');
+    setIsSubmitting(true);
+
+    try {
+      await reportProblem({
+        equipmentId: selectedItem.id,
+        equipmentName: selectedItem.name,
+        ...report
+      });
+
+      if (report.status && report.status !== selectedItem.status) {
+          let maintenanceQuantity = selectedItem.maintenanceQuantity || 0;
+
+          if (report.status === 'maintenance' && selectedItem.totalQuantity > 1) {
+            const total = selectedItem.totalQuantity || 0;
+            const increment = report.quantity || 1;
+            maintenanceQuantity = Math.max(0, Math.min(total, maintenanceQuantity + increment));
+          }
+
+          const nextStatus = report.status === 'maintenance' && selectedItem.totalQuantity > 1 && maintenanceQuantity < (selectedItem.totalQuantity || 0)
+            ? 'available'
+            : report.status;
+
+          await updateEquipment({
+              ...selectedItem,
+              status: nextStatus,
+              maintenanceQuantity
+          });
+      }
+
+      setSelectedItem(null);
+      setReport({
+        issueType: 'mechanical',
+        severity: 'minor',
+        description: '',
+        reportedBy: '',
+        status: 'maintenance',
+        quantity: 1
+      });
+      setSearchTerm('');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleShowLogs = async () => {
@@ -97,21 +148,62 @@ function ReportProblem() {
   };
 
   const handleResolve = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem || isSubmitting) return;
 
-    // Check admin permissions (is_admin 1 or 2)
     if (!user || (user.is_admin !== 1 && user.is_admin !== 2)) {
         toast.error("Only admins can return items to inventory");
         return;
     }
     
-    await updateEquipment({
+    if (selectedItem.totalQuantity > 1) {
+      const total = selectedItem.totalQuantity || 0;
+      const currentMaintenance = selectedItem.maintenanceQuantity || 0;
+      const maxRestorable = currentMaintenance > 0 ? currentMaintenance : total;
+
+      if (maxRestorable < 1) {
+        await handleReturnUpdate({
+          ...selectedItem,
+          status: 'available',
+          maintenanceQuantity: 0
+        });
+        return;
+      }
+
+      setReturnMax(maxRestorable);
+      setReturnQty(maxRestorable);
+      setShowReturnModal(true);
+      return;
+    }
+
+    await handleReturnUpdate({
       ...selectedItem,
-      status: 'available'
+      status: 'available',
+      maintenanceQuantity: 0
     });
-    
-    setSelectedItem(null);
-    setSearchTerm('');
+  };
+
+  const handleConfirmReturn = async () => {
+    if (!selectedItem || isSubmitting) return;
+
+    const max = returnMax;
+    const qty = parseInt(returnQty, 10) || 0;
+
+    if (qty < 1 || qty > max) {
+      toast.error(`Please enter a number between 1 and ${max}`);
+      return;
+    }
+
+    const currentMaintenance = selectedItem.maintenanceQuantity || 0;
+    const nextMaintenance = Math.max(0, currentMaintenance - qty);
+    const nextStatus = nextMaintenance > 0 ? 'maintenance' : 'available';
+
+    await handleReturnUpdate({
+      ...selectedItem,
+      status: nextStatus,
+      maintenanceQuantity: nextMaintenance
+    });
+
+    setShowReturnModal(false);
   };
 
   return (
@@ -181,6 +273,67 @@ function ReportProblem() {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </motion.div>
+            </div>
+        )}
+        {showReturnModal && selectedItem && (
+            <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
+                <motion.div 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0 }} 
+                    onClick={() => !isSubmitting && setShowReturnModal(false)} 
+                    className="absolute inset-0 bg-[#4a5a67]/80 backdrop-blur-md" 
+                />
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }} 
+                    animate={{ opacity: 1, scale: 1, y: 0 }} 
+                    exit={{ opacity: 0, scale: 0.9, y: 20 }} 
+                    className="relative w-full max-w-sm bg-white rounded-[2.5rem] shadow-2xl overflow-hidden" 
+                >
+                    <div className="p-6 border-b border-gray-100 bg-[#4a5a67] text-white">
+                        <h2 className="text-lg font-black uppercase tracking-widest">Return Units</h2>
+                        <p className="text-[10px] font-bold text-[#ebc1b6] uppercase tracking-widest mt-1">
+                            {selectedItem.name}
+                        </p>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <p className="text-xs text-gray-500 font-medium">
+                            How many units are ready to return to active inventory?
+                        </p>
+                        <div className="relative">
+                            <SafeIcon icon={FiBox} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                            <input
+                                type="number"
+                                min={1}
+                                max={returnMax}
+                                value={returnQty}
+                                onChange={(e) => setReturnQty(e.target.value)}
+                                className="w-full bg-gray-50 pl-11 pr-4 py-3 rounded-xl text-xs font-bold text-[#4a5a67] outline-none border border-transparent focus:border-[#ebc1b6] transition-all"
+                            />
+                        </div>
+                        <p className="text-[10px] text-gray-400">
+                            Units in repair: {selectedItem.maintenanceQuantity || 0} • Max returnable: {returnMax}
+                        </p>
+                    </div>
+                    <div className="px-6 py-4 border-t border-gray-100 flex justify-end space-x-3 bg-gray-50">
+                        <button
+                            type="button"
+                            disabled={isSubmitting}
+                            onClick={() => setShowReturnModal(false)}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-gray-200 text-gray-500 bg-white transition-all ${isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={isSubmitting}
+                            onClick={handleConfirmReturn}
+                            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-[#4a5a67] text-[#ebc1b6] shadow-md transition-all ${isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-[#3d4b56] hover:shadow-lg'}`}
+                        >
+                            Confirm Return
+                        </button>
                     </div>
                 </motion.div>
             </div>
@@ -274,6 +427,16 @@ function ReportProblem() {
                     <div>
                       <h2 className="text-xl font-bold">{selectedItem.name}</h2>
                       <p className="text-[10px] font-black text-[#ebc1b6] uppercase tracking-[0.2em] mt-1">{selectedItem.serialNumber}</p>
+                      {selectedItem.totalQuantity >= 1 && (
+                        <p className="text-[9px] font-bold text-white/70 mt-1">
+                          {Math.max(0, (selectedItem.totalQuantity || 0) - (selectedItem.maintenanceQuantity || 0))}/{selectedItem.totalQuantity || 0} units available
+                          {(selectedItem.maintenanceQuantity || 0) > 0 && (
+                            <span className="ml-1">
+                              • {selectedItem.maintenanceQuantity || 0} in repair
+                            </span>
+                          )}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="text-right flex flex-col items-end">
@@ -306,7 +469,8 @@ function ReportProblem() {
                         {(user?.is_admin === 1 || user?.is_admin === 2) ? (
                             <button 
                                 onClick={handleResolve}
-                                className="bg-[#4a5a67] text-[#ebc1b6] px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:bg-[#3d4b56] hover:shadow-xl transition-all flex items-center space-x-3 mt-4"
+                                disabled={isSubmitting}
+                                className={`bg-[#4a5a67] text-[#ebc1b6] px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg transition-all flex items-center space-x-3 mt-4 ${isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-[#3d4b56] hover:shadow-xl'}`}
                             >
                                 <span>Return to Inventory</span>
                                 <SafeIcon icon={FiCheck} />
@@ -371,8 +535,31 @@ function ReportProblem() {
                       </div>
                     </section>
 
+                    {selectedItem && selectedItem.totalQuantity > 1 && report.status === 'maintenance' && (
+                      <section className="space-y-4">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">5. Units To Move To Repair</label>
+                        <div className="relative">
+                          <SafeIcon icon={FiBox} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                          <input
+                            type="number"
+                            min={1}
+                            max={selectedItem.totalQuantity}
+                            value={report.quantity}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value, 10) || 1;
+                              setReport({ ...report, quantity: value });
+                            }}
+                            className="w-full bg-gray-50 pl-11 pr-4 py-3 rounded-xl text-xs font-bold text-[#4a5a67] outline-none border border-transparent focus:border-[#ebc1b6] transition-all"
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-400">
+                          Total units: {selectedItem.totalQuantity}
+                        </p>
+                      </section>
+                    )}
+
                     <section className="space-y-4">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">5. Select Issue Category</label>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{selectedItem && selectedItem.totalQuantity > 1 ? '6. Select Issue Category' : '5. Select Issue Category'}</label>
                     <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                       {issueTypes.map(type => (
                         <button 
@@ -408,10 +595,22 @@ function ReportProblem() {
                     )}
                   </section>
 
-                  <div className="pt-6 border-t border-gray-50 flex justify-end">
+                  <div className="pt-6 border-t border-gray-50 flex justify-end space-x-3">
+                    {(user?.is_admin === 1 || user?.is_admin === 2) && selectedItem && selectedItem.totalQuantity > 1 && (selectedItem.maintenanceQuantity || 0) > 0 && (
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={handleResolve}
+                        className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] border border-[#4a5a67] text-[#4a5a67] bg-white flex items-center space-x-2 transition-all ${isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+                      >
+                        <span>Return Units</span>
+                        <SafeIcon icon={FiCheck} />
+                      </button>
+                    )}
                     <button 
                       type="submit" 
-                      className="bg-[#4a5a67] text-[#ebc1b6] px-12 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:shadow-xl transition-all flex items-center space-x-3"
+                      disabled={isSubmitting}
+                      className={`bg-[#4a5a67] text-[#ebc1b6] px-12 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg transition-all flex items-center space-x-3 ${isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-xl'}`}
                     >
                       <span>File Repair Request</span>
                       <SafeIcon icon={FiSend} />

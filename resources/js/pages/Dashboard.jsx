@@ -18,7 +18,23 @@ function Dashboard() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const itemsRepair = equipment.filter(item => item.status === 'maintenance');
-  const currentReadiness = Math.round((equipment.filter(e => e.status === 'available').length / equipment.length) * 100);
+  const currentReadiness = useMemo(() => {
+    if (equipment.length === 0) return 0;
+    const totals = equipment.reduce(
+      (acc, item) => {
+        const total = item.totalQuantity || 0;
+        const maintenance = item.maintenanceQuantity || 0;
+        const availableUnits = Math.max(0, total - maintenance);
+        return {
+          total: acc.total + total,
+          available: acc.available + availableUnits,
+        };
+      },
+      { total: 0, available: 0 }
+    );
+    if (totals.total === 0) return 0;
+    return Math.round((totals.available / totals.total) * 100);
+  }, [equipment]);
 
   const statusOnDate = useMemo(() => {
     const targetDate = selectedDate;
@@ -216,6 +232,16 @@ function Dashboard() {
                           <p className="text-[10px] text-red-500 font-bold uppercase">In Repair</p>
                         </div>
                       </div>
+                      {item.totalQuantity > 1 && (
+                        <div className="text-right">
+                          <p className="text-[10px] font-bold text-[#4a5a67]">
+                            {Math.max(0, (item.totalQuantity || 0) - (item.maintenanceQuantity || 0))}/{item.totalQuantity || 0} available
+                          </p>
+                          <p className="text-[9px] text-blue-500 font-semibold">
+                            {item.maintenanceQuantity || 0} in repair
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <p className="text-[11px] text-gray-500 italic leading-relaxed pt-2 border-t border-gray-100">{item.remarks}</p>
                   </div>

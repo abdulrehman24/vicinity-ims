@@ -72,7 +72,7 @@ function AdminTickets() {
     return 'bg-gray-100 text-gray-700 border-gray-200';
   };
 
-  const handleStatusChange = async (ticket, nextStatus) => {
+  const handleStatusChange = async (ticket, nextStatus, resolvedQuantity) => {
     if (!nextStatus || ticket.status === nextStatus) {
       return;
     }
@@ -80,6 +80,7 @@ function AdminTickets() {
     try {
       const response = await axios.patch(`/api/admin/support-tickets/${ticket.id}/status`, {
         status: nextStatus,
+        resolvedQuantity: resolvedQuantity || undefined,
       });
       const updated = response.data || {};
       setTickets((current) =>
@@ -240,7 +241,29 @@ function AdminTickets() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleStatusChange(ticket, 'resolved')}
+                        onClick={() => {
+                          const equipment = ticket.equipment;
+                          if (equipment && equipment.total_quantity > 1) {
+                            const maintenance = equipment.maintenance_quantity || 0;
+                            const total = equipment.total_quantity || 0;
+                            const maxResolvable = maintenance > 0 ? maintenance : total;
+                            const quantity = window.prompt(
+                              `How many units are being repaired and returned to availability? (1-${maxResolvable})`,
+                              String(maxResolvable)
+                            );
+                            if (!quantity) {
+                              return;
+                            }
+                            const parsed = parseInt(quantity, 10);
+                            if (Number.isNaN(parsed) || parsed < 1 || parsed > maxResolvable) {
+                              toast.error(`Please enter a number between 1 and ${maxResolvable}`);
+                              return;
+                            }
+                            handleStatusChange(ticket, 'resolved', parsed);
+                          } else {
+                            handleStatusChange(ticket, 'resolved');
+                          }
+                        }}
                         disabled={updatingId === ticket.id || ticket.status === 'resolved'}
                         className="px-2 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-[10px] font-black uppercase tracking-widest text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed"
                       >

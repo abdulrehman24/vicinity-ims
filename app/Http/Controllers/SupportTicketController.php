@@ -33,6 +33,7 @@ class SupportTicketController extends Controller
             'severity' => 'required|string',
             'description' => 'required|string',
             'reportedBy' => 'required|string',
+            'quantity' => 'nullable|integer|min:1',
         ]);
 
         $ticketCode = $this->generateTicketCode();
@@ -45,6 +46,7 @@ class SupportTicketController extends Controller
             'description' => $validated['description'],
             'reported_by' => $validated['reportedBy'],
             'status' => 'open',
+            'quantity' => $validated['quantity'] ?? null,
         ]);
 
         $this->notifyUsers($ticket->load('equipment'), 'New Support Ticket: '.$ticket->ticket_code);
@@ -68,6 +70,7 @@ class SupportTicketController extends Controller
     {
         $validated = $request->validate([
             'status' => 'required|string|in:open,in_progress,resolved',
+            'resolvedQuantity' => 'nullable|integer|min:1',
         ]);
 
         $oldStatus = $ticket->status;
@@ -81,21 +84,34 @@ class SupportTicketController extends Controller
             // Reactivate equipment if resolved
             if ($ticket->status === 'resolved' && $ticket->equipment) {
                 $equipment = $ticket->equipment;
-                if ($equipment->status !== 'available') {
-                    $originalStatus = $equipment->status;
-                    $equipment->update(['status' => 'available']);
+                $resolvedQty = $validated['resolvedQuantity'] ?? null;
 
-                    // Log the change
-                    EquipmentLog::create([
-                        'equipment_id' => $equipment->id,
-                        'user_id' => auth()->id(),
-                        'user_name' => auth()->user() ? auth()->user()->name : 'System',
-                        'action' => 'status_change',
-                        'previous_status' => $originalStatus,
-                        'new_status' => 'available',
-                        'description' => "Ticket {$ticket->ticket_code} resolved",
-                    ]);
+                $originalStatus = $equipment->status;
+                $maintenance = (int) ($equipment->maintenance_quantity ?? 0);
+                $total = (int) ($equipment->total_quantity ?? 0);
+
+                if ($resolvedQty !== null) {
+                    $maintenance = max(0, $maintenance - $resolvedQty);
+                } else {
+                    $maintenance = 0;
                 }
+
+                $newStatus = $maintenance > 0 && $maintenance >= $total ? 'maintenance' : 'available';
+
+                $equipment->update([
+                    'status' => $newStatus,
+                    'maintenance_quantity' => $maintenance,
+                ]);
+
+                EquipmentLog::create([
+                    'equipment_id' => $equipment->id,
+                    'user_id' => auth()->id(),
+                    'user_name' => auth()->user() ? auth()->user()->name : 'System',
+                    'action' => 'status_change',
+                    'previous_status' => $originalStatus,
+                    'new_status' => $newStatus,
+                    'description' => "Ticket {$ticket->ticket_code} resolved",
+                ]);
             }
         }
 

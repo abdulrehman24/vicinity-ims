@@ -214,10 +214,19 @@ class BookingController extends Controller
                     $equipment = Equipment::find($pivot->equipment_id);
                     if ($equipment) {
                         if ($itemData['reportedProblem']) {
-                            $equipment->status = 'maintenance';
+                            $maintenance = (int) ($equipment->maintenance_quantity ?? 0);
+                            $total = (int) ($equipment->total_quantity ?? 0);
+                            $maintenance += (int) ($pivot->quantity ?? 1);
+                            if ($total > 0 && $maintenance > $total) {
+                                $maintenance = $total;
+                            }
+                            $equipment->maintenance_quantity = $maintenance;
                             $equipment->remarks = $itemData['problemNote'];
+                            $equipment->status = $maintenance >= $total && $total > 0 ? 'maintenance' : 'available';
                         } else {
-                            $equipment->status = 'available';
+                            if ($equipment->status === 'checked_out') {
+                                $equipment->status = 'available';
+                            }
                         }
                         $equipment->save();
                     }
