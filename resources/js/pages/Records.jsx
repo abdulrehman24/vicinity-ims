@@ -146,16 +146,18 @@ function Records() {
       
       if (!groups[key]) {
         groups[key] = {
-            id: key,
-            shootName: b.shootName,
-            quotationNumber: b.quotationNumber,
-            dates: [], 
-            bookingIds: new Set(),
-            items: [],
-            status: b.status,
-            user: b.user?.name || b.user || 'Operations',
-            createdAt: b.createdAt || b.created_at,
-            shift: b.shift
+          id: key,
+          shootName: b.shootName,
+          quotationNumber: b.quotationNumber,
+          dates: [],
+          bookingIds: new Set(),
+          items: [],
+          status: b.status,
+          user: b.user?.name || b.user || 'Operations',
+          createdAt: b.createdAt || b.created_at,
+          shift: b.shift,
+          collaborators: b.collaborators || [],
+          shootType: b.shoot_type || b.shootType || null,
         };
       }
       
@@ -313,10 +315,10 @@ function Records() {
             <div className="grid grid-cols-1 gap-4">
               {filteredRecords.map((group) => (
                 <RecordGroup 
-                    key={group.id} 
-                    group={group} 
-                    onEdit={() => navigate('/', { state: { editProject: group } })}
-                    onCancel={() => handleCancelRequest(group)}
+                  key={group.id} 
+                  group={group} 
+                  onEdit={(editProject) => navigate('/', { state: { editProject } })}
+                  onCancel={() => handleCancelRequest(group)}
                 />
               ))}
               {filteredRecords.length === 0 && <EmptyState />}
@@ -387,20 +389,33 @@ function Records() {
                           )}
                         </div>
 
-                        <div className="border-t border-white/10 pt-3">
-                          <p className="text-[9px] font-bold text-white/60 mb-2">{group.items.length} Items</p>
-                          <ul className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">
-                             {(() => {
-                                const counts = {};
-                                group.items.forEach(i => counts[i.equipmentName] = (counts[i.equipmentName] || 0) + 1);
-                                return Object.entries(counts).sort((a,b) => a[0].localeCompare(b[0])).map(([name, count], idx) => (
-                                   <li key={idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2">
-                                      <div className="w-1 h-1 bg-white/20 rounded-full" />
-                                      <span>{name}</span>
-                                    </li>
-                                ));
-                             })()}
-                          </ul>
+                      <div className="border-t border-white/10 pt-3">
+                          {(() => {
+                            const counts = {};
+                            group.items.forEach(i => {
+                              const name = i.equipmentName;
+                              const qty = i.quantity || 1;
+                              counts[name] = (counts[name] || 0) + qty;
+                            });
+                            const totalUnits = Object.values(counts).reduce((sum, v) => sum + v, 0);
+                            return (
+                              <>
+                                <p className="text-[9px] font-bold text-white/60 mb-2">{totalUnits} Items</p>
+                                <ul className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                                  {Object.entries(counts)
+                                    .sort((a, b) => a[0].localeCompare(b[0]))
+                                    .map(([name, count], idx) => (
+                                      <li key={idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2">
+                                        <div className="w-1 h-1 bg-white/20 rounded-full" />
+                                        <span>
+                                          {name}{count > 1 ? ` x${count}` : ''}
+                                        </span>
+                                      </li>
+                                    ))}
+                                </ul>
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     ))
@@ -470,7 +485,7 @@ function Records() {
 function RecordGroup({ group, onEdit, onCancel }) {
   const [expanded, setExpanded] = useState(false);
   
-  // Aggregate items by name to prevent duplicates
+  // Aggregate items by name and sum quantities to prevent duplicates
   const aggregatedItems = useMemo(() => {
     const counts = {};
     const firstItems = {};
@@ -481,7 +496,7 @@ function RecordGroup({ group, onEdit, onCancel }) {
            counts[name] = 0;
            firstItems[name] = item;
        }
-       counts[name]++;
+       counts[name] += item.quantity || 1;
     });
     
     return Object.values(firstItems).map(item => ({
@@ -529,7 +544,9 @@ function RecordGroup({ group, onEdit, onCancel }) {
               )}
               <div className="flex items-center space-x-1 text-[#4a5a67]">
                 <div className="w-1.5 h-1.5 bg-[#4a5a67] rounded-full" />
-                <span>{aggregatedItems.length} Items</span>
+                <span>
+                  {aggregatedItems.reduce((sum, item) => sum + (item.displayQuantity || 1), 0)} Items
+                </span>
               </div>
             </div>
           </div>
@@ -555,7 +572,29 @@ function RecordGroup({ group, onEdit, onCancel }) {
              {!isCancelled && !isReturned && (
                 <>
                     <button 
-                        onClick={onEdit}
+                        onClick={() => {
+                          const editProject = {
+                            id: group.id,
+                            shootName: group.shootName,
+                            quotationNumber: group.quotationNumber,
+                            dates: group.dates,
+                            startDate: group.startDate,
+                            endDate: group.endDate,
+                            bookingIds: group.bookingIds,
+                            status: group.status,
+                            user: group.user,
+                            createdAt: group.createdAt,
+                            shift: group.shift,
+                            collaborators: group.collaborators,
+                            shootType: group.shootType,
+                            items: aggregatedItems.map(item => ({
+                              equipmentId: item.equipmentId || item.id,
+                              quantity: item.displayQuantity || item.quantity || 1,
+                              equipmentName: item.equipmentName,
+                            })),
+                          };
+                          onEdit(editProject);
+                        }}
                         className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-[#4a5a67] transition-colors"
                         title="Edit Booking"
                     >
@@ -590,7 +629,9 @@ function RecordGroup({ group, onEdit, onCancel }) {
                     <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
                       <div className="flex items-center space-x-3 overflow-hidden">
                         <div className="w-1.5 h-1.5 bg-[#ebc1b6] rounded-full shrink-0" />
-                        <span className="text-xs font-bold text-[#4a5a67] truncate">{item.equipmentName}</span>
+                        <span className="text-xs font-bold text-[#4a5a67] truncate">
+                          {item.equipmentName}{item.displayQuantity > 1 ? ` x${item.displayQuantity}` : ''}
+                        </span>
                       </div>
                       <div className="flex items-center space-x-2">
                            {item.type === 'problem_report' && (

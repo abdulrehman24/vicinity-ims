@@ -87,7 +87,7 @@ function CheckInOut() {
           onClick={() => {
             setActiveTab('out');
             setProjectToEdit(null);
-          }} 
+          }}
           icon={FiLogOut} 
           label="Check In" 
         />
@@ -154,6 +154,11 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
+  const editingBookingIdSet = useMemo(
+    () => new Set(editingProject?.bookingIds || []),
+    [editingProject]
+  );
+
   // Pre-fill form if editing
   React.useEffect(() => {
     if (editingProject) {
@@ -179,29 +184,31 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
         // Populate items
         const items = editingProject.items.map(i => {
             const eq = equipment.find(e => e.id === i.equipmentId || e.id === i.id);
+            const baseQty = i.quantity || i.qty || 1;
+
             if (eq) {
                 return {
                     id: eq.id,
-                    qty: i.quantity || i.qty || 1,
+                    qty: baseQty,
                     name: eq.name,
                     image: eq.image
                 };
             }
             return {
                 id: i.equipmentId || i.id,
-                qty: i.quantity || i.qty || 1,
+                qty: baseQty,
                 name: i.equipmentName || i.name || 'Unknown',
                 image: i.image
             };
         });
         
-        // Aggregate items by ID to set Qty correctly if multiple units of same item
+        // Aggregate items by ID and sum their quantities
         const aggregatedItems = items.reduce((acc, curr) => {
             const existing = acc.find(i => i.id === curr.id);
             if (existing) {
-                existing.qty += 1;
+                existing.qty += curr.qty;
             } else {
-                acc.push({ ...curr, qty: 1 });
+                acc.push({ ...curr });
             }
             return acc;
         }, []);
@@ -219,13 +226,14 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
       .sort();
   }, [selectedDates]);
 
-  const getAvailableQty = (item, dates, requestedShift) => {
+  const getAvailableQty = (item, dates, requestedShift, ignoreBookingIds) => {
     const maintenance = item.maintenanceQuantity || 0;
     const total = item.totalQuantity || 0;
     const effectiveTotal = Math.max(0, total - maintenance);
 
     const relevantBookings = bookings.filter(b => {
       if (b.status === 'returned') return false;
+      if (ignoreBookingIds && ignoreBookingIds.has && ignoreBookingIds.has(b.id)) return false;
       return b.equipmentId === item.id;
     });
 
@@ -257,7 +265,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
     if (existing) {
       setSelectedItems(selectedItems.filter(i => i.id !== item.id));
     } else {
-      const avail = getAvailableQty(item, requestedDates, shift);
+      const avail = getAvailableQty(item, requestedDates, shift, editingBookingIdSet);
       if (avail <= 0) {
         toast.error("No units available for these dates/shift");
         return;
@@ -285,7 +293,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
             return;
         }
 
-        const avail = getAvailableQty(item, requestedDates, shift);
+        const avail = getAvailableQty(item, requestedDates, shift, editingBookingIdSet);
         const existingItemIndex = newItems.findIndex(i => i.id === item.id);
         const currentQty = existingItemIndex >= 0 ? newItems[existingItemIndex].qty : 0;
         
@@ -513,7 +521,9 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {selectedItems.map(item => {
                   const masterItem = equipment.find(e => e.id === item.id);
-                  const maxAvail = getAvailableQty(masterItem, requestedDates, shift);
+                  const maxAvail = masterItem
+                    ? getAvailableQty(masterItem, requestedDates, shift, editingBookingIdSet)
+                    : item.qty;
                   return (
                     <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
                       <div className="flex items-center space-x-3">
@@ -617,7 +627,8 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
       if (eq) {
           projects[key].items.push({
               ...eq,
-              bookingEquipmentId: b.bookingEquipmentId
+              bookingEquipmentId: b.bookingEquipmentId,
+              quantity: b.quantity || 1
           });
       }
     });

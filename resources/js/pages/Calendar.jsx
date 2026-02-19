@@ -102,6 +102,7 @@ function CalendarPage() {
       const userName = booking.user?.name || 'Operations';
       const shootName = booking.shootName || 'Untitled Project';
       const quotationNumber = booking.quotationNumber || '';
+      const qty = booking.quantity || 1;
 
       const addToMap = (dateStr, type) => {
         const key = `${type}|${dateStr}|${shootName}|${quotationNumber}`;
@@ -114,10 +115,13 @@ function CalendarPage() {
             quotationNumber,
             userName,
             createdAt: booking.created_at || booking.createdAt,
-            items: []
+            items: {}
           };
         }
-        projectMap[key].items.push(eqName);
+        if (!projectMap[key].items[eqName]) {
+          projectMap[key].items[eqName] = 0;
+        }
+        projectMap[key].items[eqName] += qty;
       };
 
       if (booking.dates && Array.isArray(booking.dates) && booking.dates.length > 0) {
@@ -143,7 +147,14 @@ function CalendarPage() {
         }
       }
     });
-    return Object.values(projectMap);
+
+    return Object.values(projectMap).map(ev => ({
+      ...ev,
+      items: Object.entries(ev.items || {}).map(([name, quantity]) => ({
+        name,
+        quantity
+      })),
+    }));
   }, [bookings, equipment]);
 
   const selectedDateBookings = useMemo(() => {
@@ -272,13 +283,20 @@ function CalendarPage() {
                       </div>
 
                       <div className="border-t border-white/10 pt-3">
-                        <p className="text-[9px] font-bold text-white/60 mb-2">{[...new Set(event.items)].length} Items</p>
+                        <p className="text-[9px] font-bold text-white/60 mb-2">
+                          {event.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} Items
+                        </p>
                         <ul className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                           {[...new Set(event.items)].sort().map((item, idx) => (
-                             <li key={idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2">
-                               <div className="w-1 h-1 bg-white/20 rounded-full" />
-                               <span>{item}</span>
-                             </li>
+                           {event.items
+                              .slice()
+                              .sort((a, b) => a.name.localeCompare(b.name))
+                              .map((item, idx) => (
+                                <li key={idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2">
+                                  <div className="w-1 h-1 bg-white/20 rounded-full" />
+                                  <span>
+                                    {item.name}{item.quantity > 1 ? ` x${item.quantity}` : ''}
+                                  </span>
+                                </li>
                            ))}
                         </ul>
                       </div>
