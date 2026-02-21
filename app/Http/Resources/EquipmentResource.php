@@ -27,6 +27,7 @@ class EquipmentResource extends JsonResource
             'image' => $this->image_path,
             'totalQuantity' => $this->total_quantity,
             'maintenanceQuantity' => $this->maintenance_quantity,
+            'decommissionedQuantity' => $this->decommissioned_quantity,
             'purchaseDate' => $this->purchase_date ? $this->purchase_date->format('Y-m-d') : null,
             'remarks' => $this->remarks,
             'description' => $this->description,

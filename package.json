@@ -18,6 +18,10 @@
         "vite": "^7.0.7"
     },
     "dependencies": {
+        "@fullcalendar/core": "^6.1.20",
+        "@fullcalendar/daygrid": "^6.1.20",
+        "@fullcalendar/interaction": "^6.1.20",
+        "@fullcalendar/react": "^6.1.20",
         "@questlabs/react-sdk": "^2.2.92",
         "browser-image-compression": "^2.0.2",
         "date-fns": "^4.1.0",

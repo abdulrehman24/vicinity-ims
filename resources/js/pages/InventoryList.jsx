@@ -32,6 +32,7 @@ function InventoryList() {
 
   const [decommissioningItem, setDecommissioningItem] = useState(null);
   const [repairingItem, setRepairingItem] = useState(null);
+  const [restoringItem, setRestoringItem] = useState(null);
 
   const uniqueCategories = useMemo(() => {
     return Array.isArray(categories) ? categories : [];
@@ -47,9 +48,15 @@ function InventoryList() {
     if (selectedCategory) result = result.filter(i => i.category === selectedCategory);
     
     if (!showDecommissioned) {
-      result = result.filter(i => i.status !== 'decommissioned');
+      // Active view: show items that have at least one non-decommissioned unit
+      result = result.filter(i => {
+        const total = i.totalQuantity ?? 0;
+        const decommissioned = i.decommissionedQuantity ?? 0;
+        return i.status !== 'decommissioned' && (total - decommissioned) > 0;
+      });
     } else {
-      result = result.filter(i => i.status === 'decommissioned');
+      // Decommission view: show any items with decommissioned units
+      result = result.filter(i => (i.decommissionedQuantity ?? 0) > 0);
     }
     return result;
   }, [searchTerm, selectedCategory, equipment, fuse, showDecommissioned]);
@@ -76,27 +83,98 @@ function InventoryList() {
   const endIndex = Math.min(totalItems, page * pageSize);
 
   const handleDecommissionConfirm = (id, data) => {
+    const item = equipment.find(e => e.id === id);
+    if (!item) return;
+
+    const total = item.totalQuantity ?? 1;
+    const maintenance = item.maintenanceQuantity ?? 0;
+    const decommissioned = item.decommissionedQuantity ?? 0;
+    const rawQty = parseInt(data.quantity, 10) || 1;
+    const maxDecommission = Math.max(1, total - maintenance - decommissioned);
+    const qty = Math.min(rawQty, maxDecommission);
+
+    const newDecommissioned = Math.min(total, decommissioned + qty);
+    const remaining = total - newDecommissioned;
+    const newStatus = remaining <= 0
+      ? 'decommissioned'
+      : (maintenance > 0 && maintenance >= remaining ? 'maintenance' : 'available');
+
     updateEquipment({
+      ...item,
       id,
-      status: 'decommissioned',
+      status: newStatus,
+      decommissionedQuantity: newDecommissioned,
       decommissionDate: data.date,
       decommissionReason: data.reason
     });
     setDecommissioningItem(null);
-    toast.success("Asset moved to graveyard");
+    toast.success(qty === total ? "Asset moved to graveyard" : `Decommissioned ${qty} unit(s)`);
   };
 
   const handleRepairConfirm = (id, data) => {
     const item = equipment.find(e => e.id === id);
+    if (!item) return;
+
+    const total = item.totalQuantity ?? 1;
+    const maintenance = item.maintenanceQuantity ?? 0;
+    const decommissioned = item.decommissionedQuantity ?? 0;
+    const available = Math.max(0, total - maintenance - decommissioned);
+    const rawQty = parseInt(data.quantity, 10) || 1;
+    const qty = Math.min(rawQty, available);
+
+    if (qty <= 0) {
+      setRepairingItem(null);
+      return;
+    }
+
+    const newMaintenance = Math.min(total, maintenance + qty);
+    const remaining = total - (item.decommissionedQuantity ?? 0);
+    const newStatus = newMaintenance > 0 && newMaintenance >= remaining ? 'maintenance' : 'available';
+
     updateEquipment({
+      ...item,
       id,
-      status: 'maintenance',
+      status: newStatus,
       remarks: data.reason,
       repairStartDate: data.date,
-      maintenanceQuantity: item ? item.totalQuantity : undefined
+      maintenanceQuantity: newMaintenance
     });
     setRepairingItem(null);
-    toast.success("Asset sent to service bay");
+    toast.success(`Sent ${qty} unit(s) to service bay`);
+  };
+
+  const handleRestoreConfirm = (id, data) => {
+    const item = equipment.find(e => e.id === id);
+    if (!item) return;
+
+    const total = item.totalQuantity ?? 1;
+    const maintenance = item.maintenanceQuantity ?? 0;
+    const decommissioned = item.decommissionedQuantity ?? 0;
+
+    if (maintenance > 0) {
+      const rawQty = parseInt(data.quantity, 10) || 1;
+      const qty = Math.min(rawQty, maintenance);
+      const newMaintenance = Math.max(0, maintenance - qty);
+      const remaining = total - decommissioned;
+      const newStatus = newMaintenance > 0 && newMaintenance >= remaining ? 'maintenance' : 'available';
+
+      updateEquipment({
+        ...item,
+        id,
+        status: newStatus,
+        maintenanceQuantity: newMaintenance
+      });
+      toast.success(`Restored ${qty} unit(s) to active inventory`);
+    } else {
+      updateEquipment({
+        ...item,
+        id,
+        status: 'available'
+      });
+      toast.success('Asset restored');
+    }
+
+    setRestoringItem(null);
   };
 
   const executeProtectedAction = (action) => {
@@ -175,7 +253,11 @@ function InventoryList() {
             onDecommission={() => setDecommissioningItem(item)}
             onRepair={() => setRepairingItem(item)}
             onEdit={() => executeProtectedAction(() => setEditingItem(item))}
-            onActivate={(id) => updateEquipment({id, status: 'available'})}
+            onActivate={(id) => {
+              const original = equipment.find(e => e.id === id);
+              if (!original) return;
+              setRestoringItem(original);
+            }}
           />
         ))}
       </div>
@@ -277,6 +359,15 @@ function InventoryList() {
             onConfirm={(data) => handleRepairConfirm(repairingItem.id, data)} 
           />
         )}
+
+        {restoringItem && (
+          <ActionModal 
+            item={restoringItem} 
+            type="restore"
+            onClose={() => setRestoringItem(null)} 
+            onConfirm={(data) => handleRestoreConfirm(restoringItem.id, data)} 
+          />
+        )}
       </AnimatePresence>
     </motion.div>
   );
@@ -285,15 +376,26 @@ function InventoryList() {
 function ActionModal({ item, type, onClose, onConfirm }) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    reason: ''
+    reason: '',
+    quantity: 1
   });
 
   const isDecommission = type === 'decommission';
-  const themeColor = isDecommission ? 'bg-orange-500' : 'bg-blue-500';
+  const isRepair = type === 'repair';
+  const isRestore = type === 'restore';
+
+  const themeColor = isDecommission ? 'bg-orange-500' : isRestore ? 'bg-green-500' : 'bg-blue-500';
   const icon = isDecommission ? FiAlertTriangle : FiTool;
-  const title = isDecommission ? 'Confirm Decommission' : 'Initiate Repair';
-  const subTitle = isDecommission ? 'Permanent Removal from Active Fleet' : 'Transfer to Technical Service Bay';
-  const buttonText = isDecommission ? 'Confirm Decommission' : 'Send to Repair';
+  const title = isDecommission ? 'Confirm Decommission' : isRestore ? 'Restore From Repair' : 'Initiate Repair';
+  const subTitle = isDecommission ? 'Permanent Removal from Active Fleet' : isRestore ? 'Return Units to Active Fleet' : 'Transfer to Technical Service Bay';
+  const buttonText = isDecommission ? 'Confirm Decommission' : isRestore ? 'Restore Units' : 'Send to Repair';
+
+  const totalQty = item.totalQuantity ?? 1;
+  const maintenanceQty = item.maintenanceQuantity ?? 0;
+  const decommissionedQty = item.decommissionedQuantity ?? 0;
+  const maxRepairUnits = Math.max(1, totalQty - maintenanceQty - decommissionedQty);
+  const maxDecommissionUnits = Math.max(1, totalQty - maintenanceQty - decommissionedQty);
+  const maxRestoreUnits = Math.max(1, maintenanceQty || 1);
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -325,7 +427,7 @@ function ActionModal({ item, type, onClose, onConfirm }) {
           <div className="space-y-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                {isDecommission ? 'Removal Date' : 'Service Start Date'}
+                {isDecommission ? 'Removal Date' : isRestore ? 'Restoration Date' : 'Service Start Date'}
               </label>
               <div className="relative">
                 <SafeIcon icon={FiCalendar} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
@@ -340,7 +442,7 @@ function ActionModal({ item, type, onClose, onConfirm }) {
 
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                {isDecommission ? 'Reason for Decommissioning' : 'Technical Issue Description'}
+                {isDecommission ? 'Reason for Decommissioning' : isRestore ? 'Restoration Note' : 'Technical Issue Description'}
               </label>
               <div className="relative">
                 <SafeIcon icon={FiFileText} className="absolute left-4 top-4 text-gray-300" />
@@ -352,6 +454,29 @@ function ActionModal({ item, type, onClose, onConfirm }) {
                 />
               </div>
             </div>
+
+            {(isRestore ? maintenanceQty > 0 : totalQty > 1) && (
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                  {isDecommission ? 'Units to Decommission' : isRestore ? 'Units to Restore' : 'Units to Move to Repair'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={1}
+                    max={isDecommission ? maxDecommissionUnits : isRestore ? maxRestoreUnits : maxRepairUnits}
+                    value={formData.quantity}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10) || 1;
+                      const max = isDecommission ? maxDecommissionUnits : isRestore ? maxRestoreUnits : maxRepairUnits;
+                      const clamped = Math.max(1, Math.min(value, max));
+                      setFormData({ ...formData, quantity: clamped });
+                    }}
+                    className="w-full px-4 py-3 bg-gray-50 border border-transparent focus:bg-white rounded-xl outline-none transition-all font-bold text-sm text-[#4a5a67] focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex space-x-3 pt-4">
@@ -360,7 +485,7 @@ function ActionModal({ item, type, onClose, onConfirm }) {
             </button>
             <button 
               onClick={() => onConfirm(formData)}
-              disabled={!formData.reason}
+              disabled={type !== 'restore' && !formData.reason}
               className={`flex-[2] py-4 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg transition-all disabled:opacity-30 ${themeColor} ${isDecommission ? 'shadow-orange-200' : 'shadow-blue-200'}`}
             >
               {buttonText}
@@ -394,14 +519,23 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate
         )}
 
         {item.totalQuantity > 1 && (
-          <div className="mb-3 flex items-center justify-between text-[11px]">
-            <span className="font-bold text-[#4a5a67]">
-              {(item.totalQuantity || 0) - (item.maintenanceQuantity || 0)}/{item.totalQuantity || 0} units available
-            </span>
-            {item.maintenanceQuantity > 0 && (
-              <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-full">
-                {item.maintenanceQuantity} in repair
+          <div className="mb-3 flex flex-col space-y-1 text-[11px]">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-[#4a5a67]">
+                {(item.totalQuantity || 0) - (item.maintenanceQuantity || 0) - (item.decommissionedQuantity || 0)}/{item.totalQuantity || 0} units available
               </span>
+              {item.maintenanceQuantity > 0 && (
+                <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-full">
+                  {item.maintenanceQuantity} in repair
+                </span>
+              )}
+            </div>
+            {item.decommissionedQuantity > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-gray-500">
+                  {item.decommissionedQuantity} decommissioned
+                </span>
+              </div>
             )}
           </div>
         )}

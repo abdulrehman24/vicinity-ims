@@ -17,19 +17,36 @@ const {
 } = FiIcons;
 
 function CheckInOut() {
-  const { equipment, bookings, bundles, categories, checkOutEquipment, batchCheckIn, isAdmin, replaceBooking } = useInventory();
+  const { equipment, bookings, bundles, categories, checkOutEquipment, batchCheckIn, isAdmin, replaceBooking, user } = useInventory();
   const [activeTab, setActiveTab] = useState('in');
   const [projectToEdit, setProjectToEdit] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
-    if (location.state?.editProject) {
-      handleEditRequest(location.state.editProject);
-      // Clear state to avoid re-triggering on refresh/nav? 
-      // Actually, standard behavior is fine, but maybe good to clear.
-      // window.history.replaceState({}, document.title) // optional
+    if (location.state?.editProject && user) {
+      const project = location.state.editProject;
+      const isSuperAdmin = user.is_admin >= 2;
+
+      const collaboratorEmails = new Set();
+      if (Array.isArray(project.collaborators)) {
+        project.collaborators.forEach(c => {
+          if (typeof c === 'string') {
+            collaboratorEmails.add(c.toLowerCase());
+          } else if (c && c.email) {
+            collaboratorEmails.add(c.email.toLowerCase());
+          }
+        });
+      }
+
+      const currentEmail = user.email ? user.email.toLowerCase() : null;
+      const isOwnerByName = project.user && typeof project.user === 'string' && project.user === user.name;
+
+      if (isSuperAdmin || isOwnerByName || (currentEmail && collaboratorEmails.has(currentEmail))) {
+        handleEditRequest(project);
+      }
     }
-  }, [location.state]);
+  }, [location.state, user]);
 
   const handleEditRequest = (project) => {
     setProjectToEdit(project);
@@ -39,32 +56,45 @@ function CheckInOut() {
   const handleManualOutConfirm = async (payloadOrPayloads) => {
     const payloads = Array.isArray(payloadOrPayloads) ? payloadOrPayloads : [payloadOrPayloads];
 
-    if (projectToEdit) {
-      // Editing mode
-      const [first, ...rest] = payloads;
-      
-      // 1. Replace existing bookings with the first group
-      // This will cancel the old 'ids' and create a new booking for 'first' payload
-      await replaceBooking(projectToEdit.bookingIds, first);
-      
-      // 2. Create new bookings for any remaining groups (if user split a contiguous booking into disjoint ones)
-      if (rest.length > 0) {
-        for (const p of rest) {
-            await checkOutEquipment(p);
+    setIsProcessing(true);
+    try {
+      if (projectToEdit) {
+        const [first, ...rest] = payloads;
+        
+        await replaceBooking(projectToEdit.bookingIds, first, { showToast: true });
+        
+        if (rest.length > 0) {
+          await Promise.all(
+            rest.map(p => checkOutEquipment(p, { showToast: false }))
+          );
+        }
+
+        setProjectToEdit(null);
+      } else {
+        if (payloads.length === 1) {
+          await checkOutEquipment(payloads[0]);
+        } else {
+          await Promise.all(
+            payloads.map(p => checkOutEquipment(p, { showToast: false }))
+          );
+          toast.success("Bookings created successfully");
         }
       }
-
-      setProjectToEdit(null);
-    } else {
-      // Normal checkout
-      for (const p of payloads) {
-        await checkOutEquipment(p);
-      }
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 max-w-7xl mx-auto">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 max-w-7xl mx-auto relative">
+      {isProcessing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl px-8 py-6 shadow-lg flex items-center space-x-3">
+            <div className="w-5 h-5 border-2 border-[#ebc1b6] border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs font-black tracking-widest text-[#4a5a67] uppercase">Processing booking...</span>
+          </div>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-10">
         <div>
           <h1 className="text-4xl font-black text-[#4a5a67] uppercase tracking-tight mb-2">OPERATIONS</h1>
@@ -149,7 +179,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
   const [selectedItems, setSelectedItems] = useState([]); // Array of {id, qty}
   const [selectedDates, setSelectedDates] = useState([]);
   const [shift, setShift] = useState('Full Day');
-  const [formData, setFormData] = useState({ projTitle: '', quote: '', shootType: 'Commercial' });
+  const [formData, setFormData] = useState({ projTitle: '', quote: '', shootType: 'Commercial', remarks: '' });
   const [collaborators, setCollaborators] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -165,7 +195,8 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
         setFormData({
             projTitle: editingProject.shootName,
             quote: editingProject.quotationNumber,
-            shootType: editingProject.shootType || 'Commercial'
+            shootType: editingProject.shootType || 'Commercial',
+            remarks: editingProject.remarks || ''
         });
         setShift(editingProject.shift || 'Full Day');
         
@@ -229,7 +260,8 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
   const getAvailableQty = (item, dates, requestedShift, ignoreBookingIds) => {
     const maintenance = item.maintenanceQuantity || 0;
     const total = item.totalQuantity || 0;
-    const effectiveTotal = Math.max(0, total - maintenance);
+    const decommissioned = item.decommissionedQuantity || 0;
+    const effectiveTotal = Math.max(0, total - maintenance - decommissioned);
 
     const relevantBookings = bookings.filter(b => {
       if (b.status === 'returned') return false;
@@ -341,12 +373,14 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
     setSelectedItems(prev => prev.filter(i => i.id !== id));
   };
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
     const dateGroups = groupDates(requestedDates);
 
-    const payloads = dateGroups.map(group => ({
+    const payloads = dateGroups.map((group, index) => ({
       shootName: formData.projTitle,
       quotationNumber: formData.quote,
+      shootType: formData.shootType,
+      remarks: formData.remarks,
       shift,
       dates: group,
       startDate: group[0],
@@ -360,11 +394,18 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
         equipmentId: item.id,
         quantity: item.qty,
       })),
+      allDates: requestedDates,
+      sendNotifications: index === 0,
     }));
 
-    onConfirm(payloads);
+    await onConfirm(payloads);
     setSelectedItems([]);
-    setFormData({ projTitle: '', quote: '', shootType: 'Commercial' });
+    setSelectedDates([]);
+    setShift('Full Day');
+    setFormData({ projTitle: '', quote: '', shootType: 'Commercial', remarks: '' });
+    setCollaborators([]);
+    setSearchTerm('');
+    setSelectedCategory('all');
   };
 
   const filteredEquipment = useMemo(() => {
@@ -516,6 +557,18 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
               </InputGroup>
             </div>
 
+            <div>
+              <InputGroup label="Remarks">
+                <textarea
+                  value={formData.remarks}
+                  onChange={e => setFormData({ ...formData, remarks: e.target.value })}
+                  maxLength={500}
+                  className="w-full bg-gray-50 p-4 rounded-2xl focus:bg-white border border-transparent focus:border-[#ebc1b6] outline-none font-bold text-xs min-h-[60px]"
+                  placeholder="Any special notes or additional information for this booking"
+                />
+              </InputGroup>
+            </div>
+
             <div className="space-y-4">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Selected Cart</label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -597,16 +650,50 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
 }
 
 function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
-  const { cancelBooking } = useInventory();
+  const { cancelBooking, user } = useInventory();
   const [returnStates, setReturnStates] = useState({}); // { itemId: { isDamaged: bool, note: str } }
   const [selectedProjectKeys, setSelectedProjectKeys] = useState([]);
   const [deleteModal, setDeleteModal] = useState(null);
 
   const projectKey = (project) => `${project.shootName}|${project.quotationNumber || ''}|${project.startDate}|${project.endDate}`;
 
+  const visibleBookings = useMemo(() => {
+    if (!user) return bookings;
+
+    const isSuperAdmin = user.is_admin >= 2;
+    if (isSuperAdmin) return bookings;
+
+    const currentId = user.id;
+    const currentEmail = user.email ? user.email.toLowerCase() : null;
+
+    return bookings.filter(b => {
+      let isOwner = false;
+      if (b.user && b.user.id) {
+        isOwner = b.user.id === currentId;
+      } else if (typeof b.user === 'string' && user.name) {
+        isOwner = b.user === user.name;
+      }
+
+      let isCollaborator = false;
+      if (Array.isArray(b.collaborators) && currentEmail) {
+        b.collaborators.forEach(c => {
+          if (typeof c === 'string') {
+            if (c.toLowerCase() === currentEmail) {
+              isCollaborator = true;
+            }
+          } else if (c && c.email && c.email.toLowerCase() === currentEmail) {
+            isCollaborator = true;
+          }
+        });
+      }
+
+      return isOwner || isCollaborator;
+    });
+  }, [bookings, user]);
+
   const activeProjects = useMemo(() => {
     const projects = {};
-    bookings.filter(b => b.status === 'active').forEach(b => {
+    visibleBookings.filter(b => b.status === 'active').forEach(b => {
       const key = `${b.shootName}|${b.quotationNumber || ''}|${b.startDate}|${b.endDate}`;
       if (!projects[key]) {
         projects[key] = { 
@@ -633,7 +720,7 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
       }
     });
     return Object.values(projects).map(p => ({ ...p, bookingIds: Array.from(p.bookingIds) }));
-  }, [bookings, equipment]);
+  }, [visibleBookings, equipment]);
 
   const toggleDamage = (itemId) => {
     setReturnStates(prev => ({
@@ -708,6 +795,41 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
 
   const handleEditProject = (project, e) => {
     e.stopPropagation();
+
+    if (!user) return;
+
+    const isSuperAdmin = user.is_admin >= 2;
+
+    const relatedBookings = bookings.filter(b => project.bookingIds.includes(b.id));
+
+    const ownerIds = new Set();
+    const collaboratorEmails = new Set();
+
+    relatedBookings.forEach(b => {
+      if (b.user && b.user.id) {
+        ownerIds.add(b.user.id);
+      }
+      if (Array.isArray(b.collaborators)) {
+        b.collaborators.forEach(c => {
+          if (typeof c === 'string') {
+            collaboratorEmails.add(c.toLowerCase());
+          } else if (c && c.email) {
+            collaboratorEmails.add(c.email.toLowerCase());
+          }
+        });
+      }
+    });
+
+    const currentId = user.id;
+    const currentEmail = user.email ? user.email.toLowerCase() : null;
+
+    const canEdit =
+      isSuperAdmin ||
+      (currentId && ownerIds.has(currentId)) ||
+      (currentEmail && collaboratorEmails.has(currentEmail));
+
+    if (!canEdit) return;
+
     onEditRequest(project);
   };
 

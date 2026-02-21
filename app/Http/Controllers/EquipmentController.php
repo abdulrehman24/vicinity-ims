@@ -44,7 +44,11 @@ class EquipmentController extends Controller
             'description' => 'nullable|string',
             'totalQuantity' => 'nullable|integer|min:1',
             'maintenanceQuantity' => 'nullable|integer|min:0',
+            'decommissionedQuantity' => 'nullable|integer|min:0',
             'nextAuditDate' => 'nullable|date',
+            'decommissionDate' => 'nullable|date',
+            'decommissionReason' => 'nullable|string',
+            'repairStartDate' => 'nullable|date',
         ]);
 
         $equipmentData = $this->mapFrontendToBackend($data);
@@ -90,9 +94,13 @@ class EquipmentController extends Controller
             'purchaseDate' => 'nullable|date',
             'remarks' => 'nullable|string',
             'description' => 'nullable|string',
-            'totalQuantity' => 'nullable|integer|min:1',
+            'totalQuantity' => 'nullable|integer|min:0',
             'maintenanceQuantity' => 'nullable|integer|min:0',
+            'decommissionedQuantity' => 'nullable|integer|min:0',
             'nextAuditDate' => 'nullable|date',
+            'decommissionDate' => 'nullable|date',
+            'decommissionReason' => 'nullable|string',
+            'repairStartDate' => 'nullable|date',
         ]);
 
         $equipmentData = $this->mapFrontendToBackend($data);
@@ -226,6 +234,9 @@ class EquipmentController extends Controller
         }
         if (array_key_exists('maintenanceQuantity', $data)) {
             $mapped['maintenance_quantity'] = $data['maintenanceQuantity'];
+        }
+        if (array_key_exists('decommissionedQuantity', $data)) {
+            $mapped['decommissioned_quantity'] = $data['decommissionedQuantity'];
         }
         if (array_key_exists('nextAuditDate', $data)) {
             $mapped['next_audit_date'] = $data['nextAuditDate'];

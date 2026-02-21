@@ -24,6 +24,7 @@ class Equipment extends Model
         'repair_start_date',
         'total_quantity',
         'maintenance_quantity',
+        'decommissioned_quantity',
         'next_audit_date',
     ];
 

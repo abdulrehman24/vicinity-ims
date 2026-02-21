@@ -14,6 +14,7 @@ class Booking extends Model
         'start_date',
         'end_date',
         'shift',
+        'remarks',
         'collaborators',
         'status',
         'returned_at',

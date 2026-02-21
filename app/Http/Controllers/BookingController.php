@@ -34,6 +34,7 @@ class BookingController extends Controller
             'shootName' => 'required|string',
             'quotationNumber' => 'nullable|string',
             'shootType' => 'nullable|string',
+            'remarks' => 'nullable|string|max:500',
             'dates' => 'required|array|min:1',
             'dates.*' => 'required|date',
             'shift' => 'required|string',
@@ -62,6 +63,13 @@ class BookingController extends Controller
         $startDate = $dates->first();
         $endDate = $dates->last();
 
+        $allDatesInput = $request->input('allDates');
+        $allDates = is_array($allDatesInput) && count($allDatesInput) > 0
+            ? collect($allDatesInput)->sort()->values()
+            : $dates;
+
+        $sendNotifications = $request->boolean('sendNotifications', true);
+
         $booking = Booking::create([
             'user_id' => auth()->id() ?? 1,
             'project_title' => $validated['shootName'],
@@ -70,6 +78,7 @@ class BookingController extends Controller
             'start_date' => $startDate,
             'end_date' => $endDate,
             'shift' => $validated['shift'],
+            'remarks' => $validated['remarks'] ?? null,
             'collaborators' => $validated['collaborators'] ?? [],
             'status' => 'active',
         ]);
@@ -132,51 +141,50 @@ class BookingController extends Controller
             }
         }
 
-        try {
-            // Notification Logic based on Admin Settings
-            $notifyCreator = Setting::where('key', 'booking_notify_creator')->value('value');
-            $notifyAdmins = Setting::where('key', 'booking_notify_admins')->value('value');
-            $notifyEmails = Setting::where('key', 'booking_notify_emails')->value('value');
+        if ($sendNotifications) {
+            try {
+                $notifyCreator = Setting::where('key', 'booking_notify_creator')->value('value');
+                $notifyAdmins = Setting::where('key', 'booking_notify_admins')->value('value');
+                $notifyEmails = Setting::where('key', 'booking_notify_emails')->value('value');
 
-            // Default to true if not set (User + All Admins)
-            $shouldNotifyCreator = $notifyCreator === null ? true : $notifyCreator === '1';
-            $shouldNotifyAdmins = $notifyAdmins === null ? true : $notifyAdmins === '1';
+                $shouldNotifyCreator = $notifyCreator === null ? true : $notifyCreator === '1';
+                $shouldNotifyAdmins = $notifyAdmins === null ? true : $notifyAdmins === '1';
 
-            $recipients = [];
+                $recipients = [];
 
-            // 1. Notify Creator (User)
-            if ($shouldNotifyCreator && auth()->user()) {
-                $recipients[] = auth()->user()->email;
+                if ($shouldNotifyCreator && auth()->user()) {
+                    $recipients[] = auth()->user()->email;
+                }
+
+                if ($shouldNotifyAdmins) {
+                    $adminEmails = User::where('is_admin', '>=', 1)->pluck('email')->toArray();
+                    $recipients = array_merge($recipients, $adminEmails);
+                }
+
+                if ($notifyEmails) {
+                    $additionalEmails = array_map('trim', explode(',', $notifyEmails));
+                    $recipients = array_merge($recipients, $additionalEmails);
+                }
+
+                $operationsAddress = config('mail.operations_address');
+                if ($operationsAddress) {
+                    $recipients[] = $operationsAddress;
+                }
+
+                $recipients = array_unique(array_filter($recipients, function ($email) {
+                    return filter_var($email, FILTER_VALIDATE_EMAIL);
+                }));
+
+                $notificationDates = $allDates->map(function ($date) {
+                    return (string) $date;
+                })->all();
+
+                foreach ($recipients as $recipient) {
+                    Mail::to($recipient)->queue(new BookingNotificationMail($booking, $notificationDates));
+                }
+            } catch (\Throwable $e) {
+                Log::error('Booking notification emails failed: '.$e->getMessage());
             }
-
-            // 2. Notify All Admins
-            if ($shouldNotifyAdmins) {
-                $adminEmails = User::where('is_admin', '>=', 1)->pluck('email')->toArray();
-                $recipients = array_merge($recipients, $adminEmails);
-            }
-
-            // 3. Notify Additional Emails
-            if ($notifyEmails) {
-                $additionalEmails = array_map('trim', explode(',', $notifyEmails));
-                $recipients = array_merge($recipients, $additionalEmails);
-            }
-
-            // 4. Fallback/Operations Address (Legacy)
-            $operationsAddress = config('mail.operations_address');
-            if ($operationsAddress) {
-                $recipients[] = $operationsAddress;
-            }
-
-            // Filter unique and valid emails
-            $recipients = array_unique(array_filter($recipients, function ($email) {
-                return filter_var($email, FILTER_VALIDATE_EMAIL);
-            }));
-
-            foreach ($recipients as $recipient) {
-                Mail::to($recipient)->queue(new BookingNotificationMail($booking));
-            }
-        } catch (\Throwable $e) {
-            Log::error('Booking notification emails failed: '.$e->getMessage());
         }
 
         return response()->json([
@@ -357,41 +365,114 @@ class BookingController extends Controller
             'shootType' => 'nullable|string',
             'shift' => 'nullable|string',
             'collaborators' => 'nullable|array',
+            'remarks' => 'nullable|string|max:500',
         ]);
 
         // 2. Transaction
         return DB::transaction(function () use ($validated, $request) {
-            // A. Cancel old bookings (release items)
             $oldBookings = Booking::whereIn('id', $validated['ids'])->get();
-            foreach ($oldBookings as $oldBooking) {
-                // Cancel pivot items
-                DB::table('booking_equipment')
-                    ->where('booking_id', $oldBooking->id)
-                    ->update(['status' => 'cancelled']);
-                
-                // Note: We don't necessarily set equipment to 'available' here because we might re-book it immediately.
-                // But strictly speaking, the availability check for the new booking should handle concurrency.
-                // To be safe and clean, let's "return" them logic-wise by marking them cancelled.
-                // Real availability check is done by looking at active bookings.
-                
-                $oldBooking->update(['status' => 'cancelled']);
+
+            $authUser = auth()->user();
+            if (! $authUser) {
+                abort(403, 'You are not allowed to edit this booking.');
             }
 
-            // B. Create new bookings using store logic
-            // We can reuse the store logic or call the store method internally if refactored, 
-            // but for now, let's duplicate the critical creation logic to ensure it fits the new payload structure
-            // which matches the store payload exactly except for 'ids'.
-            
-            // Re-map request to match store() expectations if needed, but the payload seems identical to store()
-            // except for the 'ids' field which we just used.
-            
-            // Call internal store logic
-            return $this->createBooking($validated);
+            $canEdit = false;
+
+            foreach ($oldBookings as $oldBooking) {
+                if ($oldBooking->user_id && $oldBooking->user_id === $authUser->id) {
+                    $canEdit = true;
+                    break;
+                }
+
+                $collaborators = $oldBooking->collaborators ?? [];
+                foreach ($collaborators as $collaborator) {
+                    $email = is_string($collaborator) ? $collaborator : ($collaborator['email'] ?? null);
+                    if ($email && strtolower($email) === strtolower($authUser->email)) {
+                        $canEdit = true;
+                        break 2;
+                    }
+                }
+            }
+
+            if (! $canEdit && $authUser->is_admin < 2) {
+                abort(403, 'You are not allowed to edit this booking.');
+            }
+
+            if ($oldBookings->isEmpty()) {
+                abort(404, 'No bookings found to edit.');
+            }
+
+            // Pick a canonical booking to keep (earliest start_date, fallback to first)
+            $booking = $oldBookings
+                ->filter(fn ($b) => $b->start_date !== null)
+                ->sortBy('start_date')
+                ->first() ?? $oldBookings->first();
+
+            $dates = collect($validated['dates'])->sort()->values();
+            $startDate = $dates->first();
+            $endDate = $dates->last();
+
+            $allDatesInput = $request->input('allDates');
+            $allDates = is_array($allDatesInput) && count($allDatesInput) > 0
+                ? collect($allDatesInput)->sort()->values()
+                : $dates;
+
+            // Update canonical booking in place
+            $booking->update([
+                'project_title' => $validated['shootName'],
+                'quotation_number' => $validated['quotationNumber'] ?? null,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'shift' => $validated['shift'] ?? 'Full Day',
+                'shoot_type' => $validated['shootType'] ?? 'Commercial',
+                'collaborators' => $validated['collaborators'] ?? [],
+            'remarks' => $validated['remarks'] ?? $booking->remarks,
+                'status' => 'active',
+            ]);
+
+            // Reset date records on canonical booking
+            $booking->dates()->delete();
+            foreach ($allDates as $date) {
+                $booking->dates()->create(['date' => $date]);
+            }
+
+            // Reset booking_equipment pivot rows on canonical booking
+            DB::table('booking_equipment')
+                ->where('booking_id', $booking->id)
+                ->delete();
+
+            foreach ($validated['items'] as $item) {
+                DB::table('booking_equipment')->insert([
+                    'booking_id' => $booking->id,
+                    'equipment_id' => $item['equipmentId'],
+                    'quantity' => $item['quantity'],
+                    'status' => 'active',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            // Remove any other old bookings for this project (no cancellation records)
+            foreach ($oldBookings as $oldBooking) {
+                if ($oldBooking->id === $booking->id) {
+                    continue;
+                }
+
+                DB::table('booking_equipment')
+                    ->where('booking_id', $oldBooking->id)
+                    ->delete();
+
+                $oldBooking->dates()->delete();
+                $oldBooking->delete();
+            }
+
+            return $booking;
         });
     }
 
     // Extracted from store() to be reusable
-    private function createBooking($validated)
+    private function createBooking($validated, Request $request)
     {
         $user = User::where('name', $validated['user'])->first();
         $userId = $user ? $user->id : (auth()->id() ?? 1); // Operations fallback
@@ -400,6 +481,13 @@ class BookingController extends Controller
         
         $startDate = min($validated['dates']);
         $endDate = max($validated['dates']);
+
+        $allDatesInput = $request->input('allDates');
+        $allDates = is_array($allDatesInput) && count($allDatesInput) > 0
+            ? collect($allDatesInput)->sort()->values()
+            : collect($validated['dates'])->sort()->values();
+
+        $sendNotifications = $request->boolean('sendNotifications', true);
         
         $booking = Booking::create([
             'user_id' => $userId,
@@ -410,6 +498,7 @@ class BookingController extends Controller
             'shift' => $validated['shift'] ?? 'Full Day',
             'shoot_type' => $validated['shootType'] ?? 'Commercial',
             'collaborators' => $validated['collaborators'] ?? [],
+            'remarks' => $validated['remarks'] ?? null,
             'status' => 'active',
         ]);
 
@@ -484,51 +573,50 @@ class BookingController extends Controller
             }
         }
 
-        try {
-            // Notification Logic based on Admin Settings
-            $notifyCreator = Setting::where('key', 'booking_notify_creator')->value('value');
-            $notifyAdmins = Setting::where('key', 'booking_notify_admins')->value('value');
-            $notifyEmails = Setting::where('key', 'booking_notify_emails')->value('value');
+        if ($sendNotifications) {
+            try {
+                $notifyCreator = Setting::where('key', 'booking_notify_creator')->value('value');
+                $notifyAdmins = Setting::where('key', 'booking_notify_admins')->value('value');
+                $notifyEmails = Setting::where('key', 'booking_notify_emails')->value('value');
 
-            // Default to true if not set (User + All Admins)
-            $shouldNotifyCreator = $notifyCreator === null ? true : $notifyCreator === '1';
-            $shouldNotifyAdmins = $notifyAdmins === null ? true : $notifyAdmins === '1';
+                $shouldNotifyCreator = $notifyCreator === null ? true : $notifyCreator === '1';
+                $shouldNotifyAdmins = $notifyAdmins === null ? true : $notifyAdmins === '1';
 
-            $recipients = [];
+                $recipients = [];
 
-            // 1. Notify Creator (User)
-            if ($shouldNotifyCreator && auth()->user()) {
-                $recipients[] = auth()->user()->email;
+                if ($shouldNotifyCreator && auth()->user()) {
+                    $recipients[] = auth()->user()->email;
+                }
+
+                if ($shouldNotifyAdmins) {
+                    $adminEmails = User::where('is_admin', '>=', 1)->pluck('email')->toArray();
+                    $recipients = array_merge($recipients, $adminEmails);
+                }
+
+                if ($notifyEmails) {
+                    $additionalEmails = array_map('trim', explode(',', $notifyEmails));
+                    $recipients = array_merge($recipients, $additionalEmails);
+                }
+
+                $operationsAddress = config('mail.operations_address');
+                if ($operationsAddress) {
+                    $recipients[] = $operationsAddress;
+                }
+
+                $recipients = array_unique(array_filter($recipients, function ($email) {
+                    return filter_var($email, FILTER_VALIDATE_EMAIL);
+                }));
+
+                $notificationDates = $allDates->map(function ($date) {
+                    return (string) $date;
+                })->all();
+
+                foreach ($recipients as $recipient) {
+                    Mail::to($recipient)->queue(new BookingNotificationMail($booking, $notificationDates));
+                }
+            } catch (\Throwable $e) {
+                Log::error('Booking notification emails failed: '.$e->getMessage());
             }
-
-            // 2. Notify All Admins
-            if ($shouldNotifyAdmins) {
-                $adminEmails = User::where('is_admin', '>=', 1)->pluck('email')->toArray();
-                $recipients = array_merge($recipients, $adminEmails);
-            }
-
-            // 3. Notify Additional Emails
-            if ($notifyEmails) {
-                $additionalEmails = array_map('trim', explode(',', $notifyEmails));
-                $recipients = array_merge($recipients, $additionalEmails);
-            }
-
-            // 4. Fallback/Operations Address (Legacy)
-            $operationsAddress = config('mail.operations_address');
-            if ($operationsAddress) {
-                $recipients[] = $operationsAddress;
-            }
-
-            // Filter unique and valid emails
-            $recipients = array_unique(array_filter($recipients, function ($email) {
-                return filter_var($email, FILTER_VALIDATE_EMAIL);
-            }));
-
-            foreach ($recipients as $recipient) {
-                Mail::to($recipient)->queue(new BookingNotificationMail($booking));
-            }
-        } catch (\Throwable $e) {
-            Log::error('Booking notification emails failed: '.$e->getMessage());
         }
 
         return response()->json(['message' => 'Booking updated successfully', 'booking_id' => $booking->id]);

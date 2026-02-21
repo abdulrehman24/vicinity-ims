@@ -16,7 +16,7 @@ const {
 } = FiIcons;
 
 function Records() {
-  const { bookings, equipment, cancelBooking, batchCancel } = useInventory();
+  const { bookings, equipment, cancelBooking, batchCancel, user } = useInventory();
   const [view, setView] = useState('list'); // 'list' or 'calendar'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -36,6 +36,40 @@ function Records() {
     });
   };
 
+  const visibleBookings = useMemo(() => {
+    if (!user) return bookings;
+
+    const isSuperAdmin = user.is_admin >= 2;
+    if (isSuperAdmin) return bookings;
+
+    const currentId = user.id;
+    const currentEmail = user.email ? user.email.toLowerCase() : null;
+
+    return bookings.filter(b => {
+      let isOwner = false;
+      if (b.user && b.user.id) {
+        isOwner = b.user.id === currentId;
+      } else if (typeof b.user === 'string' && user.name) {
+        isOwner = b.user === user.name;
+      }
+
+      let isCollaborator = false;
+      if (Array.isArray(b.collaborators) && currentEmail) {
+        b.collaborators.forEach(c => {
+          if (typeof c === 'string') {
+            if (c.toLowerCase() === currentEmail) {
+              isCollaborator = true;
+            }
+          } else if (c && c.email && c.email.toLowerCase() === currentEmail) {
+            isCollaborator = true;
+          }
+        });
+      }
+
+      return isOwner || isCollaborator;
+    });
+  }, [bookings, user]);
+
   const stockByCategory = useMemo(() => {
     const stock = {};
     equipment.forEach(item => {
@@ -50,7 +84,7 @@ function Records() {
   const usageByDate = useMemo(() => {
     const usage = {}; // dateStr -> { category: qty }
 
-    bookings.forEach(bItem => {
+    visibleBookings.forEach(bItem => {
       // For records, we probably want to see historical usage too
       // if (bItem.status === 'cancelled') return;
 
@@ -81,11 +115,11 @@ function Records() {
     });
     
     return usage;
-  }, [bookings, equipment]);
+  }, [visibleBookings, equipment]);
 
   const records = useMemo(() => {
     const events = [];
-    bookings.forEach(b => {
+    visibleBookings.forEach(b => {
         const eqName = equipment.find(e => e.id === b.equipmentId)?.name || 'Unknown Equipment';
         const baseId = b.bookingEquipmentId ? `be-${b.bookingEquipmentId}` : `${b.id}-${b.equipmentId || 'unknown'}`;
         
@@ -129,7 +163,7 @@ function Records() {
         }
     });
     return events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }, [bookings, equipment]);
+  }, [visibleBookings, equipment]);
 
   const groupedRecords = useMemo(() => {
     const groups = {};
@@ -137,7 +171,7 @@ function Records() {
     // Helper to get date object
     const getDateObj = (d) => typeof d === 'object' ? d.date : d;
 
-    bookings.forEach(b => {
+    visibleBookings.forEach(b => {
       // Skip cancelled bookings from records view
       if (b.status === 'cancelled') return;
 
@@ -158,15 +192,19 @@ function Records() {
           shift: b.shift,
           collaborators: b.collaborators || [],
           shootType: b.shoot_type || b.shootType || null,
+          remarks: b.remarks || '',
         };
       }
       
       groups[key].bookingIds.add(b.id);
       
-      const eqName = equipment.find(e => e.id === b.equipmentId)?.name || 'Unknown Equipment';
+      const eq = equipment.find(e => e.id === b.equipmentId);
+      const eqName = eq?.name || 'Unknown Equipment';
+      const eqCategory = eq?.category || '';
       groups[key].items.push({
           ...b,
-          equipmentName: eqName
+          equipmentName: eqName,
+          equipmentCategory: eqCategory
       });
       
       // Collect dates
@@ -184,20 +222,16 @@ function Records() {
         const startDate = uniqueDates.length > 0 ? uniqueDates[0] : null;
         const endDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
         
-        // Determine overall status
-        // If any item is 'out', status is 'out'. If all 'returned', 'returned'.
-        // If 'cancelled', 'cancelled'.
-        // This is a simplification.
-        
         return {
             ...g,
             bookingIds: Array.from(g.bookingIds),
+            dates: uniqueDates,
             startDate,
             endDate,
             date: startDate || g.createdAt // For sorting
         };
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [bookings, equipment]);
+  }, [visibleBookings, equipment]);
 
   const filteredRecords = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -219,9 +253,51 @@ function Records() {
   }, [groupedRecords, searchTerm]);
 
   const selectedDayRecords = useMemo(() => {
-    return groupedRecords.filter(group => 
-      isSameDay(new Date(group.date), selectedDate)
-    );
+    return groupedRecords
+      .filter(group => {
+        if (group.dates && group.dates.length > 0) {
+          return group.dates.some(d => {
+            const dateVal = typeof d === 'object' ? d.date : d;
+            try {
+              return isSameDay(new Date(dateVal), selectedDate);
+            } catch {
+              return false;
+            }
+          });
+        }
+
+        if (group.startDate && group.endDate) {
+          try {
+            const start = new Date(group.startDate);
+            const end = new Date(group.endDate);
+            return isWithinInterval(selectedDate, { start, end });
+          } catch {
+            return false;
+          }
+        }
+
+        if (group.startDate) {
+          try {
+            return isSameDay(new Date(group.startDate), selectedDate);
+          } catch {
+            return false;
+          }
+        }
+
+        if (group.date) {
+          try {
+            return isSameDay(new Date(group.date), selectedDate);
+          } catch {
+            return false;
+          }
+        }
+
+        return false;
+      })
+      .map(group => ({
+        ...group,
+        type: group.status === 'returned' ? 'returned' : 'checkout',
+      }));
   }, [groupedRecords, selectedDate]);
 
   const tileContent = ({ date, view }) => {
@@ -317,6 +393,7 @@ function Records() {
                 <RecordGroup 
                   key={group.id} 
                   group={group} 
+                  currentUser={user}
                   onEdit={(editProject) => navigate('/', { state: { editProject } })}
                   onCancel={() => handleCancelRequest(group)}
                 />
@@ -370,7 +447,7 @@ function Records() {
                             <SafeIcon icon={group.type === 'checkout' ? FiLogOut : FiLogIn} className="text-xs" />
                           </div>
                           <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
-                            {group.type.replace('_', ' ')}
+                            {(group.type || 'checkout').replace('_', ' ')}
                           </span>
                         </div>
                         <h4 className="text-sm font-bold mb-1">{group.shootName}</h4>
@@ -392,27 +469,79 @@ function Records() {
                       <div className="border-t border-white/10 pt-3">
                           {(() => {
                             const counts = {};
+                            const meta = {};
+                            const getDateValue = (d) => (typeof d === 'object' ? d.date : d);
+
                             group.items.forEach(i => {
                               const name = i.equipmentName;
+                              const category = i.equipmentCategory || '';
                               const qty = i.quantity || 1;
-                              counts[name] = (counts[name] || 0) + qty;
+
+                              let isActiveOnSelectedDate = false;
+
+                              if (i.dates && Array.isArray(i.dates) && i.dates.length > 0) {
+                                isActiveOnSelectedDate = i.dates.some(d => {
+                                  const dateVal = getDateValue(d);
+                                  try {
+                                    return isSameDay(parseISO(dateVal), selectedDate);
+                                  } catch {
+                                    return false;
+                                  }
+                                });
+                              } else if (i.startDate && i.endDate) {
+                                try {
+                                  const start = parseISO(i.startDate);
+                                  const end = parseISO(i.endDate);
+                                  isActiveOnSelectedDate = isWithinInterval(selectedDate, { start, end });
+                                } catch {
+                                  isActiveOnSelectedDate = false;
+                                }
+                              } else if (i.startDate) {
+                                try {
+                                  isActiveOnSelectedDate = isSameDay(parseISO(i.startDate), selectedDate);
+                                } catch {
+                                  isActiveOnSelectedDate = false;
+                                }
+                              }
+
+                              if (!isActiveOnSelectedDate) return;
+
+                              counts[name] = Math.max(counts[name] || 0, qty);
+                              if (!meta[name]) meta[name] = category;
                             });
                             const totalUnits = Object.values(counts).reduce((sum, v) => sum + v, 0);
                             return (
                               <>
                                 <p className="text-[9px] font-bold text-white/60 mb-2">{totalUnits} Items</p>
-                                <ul className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">
-                                  {Object.entries(counts)
-                                    .sort((a, b) => a[0].localeCompare(b[0]))
-                                    .map(([name, count], idx) => (
-                                      <li key={idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2">
-                                        <div className="w-1 h-1 bg-white/20 rounded-full" />
-                                        <span>
-                                          {name}{count > 1 ? ` x${count}` : ''}
-                                        </span>
-                                      </li>
+                                <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                                  {Object.entries(
+                                      Object.entries(counts).reduce((acc, [name, count]) => {
+                                        const category = meta[name] || '';
+                                        const key = category || 'Uncategorized';
+                                        if (!acc[key]) acc[key] = [];
+                                        acc[key].push({ name, count });
+                                        return acc;
+                                      }, {})
+                                    )
+                                    .sort(([catA], [catB]) => catA.toLowerCase().localeCompare(catB.toLowerCase()))
+                                    .map(([category, items]) => (
+                                      <div key={category} className="space-y-0.5">
+                                        <div className="text-[8px] font-black uppercase tracking-widest text-white/40">
+                                          {category}
+                                        </div>
+                                        {items
+                                          .sort((a, b) => a.name.localeCompare(b.name))
+                                          .map((row, idx) => (
+                                            <div key={category + '-' + idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2 pl-2">
+                                              <div className="w-1 h-1 bg-white/20 rounded-full" />
+                                              <span>
+                                                {row.name}{row.count > 1 ? ` x${row.count}` : ''}
+                                              </span>
+                                            </div>
+                                          ))}
+                                      </div>
                                     ))}
-                                </ul>
+                                </div>
                               </>
                             );
                           })()}
@@ -482,7 +611,7 @@ function Records() {
   );
 }
 
-function RecordGroup({ group, onEdit, onCancel }) {
+function RecordGroup({ group, onEdit, onCancel, currentUser }) {
   const [expanded, setExpanded] = useState(false);
   
   // Aggregate items by name and sum quantities to prevent duplicates
@@ -492,23 +621,58 @@ function RecordGroup({ group, onEdit, onCancel }) {
     
     group.items.forEach(item => {
        const name = item.equipmentName;
+       const qty = item.quantity || 1;
        if (!counts[name]) {
-           counts[name] = 0;
+           counts[name] = qty;
            firstItems[name] = item;
+       } else {
+           counts[name] = Math.max(counts[name], qty);
        }
-       counts[name] += item.quantity || 1;
     });
     
     return Object.values(firstItems).map(item => ({
         ...item,
         displayQuantity: counts[item.equipmentName]
-    })).sort((a, b) => a.equipmentName.localeCompare(b.equipmentName));
+    }));
   }, [group.items]);
   
   // Determine display status/color
   const isReturned = group.items.every(i => i.status === 'returned');
   const isCancelled = group.items.every(i => i.status === 'cancelled');
   const isPartial = !isReturned && !isCancelled; // Simplified
+
+  const canEdit = useMemo(() => {
+    if (!currentUser) return false;
+
+    const isSuperAdmin = currentUser.is_admin >= 2;
+    if (isSuperAdmin) return true;
+
+    const ownerIds = new Set();
+    const collaboratorEmails = new Set();
+
+    group.items.forEach(i => {
+      if (i.user && i.user.id) {
+        ownerIds.add(i.user.id);
+      }
+      if (Array.isArray(i.collaborators)) {
+        i.collaborators.forEach(c => {
+          if (typeof c === 'string') {
+            collaboratorEmails.add(c.toLowerCase());
+          } else if (c && c.email) {
+            collaboratorEmails.add(c.email.toLowerCase());
+          }
+        });
+      }
+    });
+
+    const currentId = currentUser.id;
+    const currentEmail = currentUser.email ? currentUser.email.toLowerCase() : null;
+
+    if (currentId && ownerIds.has(currentId)) return true;
+    if (currentEmail && collaboratorEmails.has(currentEmail)) return true;
+
+    return false;
+  }, [currentUser, group.items]);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:border-[#ebc1b6] transition-all group-card">
@@ -571,35 +735,38 @@ function RecordGroup({ group, onEdit, onCancel }) {
           <div className="flex items-center space-x-2" onClick={e => e.stopPropagation()}>
              {!isCancelled && !isReturned && (
                 <>
-                    <button 
-                        onClick={() => {
-                          const editProject = {
-                            id: group.id,
-                            shootName: group.shootName,
-                            quotationNumber: group.quotationNumber,
-                            dates: group.dates,
-                            startDate: group.startDate,
-                            endDate: group.endDate,
-                            bookingIds: group.bookingIds,
-                            status: group.status,
-                            user: group.user,
-                            createdAt: group.createdAt,
-                            shift: group.shift,
-                            collaborators: group.collaborators,
-                            shootType: group.shootType,
-                            items: aggregatedItems.map(item => ({
-                              equipmentId: item.equipmentId || item.id,
-                              quantity: item.displayQuantity || item.quantity || 1,
-                              equipmentName: item.equipmentName,
-                            })),
-                          };
-                          onEdit(editProject);
-                        }}
-                        className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-[#4a5a67] transition-colors"
-                        title="Edit Booking"
-                    >
-                        <SafeIcon icon={FiEdit2} />
-                    </button>
+                    {canEdit && (
+                      <button 
+                          onClick={() => {
+                            const editProject = {
+                              id: group.id,
+                              shootName: group.shootName,
+                              quotationNumber: group.quotationNumber,
+                              dates: group.dates,
+                              startDate: group.startDate,
+                              endDate: group.endDate,
+                              bookingIds: group.bookingIds,
+                              status: group.status,
+                              user: group.user,
+                              createdAt: group.createdAt,
+                              shift: group.shift,
+                              collaborators: group.collaborators,
+                              shootType: group.shootType,
+                              remarks: group.remarks,
+                              items: aggregatedItems.map(item => ({
+                                equipmentId: item.equipmentId || item.id,
+                                quantity: item.displayQuantity || item.quantity || 1,
+                                equipmentName: item.equipmentName,
+                              })),
+                            };
+                            onEdit(editProject);
+                          }}
+                          className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-[#4a5a67] transition-colors"
+                          title="Edit Booking"
+                      >
+                          <SafeIcon icon={FiEdit2} />
+                      </button>
+                    )}
                     <button 
                         onClick={onCancel}
                         className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
@@ -624,22 +791,52 @@ function RecordGroup({ group, onEdit, onCancel }) {
               exit={{ height: 0, opacity: 0 }}
               className="bg-gray-50 border-t border-gray-100"
             >
-               <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                 {aggregatedItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
-                      <div className="flex items-center space-x-3 overflow-hidden">
-                        <div className="w-1.5 h-1.5 bg-[#ebc1b6] rounded-full shrink-0" />
-                        <span className="text-xs font-bold text-[#4a5a67] truncate">
-                          {item.equipmentName}{item.displayQuantity > 1 ? ` x${item.displayQuantity}` : ''}
-                        </span>
+               <div className="p-6 space-y-4">
+                 {group.remarks && (
+                   <div className="p-4 bg-white rounded-xl border border-gray-100">
+                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                       Remarks
+                     </div>
+                     <div className="text-[11px] font-bold text-[#4a5a67] whitespace-pre-line">
+                       {group.remarks}
+                     </div>
+                   </div>
+                 )}
+                 {Object.entries(
+                    aggregatedItems.reduce((acc, item) => {
+                      const cat = item.equipmentCategory || 'Uncategorized';
+                      if (!acc[cat]) acc[cat] = [];
+                      acc[cat].push(item);
+                      return acc;
+                    }, {})
+                  )
+                  .sort(([catA], [catB]) => catA.toLowerCase().localeCompare(catB.toLowerCase()))
+                  .map(([category, items]) => (
+                    <div key={category} className="space-y-2">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                        {category}
                       </div>
-                      <div className="flex items-center space-x-2">
-                           {item.type === 'problem_report' && (
-                              <SafeIcon icon={FiAlertTriangle} className="text-red-500 text-xs" />
-                           )}
-                       </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {items
+                          .sort((a, b) => a.equipmentName.localeCompare(b.equipmentName))
+                          .map((item, idx) => (
+                            <div key={category + '-' + idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
+                              <div className="flex items-center space-x-3 overflow-hidden">
+                                <div className="w-1.5 h-1.5 bg-[#ebc1b6] rounded-full shrink-0" />
+                                <span className="text-xs font-bold text-[#4a5a67] truncate">
+                                  {item.equipmentName}{item.displayQuantity > 1 ? ` x${item.displayQuantity}` : ''}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                   {item.type === 'problem_report' && (
+                                      <SafeIcon icon={FiAlertTriangle} className="text-red-500 text-xs" />
+                                   )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
                     </div>
-                 ))}
+                  ))}
                </div>
             </motion.div>
          )}

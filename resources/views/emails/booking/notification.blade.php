@@ -13,11 +13,25 @@
         A new equipment booking has been scheduled. You have been added as a collaborator for this deployment.
     </div>
 
+    @php
+        $formattedDates = '';
+
+        if (isset($dates) && is_array($dates) && count($dates) > 0) {
+            $formattedDates = collect($dates)
+                ->map(function ($date) {
+                    return \Carbon\Carbon::parse($date)->format('d M Y');
+                })
+                ->implode(', ');
+        } elseif ($booking->start_date && $booking->end_date) {
+            $formattedDates = \Carbon\Carbon::parse($booking->start_date)->format('d M Y').' – '.\Carbon\Carbon::parse($booking->end_date)->format('d M Y');
+        }
+    @endphp
+
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
         <tr>
             <td style="width:50%;padding:8px 0;font-size:12px;color:#6b7280;">
                 <div style="font-weight:700;color:#4a5a67;">Dates</div>
-                <div>{{ \Carbon\Carbon::parse($booking->start_date)->format('d M Y') }} – {{ \Carbon\Carbon::parse($booking->end_date)->format('d M Y') }}</div>
+                <div>{{ $formattedDates }}</div>
             </td>
             <td style="width:50%;padding:8px 0;font-size:12px;color:#6b7280;">
                 <div style="font-weight:700;color:#4a5a67;">Shift</div>
@@ -34,6 +48,14 @@
                 <div>{{ $booking->shoot_type }}</div>
             </td>
         </tr>
+        @if(!empty($booking->remarks))
+        <tr>
+            <td colspan="2" style="padding:8px 0;font-size:12px;color:#6b7280;">
+                <div style="font-weight:700;color:#4a5a67;">Remarks</div>
+                <div>{{ $booking->remarks }}</div>
+            </td>
+        </tr>
+        @endif
     </table>
 
     <div style="font-size:13px;font-weight:700;color:#4a5a67;margin-bottom:8px;">
@@ -88,4 +110,3 @@
         Please review the allocation and coordinate with the operations team if any changes are required.
     </div>
 @endsection
-

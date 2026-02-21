@@ -131,6 +131,7 @@ export function InventoryProvider({ children, user }) {
           id: b.id,
           shootName: b.project_title,
           quotationNumber: b.quotation_number,
+          remarks: b.remarks || '',
           collaborators: b.collaborators || [],
           status: b.status,
           startDate: b.start_date,
@@ -246,10 +247,13 @@ export function InventoryProvider({ children, user }) {
       }
   };
 
-  const checkOutEquipment = async (bookingData) => {
+  const checkOutEquipment = async (bookingData, options = {}) => {
+      const { showToast = true } = options;
       try {
           const response = await axios.post('/bookings', bookingData);
-          toast.success("Booking created successfully");
+          if (showToast) {
+              toast.success("Booking created successfully");
+          }
           fetchEquipment();
           fetchBookings();
       } catch (error) {
@@ -306,10 +310,13 @@ export function InventoryProvider({ children, user }) {
       }
   };
 
-  const replaceBooking = async (ids, payload) => {
+  const replaceBooking = async (ids, payload, options = {}) => {
+    const { showToast = true } = options;
     try {
         await axios.post('/bookings/replace', { ids, ...payload });
-        toast.success("Booking updated successfully");
+        if (showToast) {
+            toast.success("Booking updated successfully");
+        }
         fetchBookings();
     } catch (error) {
         console.error("Replace failed", error);
