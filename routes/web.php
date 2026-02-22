@@ -104,6 +104,8 @@ Route::middleware(['auth'])->prefix('api/admin')->group(function () {
     Route::post('/audit-settings', [SettingController::class, 'updateAuditSettings']);
     Route::get('/notification-settings', [SettingController::class, 'showNotificationSettings']);
     Route::post('/notification-settings', [SettingController::class, 'updateNotificationSettings']);
+    Route::get('/stock-take-settings', [SettingController::class, 'showStockTakeSettings']);
+    Route::post('/stock-take-settings', [SettingController::class, 'updateStockTakeSettings']);
     Route::get('/support-tickets', [SupportTicketController::class, 'index']);
     Route::patch('/support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus']);
     Route::get('/users', [UserController::class, 'index']);
