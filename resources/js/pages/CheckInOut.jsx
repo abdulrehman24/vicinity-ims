@@ -23,6 +23,39 @@ function CheckInOut() {
   const [isProcessing, setIsProcessing] = useState(false);
   const location = useLocation();
 
+  const collaboratorSuggestions = useMemo(() => {
+    const map = new Map();
+
+    if (user && user.email) {
+      map.set(user.email, user.name || '');
+    }
+
+    bookings.forEach((b) => {
+      const u = b.user;
+      if (u && u.email) {
+        if (!map.has(u.email)) {
+          map.set(u.email, u.name || '');
+        }
+      }
+
+      if (Array.isArray(b.collaborators)) {
+        b.collaborators.forEach((c) => {
+          if (typeof c === 'string') {
+            if (!map.has(c)) {
+              map.set(c, '');
+            }
+          } else if (c && c.email) {
+            if (!map.has(c.email)) {
+              map.set(c.email, c.name || '');
+            }
+          }
+        });
+      }
+    });
+
+    return Array.from(map.entries()).map(([email, name]) => ({ email, name }));
+  }, [bookings, user]);
+
   useEffect(() => {
     if (location.state?.editProject && user) {
       const project = location.state.editProject;
@@ -137,6 +170,7 @@ function CheckInOut() {
               setProjectToEdit(null);
               setActiveTab('out');
             }}
+            collaboratorSuggestions={collaboratorSuggestions}
           />
         ) : (
           <GroupReturnView 
@@ -175,7 +209,7 @@ const groupDates = (dates) => {
   return groups;
 };
 
-function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, editingProject, onCancelEdit }) {
+function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, editingProject, onCancelEdit, collaboratorSuggestions }) {
   const [selectedItems, setSelectedItems] = useState([]); // Array of {id, qty}
   const [selectedDates, setSelectedDates] = useState([]);
   const [shift, setShift] = useState('Full Day');
@@ -555,6 +589,34 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
               <InputGroup label="Quotation #">
                 <input value={formData.quote} onChange={e => setFormData({...formData, quote: e.target.value})} className="w-full bg-gray-50 p-4 rounded-2xl focus:bg-white border border-transparent focus:border-[#ebc1b6] outline-none font-bold text-sm" placeholder="QT-102" />
               </InputGroup>
+              <div className="col-span-2">
+                <InputGroup label="Booking Dates">
+                  <div className="w-full bg-gray-50 p-3 rounded-2xl border border-transparent text-xs font-bold text-[#4a5a67] min-h-[48px]">
+                    {requestedDates.length === 0 ? (
+                      <span className="text-gray-400">No dates selected</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {groupDates(requestedDates).map((group, idx) => {
+                          const start = group[0];
+                          const end = group[group.length - 1];
+                          const label = start === end
+                            ? format(parseISO(start), 'MMM d, yyyy')
+                            : `${format(parseISO(start), 'MMM d, yyyy')} - ${format(parseISO(end), 'MMM d, yyyy')}`;
+                          return (
+                            <div
+                              key={start + idx}
+                              className="flex items-center space-x-2 bg-white/70 px-3 py-1 rounded-full border border-white shadow-sm"
+                            >
+                              <SafeIcon icon={FiCalendar} className="text-[10px] text-[#4a5a67]" />
+                              <span>{label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </InputGroup>
+              </div>
             </div>
 
             <div>
@@ -571,41 +633,67 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
 
             <div className="space-y-4">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Selected Cart</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedItems.map(item => {
-                  const masterItem = equipment.find(e => e.id === item.id);
-                  const maxAvail = masterItem
-                    ? getAvailableQty(masterItem, requestedDates, shift, editingBookingIdSet)
-                    : item.qty;
-                  return (
-                    <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                      <div className="flex items-center space-x-3">
-                        <img src={item.image} className="w-10 h-10 rounded-xl object-cover" alt="" />
-                        <p className="text-xs font-bold text-[#4a5a67]">{item.name}</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-3 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
-                          <button onClick={() => updateQty(item.id, -1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiMinus} /></button>
-                          <span className="text-sm font-black text-[#4a5a67] w-4 text-center">{item.qty}</span>
-                          <button onClick={() => updateQty(item.id, 1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiPlus} /></button>
+              <div className="space-y-4">
+                {(() => {
+                  const grouped = {};
+                  selectedItems.forEach(item => {
+                    const masterItem = equipment.find(e => e.id === item.id);
+                    const category = masterItem && masterItem.category ? masterItem.category : 'Uncategorized';
+                    if (!grouped[category]) grouped[category] = [];
+                    grouped[category].push({ item, masterItem });
+                  });
+
+                  return Object.entries(grouped)
+                    .sort(([a], [b]) => a.toLowerCase().localeCompare(b.toLowerCase()))
+                    .map(([category, entries]) => (
+                      <div key={category} className="space-y-2">
+                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                          {category}
                         </div>
-                        <button 
-                          onClick={() => removeItem(item.id)} 
-                          className="p-2 text-gray-300 hover:text-red-400 transition-colors"
-                          title="Remove Item"
-                        >
-                          <SafeIcon icon={FiTrash2} />
-                        </button>
+                        <div className="grid grid-cols-1 gap-4">
+                          {entries.map(({ item, masterItem }) => {
+                            const maxAvail = masterItem
+                              ? getAvailableQty(masterItem, requestedDates, shift, editingBookingIdSet)
+                              : item.qty;
+                            return (
+                              <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                <div className="flex items-center space-x-3">
+                                  <img src={item.image} className="w-10 h-10 rounded-xl object-cover" alt="" />
+                                  <div>
+                                    <p className="text-xs font-bold text-[#4a5a67]">{item.name}</p>
+                                    {masterItem && masterItem.category && (
+                                      <p className="text-[9px] font-black uppercase opacity-50">{masterItem.category}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <div className="flex items-center space-x-3 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
+                                    <button onClick={() => updateQty(item.id, -1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiMinus} /></button>
+                                    <span className="text-sm font-black text-[#4a5a67] w-4 text-center">{item.qty}</span>
+                                    <button onClick={() => updateQty(item.id, 1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiPlus} /></button>
+                                  </div>
+                                  <button 
+                                    onClick={() => removeItem(item.id)} 
+                                    className="p-2 text-gray-300 hover:text-red-400 transition-colors"
+                                    title="Remove Item"
+                                  >
+                                    <SafeIcon icon={FiTrash2} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    ));
+                })()}
               </div>
             </div>
 
             <div className="pt-4 border-t border-gray-100">
               <CollaboratorList
                 collaborators={collaborators}
+                suggestions={collaboratorSuggestions}
                 onAdd={(collab) => {
                   const email = typeof collab === 'string' ? collab : collab.email;
                   const exists = collaborators.some(c => {

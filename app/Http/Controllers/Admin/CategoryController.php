@@ -18,7 +18,6 @@ class CategoryController extends Controller
 
     public function index(Request $request)
     {
-        $this->ensureSuperAdmin();
 
         $query = Category::query();
 

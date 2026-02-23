@@ -91,8 +91,6 @@ function CalendarPage() {
     setMoreModal({ open: true, date, events: items });
   };
 
-  // Build one "Google Calendar bar" per booking (spanning start->end)
-  // Also aggregate equipment items for the booking.
   const bookingBars = useMemo(() => {
     const map = new Map(); // bookingId -> aggregate
 
@@ -104,6 +102,8 @@ function CalendarPage() {
       const quotationNumber = b.quotationNumber || '';
       const userName = b.user?.name || 'Operations';
       const createdAt = b.created_at || b.createdAt;
+      const remarks = b.remarks || '';
+      const collaborators = Array.isArray(b.collaborators) ? b.collaborators : [];
 
       // Collect all involved dates:
       // - Prefer b.dates[] if present (these look like yyyy-MM-dd)
@@ -128,7 +128,6 @@ function CalendarPage() {
         rangeStart = safeParse(b.startDate);
       }
 
-      // Determine range end (inclusive end date from returnedAt if exists; else last date in list; else start)
       let rangeEndInclusive = null;
       const returnedAt = safeParse(b.returnedAt);
       if (returnedAt) {
@@ -141,11 +140,11 @@ function CalendarPage() {
 
       if (!rangeStart || !rangeEndInclusive) return;
 
-      // Aggregate equipment items
+      const eq = equipment.find(item => item.id === b.equipmentId);
       const eqName = b.equipmentName
         ? b.equipmentName
-        : equipment.find(item => item.id === b.equipmentId)?.name || 'Unknown Equipment';
-
+        : eq?.name || 'Unknown Equipment';
+      const eqCategory = eq?.category || 'Uncategorized';
       const qty = b.quantity || 1;
 
       if (!map.has(bookingId)) {
@@ -156,6 +155,8 @@ function CalendarPage() {
           userName,
           createdAt,
           status: b.status,
+          remarks,
+          collaborators,
           start: rangeStart,
           endInclusive: rangeEndInclusive,
           itemsMap: new Map(),
@@ -164,19 +165,23 @@ function CalendarPage() {
 
       const agg = map.get(bookingId);
 
-      // Expand range if needed (in case multiple rows)
       if (rangeStart < agg.start) agg.start = rangeStart;
       if (rangeEndInclusive > agg.endInclusive) agg.endInclusive = rangeEndInclusive;
 
-      agg.itemsMap.set(eqName, (agg.itemsMap.get(eqName) || 0) + qty);
+      const key = `${eqCategory}||${eqName}`;
+      if (!agg.itemsMap.has(key)) {
+        agg.itemsMap.set(key, { name: eqName, quantity: 0, category: eqCategory });
+      }
+      const entry = agg.itemsMap.get(key);
+      entry.quantity += qty;
     });
 
-    // Convert to array with items[]
     return Array.from(map.values()).map((agg) => ({
       ...agg,
-      items: Array.from(agg.itemsMap.entries())
-        .map(([name, quantity]) => ({ name, quantity }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+      items: Array.from(agg.itemsMap.values()).sort((a, b) => {
+        if (a.category === b.category) return a.name.localeCompare(b.name);
+        return a.category.localeCompare(b.category);
+      }),
     }));
   }, [bookings, equipment]);
 
@@ -200,6 +205,8 @@ function CalendarPage() {
           userName: b.userName,
           createdAt: b.createdAt,
           items: b.items,
+          remarks: b.remarks,
+          collaborators: b.collaborators,
           start: startStr,
           endInclusive: dateOnlyStr(b.endInclusive),
         },
@@ -332,6 +339,8 @@ function CalendarPage() {
                         userName: b.userName,
                         createdAt: b.createdAt,
                         items: b.items,
+                        remarks: b.remarks,
+                        collaborators: b.collaborators,
                         start: dateOnlyStr(b.start),
                         endInclusive: dateOnlyStr(b.endInclusive),
                       });
@@ -364,15 +373,38 @@ function CalendarPage() {
                       <p className="text-[9px] font-bold text-white/60 mb-2">
                         {b.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} Items
                       </p>
-                      <ul className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                        {b.items.map((item, idx) => (
-                          <li key={idx} className="text-[9px] text-white/40 truncate flex items-center space-x-2">
-                            <div className="w-1 h-1 bg-white/20 rounded-full" />
-                            <span>
-                              {item.name}{item.quantity > 1 ? ` x${item.quantity}` : ''}
-                            </span>
-                          </li>
-                        ))}
+                      <ul className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                        {Object.entries(
+                          b.items.reduce((acc, item) => {
+                            const category = item.category || 'Uncategorized';
+                            if (!acc[category]) acc[category] = [];
+                            acc[category].push(item);
+                            return acc;
+                          }, {})
+                        )
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([category, items]) => (
+                            <li key={category} className="space-y-1">
+                              <div className="text-[8px] font-black uppercase tracking-widest text-white/40">
+                                {category}
+                              </div>
+                              {items
+                                .slice()
+                                .sort((a, b) => a.name.localeCompare(b.name))
+                                .map((item, idx) => (
+                                  <div
+                                    key={`${category}-${item.name}-${idx}`}
+                                    className="text-[9px] text-white/40 truncate flex items-center space-x-2"
+                                  >
+                                    <div className="w-1 h-1 bg-white/20 rounded-full" />
+                                    <span>
+                                      {item.name}
+                                      {item.quantity > 1 ? ` x${item.quantity}` : ''}
+                                    </span>
+                                  </div>
+                                ))}
+                            </li>
+                          ))}
                       </ul>
                     </div>
                   </button>
@@ -513,8 +545,30 @@ function CalendarPage() {
                     <div className="text-xs font-black text-[#4a5a67] mt-1">{selectedEvent.userName}</div>
                   </div>
                   <div className="p-4 bg-gray-50 rounded-2xl">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">Type</div>
-                    <div className="text-xs font-black text-[#4a5a67] mt-1">OUT</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">Collaborators</div>
+                    <div className="text-xs font-black text-[#4a5a67] mt-1">
+                      {Array.isArray(selectedEvent.collaborators) && selectedEvent.collaborators.length > 0
+                        ? selectedEvent.collaborators
+                            .map((c) => {
+                              if (typeof c === 'string') return c;
+                              if (c && c.email) return c.email;
+                              return '';
+                            })
+                            .filter(Boolean)
+                            .join(', ')
+                        : 'None'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                    Remarks
+                  </div>
+                  <div className="text-xs text-[#4a5a67] whitespace-pre-wrap">
+                    {selectedEvent.remarks && String(selectedEvent.remarks).trim().length > 0
+                      ? selectedEvent.remarks
+                      : 'No remarks'}
                   </div>
                 </div>
 
@@ -522,19 +576,39 @@ function CalendarPage() {
                   <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
                     Equipment List
                   </div>
-                  <ul className="space-y-2">
-                    {(selectedEvent.items || [])
-                      .slice()
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map((item, idx) => (
-                        <li key={idx} className="flex items-start justify-between gap-3">
-                          <span className="text-xs font-bold text-[#4a5a67] truncate">{item.name}</span>
-                          <span className="text-[10px] font-black text-gray-400 shrink-0">
-                            {item.quantity > 1 ? `x${item.quantity}` : 'x1'}
-                          </span>
-                        </li>
+                  <div className="space-y-3">
+                    {Object.entries(
+                      (selectedEvent.items || []).reduce((acc, item) => {
+                        const category = item.category || 'Uncategorized';
+                        if (!acc[category]) acc[category] = [];
+                        acc[category].push(item);
+                        return acc;
+                      }, {})
+                    )
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([category, items]) => (
+                        <div key={category}>
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                            {category}
+                          </div>
+                          <ul className="space-y-1">
+                            {items
+                              .slice()
+                              .sort((a, b) => a.name.localeCompare(b.name))
+                              .map((item, idx) => (
+                                <li key={`${category}-${item.name}-${idx}`} className="flex items-start gap-3">
+                                  <span className="text-[10px] font-black text-gray-400 shrink-0">
+                                    {item.quantity > 1 ? `${item.quantity}x` : '1x'}
+                                  </span>
+                                  <span className="text-xs font-bold text-[#4a5a67] truncate">
+                                    {item.name}
+                                  </span>
+                                </li>
+                              ))}
+                          </ul>
+                        </div>
                       ))}
-                  </ul>
+                  </div>
                 </div>
               </div>
             </motion.div>

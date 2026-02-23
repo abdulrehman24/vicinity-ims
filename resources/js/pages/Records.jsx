@@ -168,15 +168,14 @@ function Records() {
   const groupedRecords = useMemo(() => {
     const groups = {};
     
-    // Helper to get date object
     const getDateObj = (d) => typeof d === 'object' ? d.date : d;
 
     visibleBookings.forEach(b => {
-      // Skip cancelled bookings from records view
       if (b.status === 'cancelled') return;
 
-      // Group by Shoot Name + Quotation Number
-      const key = `${b.shootName}|${b.quotationNumber || 'NoQuote'}`;
+      const start = b.startDate || 'NoStart';
+      const end = b.endDate || 'NoEnd';
+      const key = `${b.shootName}|${b.quotationNumber || 'NoQuote'}|${start}|${end}`;
       
       if (!groups[key]) {
         groups[key] = {
@@ -207,7 +206,6 @@ function Records() {
           equipmentCategory: eqCategory
       });
       
-      // Collect dates
       if (b.dates && Array.isArray(b.dates) && b.dates.length > 0) {
           b.dates.forEach(d => groups[key].dates.push(getDateObj(d)));
       } else if (b.startDate) {
@@ -217,7 +215,6 @@ function Records() {
     });
 
     return Object.values(groups).map(g => {
-        // Sort dates and find range
         const uniqueDates = [...new Set(g.dates)].sort();
         const startDate = uniqueDates.length > 0 ? uniqueDates[0] : null;
         const endDate = uniqueDates.length > 0 ? uniqueDates[uniqueDates.length - 1] : null;
@@ -228,7 +225,7 @@ function Records() {
             dates: uniqueDates,
             startDate,
             endDate,
-            date: startDate || g.createdAt // For sorting
+            date: startDate || g.createdAt
         };
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [visibleBookings, equipment]);
@@ -816,7 +813,7 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
                       <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">
                         {category}
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div className="space-y-2">
                         {items
                           .sort((a, b) => a.equipmentName.localeCompare(b.equipmentName))
                           .map((item, idx) => (

@@ -5,7 +5,7 @@ import * as FiIcons from 'react-icons/fi';
 
 const { FiUserPlus, FiX, FiMail, FiUsers, FiCalendar } = FiIcons;
 
-function CollaboratorList({ collaborators = [], onAdd, onRemove, isEditable = true }) {
+function CollaboratorList({ collaborators = [], suggestions = [], onAdd, onRemove, isEditable = true }) {
   const [email, setEmail] = useState('');
 
   const handleAdd = (e) => {
@@ -14,6 +14,26 @@ function CollaboratorList({ collaborators = [], onAdd, onRemove, isEditable = tr
     onAdd({ email });
     setEmail('');
   };
+
+  const existingEmails = new Set(
+    collaborators
+      .map((c) => (typeof c === 'string' ? c : c.email))
+      .filter(Boolean)
+      .map((v) => v.toLowerCase()),
+  );
+
+  const trimmed = email.trim().toLowerCase();
+  const filteredSuggestions = trimmed
+    ? suggestions
+        .filter((s) => s && s.email)
+        .filter((s) => !existingEmails.has(s.email.toLowerCase()))
+        .filter((s) => {
+          const name = (s.name || '').toLowerCase();
+          const mail = s.email.toLowerCase();
+          return name.includes(trimmed) || mail.includes(trimmed);
+        })
+        .slice(0, 6)
+    : [];
 
   return (
     <div className="space-y-4">
@@ -28,25 +48,57 @@ function CollaboratorList({ collaborators = [], onAdd, onRemove, isEditable = tr
       </div>
 
       {isEditable && (
-        <form onSubmit={handleAdd} className="flex space-x-2">
-          <div className="relative flex-1">
-            <SafeIcon icon={FiMail} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-xs" />
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="kevin@vicinity.studio"
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67] transition-all"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={!email}
-            className="p-2 bg-[#4a5a67] text-[#ebc1b6] rounded-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-30"
-          >
-            <SafeIcon icon={FiUserPlus} />
-          </button>
-        </form>
+        <>
+          <form onSubmit={handleAdd} className="flex space-x-2">
+            <div className="relative flex-1">
+              <SafeIcon icon={FiMail} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-xs" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Search or type email"
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67] transition-all"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!email}
+              className="p-2 bg-[#4a5a67] text-[#ebc1b6] rounded-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-30"
+            >
+              <SafeIcon icon={FiUserPlus} />
+            </button>
+          </form>
+
+          {filteredSuggestions.length > 0 && (
+            <div className="mt-2 bg-white border border-gray-100 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+              {filteredSuggestions.map((s) => (
+                <button
+                  key={s.email}
+                  type="button"
+                  onClick={() => {
+                    onAdd({ email: s.email });
+                    setEmail('');
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 text-[11px] hover:bg-gray-50"
+                >
+                  <span className="font-bold text-[#4a5a67] truncate">
+                    {s.name || s.email}
+                  </span>
+                  {s.name && (
+                    <span className="ml-2 text-[10px] text-gray-400 truncate">
+                      {s.email}
+                    </span>
+                  )}
+                  {!s.name && (
+                    <span className="ml-2 text-[10px] text-gray-400 truncate">
+                      {s.email}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <div className="flex flex-wrap gap-2">
