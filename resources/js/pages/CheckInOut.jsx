@@ -59,7 +59,7 @@ function CheckInOut() {
   useEffect(() => {
     if (location.state?.editProject && user) {
       const project = location.state.editProject;
-      const isSuperAdmin = user.is_admin >= 2;
+      const isAdmin = user.is_admin >= 1;
 
       const collaboratorEmails = new Set();
       if (Array.isArray(project.collaborators)) {
@@ -75,7 +75,7 @@ function CheckInOut() {
       const currentEmail = user.email ? user.email.toLowerCase() : null;
       const isOwnerByName = project.user && typeof project.user === 'string' && project.user === user.name;
 
-      if (isSuperAdmin || isOwnerByName || (currentEmail && collaboratorEmails.has(currentEmail))) {
+      if (isAdmin || isOwnerByName || (currentEmail && collaboratorEmails.has(currentEmail))) {
         handleEditRequest(project);
       }
     }
@@ -748,8 +748,8 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
   const visibleBookings = useMemo(() => {
     if (!user) return bookings;
 
-    const isSuperAdmin = user.is_admin >= 2;
-    if (isSuperAdmin) return bookings;
+    const isAdmin = user.is_admin >= 1;
+    if (isAdmin) return bookings;
 
     const currentId = user.id;
     const currentEmail = user.email ? user.email.toLowerCase() : null;
@@ -886,7 +886,7 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
 
     if (!user) return;
 
-    const isSuperAdmin = user.is_admin >= 2;
+    const isAdmin = user.is_admin >= 1;
 
     const relatedBookings = bookings.filter(b => project.bookingIds.includes(b.id));
 
@@ -911,14 +911,14 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
     const currentId = user.id;
     const currentEmail = user.email ? user.email.toLowerCase() : null;
 
-    const canEdit =
-      isSuperAdmin ||
-      (currentId && ownerIds.has(currentId)) ||
-      (currentEmail && collaboratorEmails.has(currentEmail));
+    const isOwner = currentId && ownerIds.has(currentId);
+    const isCollaborator = currentEmail && collaboratorEmails.has(currentEmail);
 
-    if (!canEdit) return;
-
-    onEditRequest(project);
+    if (isAdmin || isOwner || isCollaborator) {
+      onEditRequest(project);
+    } else {
+      toast.error("You don't have permission to edit this booking");
+    }
   };
 
   // REMOVED handleSaveEdit

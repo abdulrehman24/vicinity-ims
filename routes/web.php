@@ -38,7 +38,7 @@ Route::get('/admin', function () {
         return redirect('/');
     }
 
-    if (Auth::user()->is_admin >= 2) {
+    if (Auth::user()->is_admin >= 1) {
         return redirect('/admin/dashboard');
     }
 

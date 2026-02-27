@@ -39,8 +39,8 @@ function Records() {
   const visibleBookings = useMemo(() => {
     if (!user) return bookings;
 
-    const isSuperAdmin = user.is_admin >= 2;
-    if (isSuperAdmin) return bookings;
+    const isAdmin = user.is_admin >= 1;
+    if (isAdmin) return bookings;
 
     const currentId = user.id;
     const currentEmail = user.email ? user.email.toLowerCase() : null;
@@ -641,8 +641,8 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
   const canEdit = useMemo(() => {
     if (!currentUser) return false;
 
-    const isSuperAdmin = currentUser.is_admin >= 2;
-    if (isSuperAdmin) return true;
+    const isAdmin = currentUser.is_admin >= 1;
+    if (isAdmin) return true;
 
     const ownerIds = new Set();
     const collaboratorEmails = new Set();

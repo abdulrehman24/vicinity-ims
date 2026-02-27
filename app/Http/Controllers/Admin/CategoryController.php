@@ -11,7 +11,7 @@ class CategoryController extends Controller
 {
     private function ensureSuperAdmin(): void
     {
-        if (! auth()->user() || auth()->user()->is_admin < 2) {
+        if (! auth()->user() || auth()->user()->is_admin < 1) {
             abort(403);
         }
     }

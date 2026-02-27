@@ -120,10 +120,10 @@ function App() {
     return <ChangePassword onUpdate={() => window.location.reload()} />;
   }
 
-  const isSuperAdmin = user?.is_admin >= 2;
+  const isAdmin = user?.is_admin >= 1;
   const isAdminRoute = location.pathname.startsWith('/admin');
 
-  const adminElement = isSuperAdmin ? (
+  const adminElement = isAdmin ? (
     <AdminLayout onLogout={handleLogout} />
   ) : (
     <Navigate to="/" />
