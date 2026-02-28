@@ -396,10 +396,11 @@ function CalendarPage() {
                                     key={`${category}-${item.name}-${idx}`}
                                     className="text-[9px] text-white/40 truncate flex items-center space-x-2"
                                   >
-                                    <div className="w-1 h-1 bg-white/20 rounded-full" />
-                                    <span>
+                                    <span className="w-5 shrink-0 opacity-60">
+                                      {item.quantity || 1}x
+                                    </span>
+                                    <span className="uppercase tracking-tight font-medium">
                                       {item.name}
-                                      {item.quantity > 1 ? ` x${item.quantity}` : ''}
                                     </span>
                                   </div>
                                 ))}
@@ -600,7 +601,7 @@ function CalendarPage() {
                                   <span className="text-[10px] font-black text-gray-400 shrink-0">
                                     {item.quantity > 1 ? `${item.quantity}x` : '1x'}
                                   </span>
-                                  <span className="text-xs font-bold text-[#4a5a67] truncate">
+                                  <span className="text-xs font-bold text-[#4a5a67] truncate uppercase tracking-wide">
                                     {item.name}
                                   </span>
                                 </li>

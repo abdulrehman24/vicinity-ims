@@ -18,6 +18,7 @@ const {
 function Records() {
   const { bookings, equipment, cancelBooking, batchCancel, user } = useInventory();
   const [view, setView] = useState('list'); // 'list' or 'calendar'
+  const [activeTab, setActiveTab] = useState('my_bookings'); // 'my_bookings' or 'my_collaborations'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
@@ -38,9 +39,6 @@ function Records() {
 
   const visibleBookings = useMemo(() => {
     if (!user) return bookings;
-
-    const isAdmin = user.is_admin >= 1;
-    if (isAdmin) return bookings;
 
     const currentId = user.id;
     const currentEmail = user.email ? user.email.toLowerCase() : null;
@@ -66,9 +64,12 @@ function Records() {
         });
       }
 
+      if (activeTab === 'my_bookings') return isOwner;
+      if (activeTab === 'my_collaborations') return isCollaborator;
+
       return isOwner || isCollaborator;
     });
-  }, [bookings, user]);
+  }, [bookings, user, activeTab]);
 
   const stockByCategory = useMemo(() => {
     const stock = {};
@@ -341,10 +342,25 @@ function Records() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto min-h-screen">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-6">
         <div>
           <h1 className="text-4xl font-black text-[#4a5a67] uppercase tracking-tight mb-2">Archives</h1>
-          <div className="w-12 h-1 bg-[#ebc1b6] rounded-full" />
+          <div className="w-12 h-1 bg-[#ebc1b6] rounded-full mb-6" />
+          
+          <div className="flex items-center space-x-2 bg-gray-100/50 p-1 rounded-xl w-fit">
+            <button 
+              onClick={() => setActiveTab('my_bookings')}
+              className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_bookings' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+            >
+              My Bookings
+            </button>
+            <button 
+              onClick={() => setActiveTab('my_collaborations')}
+              className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_collaborations' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+            >
+              Collaborations
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center space-x-3 bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm">
@@ -789,51 +805,73 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
               className="bg-gray-50 border-t border-gray-100"
             >
                <div className="p-6 space-y-4">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div className="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">User</div>
+                     <div className="text-xs font-black text-[#4a5a67] mt-1">{group.user || 'Operations Team'}</div>
+                   </div>
+                   <div className="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Collaborators</div>
+                     <div className="text-xs font-black text-[#4a5a67] mt-1">
+                       {Array.isArray(group.collaborators) && group.collaborators.length > 0
+                         ? group.collaborators
+                             .map((c) => (typeof c === 'string' ? c : c.email))
+                             .filter(Boolean)
+                             .join(', ')
+                         : 'None'}
+                     </div>
+                   </div>
+                 </div>
+
                  {group.remarks && (
-                   <div className="p-4 bg-white rounded-xl border border-gray-100">
-                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                   <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">
                        Remarks
                      </div>
-                     <div className="text-[11px] font-bold text-[#4a5a67] whitespace-pre-line">
+                     <div className="text-xs text-[#4a5a67] whitespace-pre-wrap leading-relaxed">
                        {group.remarks}
                      </div>
                    </div>
                  )}
-                 {Object.entries(
-                    aggregatedItems.reduce((acc, item) => {
-                      const cat = item.equipmentCategory || 'Uncategorized';
-                      if (!acc[cat]) acc[cat] = [];
-                      acc[cat].push(item);
-                      return acc;
-                    }, {})
-                  )
-                  .sort(([catA], [catB]) => catA.toLowerCase().localeCompare(catB.toLowerCase()))
-                  .map(([category, items]) => (
-                    <div key={category} className="space-y-2">
-                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">
-                        {category}
-                      </div>
-                      <div className="space-y-2">
-                        {items
-                          .sort((a, b) => a.equipmentName.localeCompare(b.equipmentName))
-                          .map((item, idx) => (
-                            <div key={category + '-' + idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100">
-                              <div className="flex items-center space-x-3 overflow-hidden">
-                                <div className="w-1.5 h-1.5 bg-[#ebc1b6] rounded-full shrink-0" />
-                                <span className="text-xs font-bold text-[#4a5a67] truncate">
-                                  {item.equipmentName}{item.displayQuantity > 1 ? ` x${item.displayQuantity}` : ''}
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                   {item.type === 'problem_report' && (
-                                      <SafeIcon icon={FiAlertTriangle} className="text-red-500 text-xs" />
-                                   )}
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  ))}
+
+                 <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                   <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6">
+                     Equipment List
+                   </div>
+                   <div className="space-y-8">
+                     {Object.entries(
+                       aggregatedItems.reduce((acc, item) => {
+                         const cat = item.equipmentCategory || 'Uncategorized';
+                         if (!acc[cat]) acc[cat] = [];
+                         acc[cat].push(item);
+                         return acc;
+                       }, {})
+                     )
+                       .sort(([a], [b]) => a.localeCompare(b))
+                       .map(([category, items]) => (
+                         <div key={category} className="space-y-4">
+                           <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 border-b border-gray-50 pb-1">
+                             {category}
+                           </div>
+                           <ul className="space-y-3">
+                             {items
+                               .slice()
+                               .sort((a, b) => a.equipmentName.localeCompare(b.equipmentName))
+                               .map((item, idx) => (
+                                 <li key={`${category}-${item.equipmentName}-${idx}`} className="flex items-center space-x-3">
+                                   <span className="text-[10px] font-black text-gray-400 shrink-0 w-6">
+                                     {item.displayQuantity || 1}x
+                                   </span>
+                                   <span className="text-xs font-bold text-[#4a5a67] uppercase tracking-wide">
+                                     {item.equipmentName}
+                                   </span>
+                                 </li>
+                               ))}
+                           </ul>
+                         </div>
+                       ))}
+                   </div>
+                 </div>
                </div>
             </motion.div>
          )}

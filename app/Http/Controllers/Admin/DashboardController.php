@@ -5,9 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Equipment;
-use App\Models\User;
 use App\Models\SupportTicket;
-use Illuminate\Http\Request;
+use App\Models\User;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -26,20 +25,18 @@ class DashboardController extends Controller
         $inventory = [
             'total' => Equipment::count(),
             'available' => Equipment::where('status', 'available')->count(),
-            'on_loan' => Equipment::where('status', 'unavailable')->count(), // Assuming unavailable means on loan usually
             'maintenance' => Equipment::where('status', 'maintenance')->count(),
-            'missing' => Equipment::where('status', 'missing')->count(),
+            'checked_out' => Equipment::where('status', 'checked_out')->count(),
+            'decommissioned' => Equipment::where('status', 'decommissioned')->count(),
         ];
 
         // Booking Analytics
         $bookings = [
             'total' => Booking::count(),
-            'pending' => Booking::where('status', 'pending')->count(),
-            'approved' => Booking::where('status', 'approved')->count(),
-            'picked_up' => Booking::where('status', 'picked_up')->count(),
+            'active' => Booking::where('status', 'active')->count(),
             'returned' => Booking::where('status', 'returned')->count(),
             'cancelled' => Booking::where('status', 'cancelled')->count(),
-            'overdue' => Booking::where('status', 'picked_up')
+            'overdue' => Booking::where('status', 'active')
                 ->where('end_date', '<', Carbon::now())
                 ->count(),
         ];
@@ -51,7 +48,7 @@ class DashboardController extends Controller
             'in_progress' => SupportTicket::where('status', 'in_progress')->count(),
             'resolved' => SupportTicket::where('status', 'resolved')->count(),
         ];
-        
+
         // Recent Activity (Last 5 bookings)
         $recentBookings = Booking::with('user')
             ->orderBy('created_at', 'desc')

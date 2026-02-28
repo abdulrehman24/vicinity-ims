@@ -15,6 +15,7 @@ class EquipmentNotificationMail extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public Equipment $equipment;
+
     public string $action; // 'created' or 'decommissioned'
 
     public function __construct(Equipment $equipment, string $action)
@@ -26,9 +27,9 @@ class EquipmentNotificationMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         $subject = match ($this->action) {
-            'created' => 'New Equipment Added: ' . $this->equipment->name,
-            'decommissioned' => 'Equipment Decommissioned: ' . $this->equipment->name,
-            default => 'Equipment Update: ' . $this->equipment->name,
+            'created' => 'New Equipment Added: '.$this->equipment->name,
+            'decommissioned' => 'Equipment Decommissioned: '.$this->equipment->name,
+            default => 'Equipment Update: '.$this->equipment->name,
         };
 
         return new Envelope(

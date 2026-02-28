@@ -16,6 +16,7 @@ class BookingNotificationMail extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public Booking $booking;
+
     public array $dates = [];
 
     public function __construct(Booking $booking, ?array $dates = null)

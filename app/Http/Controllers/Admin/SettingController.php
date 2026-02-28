@@ -26,9 +26,10 @@ class SettingController extends Controller
             File::cleanDirectory(storage_path('app/public'));
 
             Artisan::call('migrate:fresh', ['--seed' => true, '--force' => true]);
+
             return response()->json(['message' => 'Database reset successfully']);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Failed to reset database: ' . $e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to reset database: '.$e->getMessage()], 500);
         }
     }
 
@@ -200,8 +201,8 @@ class SettingController extends Controller
 
         return response()->json([
             'stock_take_reminder_enabled' => $enabled === '1',
-            'stock_take_reminder_days_before' => $daysBefore ? (int)$daysBefore : 30,
-            'stock_take_reminder_days_overdue' => $daysOverdue ? (int)$daysOverdue : 3,
+            'stock_take_reminder_days_before' => $daysBefore ? (int) $daysBefore : 30,
+            'stock_take_reminder_days_overdue' => $daysOverdue ? (int) $daysOverdue : 3,
             'stock_take_reminder_frequency' => $frequency ?: 'weekly',
             'stock_take_notify_emails' => $emails ?? '',
         ]);
@@ -220,8 +221,8 @@ class SettingController extends Controller
         ]);
 
         Setting::updateOrCreate(['key' => 'stock_take_reminder_enabled'], ['value' => $data['stock_take_reminder_enabled'] ? '1' : '0']);
-        Setting::updateOrCreate(['key' => 'stock_take_reminder_days_before'], ['value' => (string)$data['stock_take_reminder_days_before']]);
-        Setting::updateOrCreate(['key' => 'stock_take_reminder_days_overdue'], ['value' => (string)$data['stock_take_reminder_days_overdue']]);
+        Setting::updateOrCreate(['key' => 'stock_take_reminder_days_before'], ['value' => (string) $data['stock_take_reminder_days_before']]);
+        Setting::updateOrCreate(['key' => 'stock_take_reminder_days_overdue'], ['value' => (string) $data['stock_take_reminder_days_overdue']]);
         Setting::updateOrCreate(['key' => 'stock_take_reminder_frequency'], ['value' => $data['stock_take_reminder_frequency']]);
         Setting::updateOrCreate(['key' => 'stock_take_notify_emails'], ['value' => $data['stock_take_notify_emails'] ?? '']);
 

@@ -50,9 +50,9 @@ function AdminDashboard() {
         emphasis: { label: { show: true, fontSize: '18', fontWeight: 'bold' } },
         data: [
           { value: stats.inventory.available, name: 'Available', itemStyle: { color: '#10b981' } },
-          { value: stats.inventory.on_loan, name: 'On Loan', itemStyle: { color: '#f59e0b' } },
+          { value: stats.inventory.checked_out, name: 'Checked Out', itemStyle: { color: '#f59e0b' } },
           { value: stats.inventory.maintenance, name: 'Maintenance', itemStyle: { color: '#ef4444' } },
-          { value: stats.inventory.missing, name: 'Missing', itemStyle: { color: '#6b7280' } },
+          { value: stats.inventory.decommissioned, name: 'Decommissioned', itemStyle: { color: '#6b7280' } },
         ]
       }
     ]
@@ -64,7 +64,7 @@ function AdminDashboard() {
     xAxis: [
       {
         type: 'category',
-        data: ['Pending', 'Approved', 'Picked Up', 'Returned', 'Overdue'],
+        data: ['Active', 'Returned', 'Cancelled', 'Overdue'],
         axisTick: { alignWithLabel: true }
       }
     ],
@@ -75,11 +75,10 @@ function AdminDashboard() {
         type: 'bar',
         barWidth: '60%',
         data: [
-          { value: stats.bookings.pending, itemStyle: { color: '#fbbf24' } },
-          { value: stats.bookings.approved, itemStyle: { color: '#3b82f6' } },
-          { value: stats.bookings.picked_up, itemStyle: { color: '#8b5cf6' } },
+          { value: stats.bookings.active, itemStyle: { color: '#8b5cf6' } },
           { value: stats.bookings.returned, itemStyle: { color: '#10b981' } },
-          { value: stats.bookings.overdue, itemStyle: { color: '#ef4444' } },
+          { value: stats.bookings.cancelled, itemStyle: { color: '#ef4444' } },
+          { value: stats.bookings.overdue, itemStyle: { color: '#f59e0b' } },
         ]
       }
     ]
@@ -114,7 +113,7 @@ function AdminDashboard() {
         <StatCard 
           title="Total Bookings" 
           value={stats.bookings.total} 
-          subtext={`${stats.bookings.picked_up} Active • ${stats.bookings.overdue} Overdue`}
+          subtext={`${stats.bookings.active} Active • ${stats.bookings.overdue} Overdue`}
           icon={FiCalendar} 
           color="bg-purple-50 text-purple-600" 
         />
@@ -166,10 +165,9 @@ function AdminDashboard() {
                   <td className="px-6 py-4 text-gray-600">{booking.project}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                      booking.status === 'approved' ? 'bg-blue-50 text-blue-600' :
-                      booking.status === 'pending' ? 'bg-yellow-50 text-yellow-600' :
-                      booking.status === 'picked_up' ? 'bg-purple-50 text-purple-600' :
+                      booking.status === 'active' || booking.status === 'picked_up' ? 'bg-purple-50 text-purple-600' :
                       booking.status === 'returned' ? 'bg-green-50 text-green-600' :
+                      booking.status === 'cancelled' ? 'bg-red-50 text-red-600' :
                       'bg-gray-50 text-gray-600'
                     }`}>
                       {booking.status}

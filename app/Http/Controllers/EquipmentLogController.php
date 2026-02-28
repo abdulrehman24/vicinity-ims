@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\EquipmentLog;
-use Illuminate\Http\Request;
 
 class EquipmentLogController extends Controller
 {
@@ -13,7 +12,7 @@ class EquipmentLogController extends Controller
             ->with('user:id,name')
             ->orderByDesc('created_at')
             ->get();
-            
+
         return response()->json(['data' => $logs]);
     }
 }

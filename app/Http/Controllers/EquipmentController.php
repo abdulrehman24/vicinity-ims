@@ -13,8 +13,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
 
 class EquipmentController extends Controller
 {
@@ -25,7 +25,7 @@ class EquipmentController extends Controller
 
     public function store(Request $request)
     {
-        if ($request->has('nextAuditDate') && !$request->input('nextAuditDate')) {
+        if ($request->has('nextAuditDate') && ! $request->input('nextAuditDate')) {
             $request->merge(['nextAuditDate' => null]);
         }
 
@@ -54,9 +54,9 @@ class EquipmentController extends Controller
         $equipmentData = $this->mapFrontendToBackend($data);
 
         // Calculate next_audit_date if not provided
-        if (!isset($equipmentData['next_audit_date'])) {
+        if (! isset($equipmentData['next_audit_date'])) {
             $auditInterval = Setting::where('key', 'audit_interval_months')->value('value') ?? 6;
-            $equipmentData['next_audit_date'] = now()->addMonths((int)$auditInterval);
+            $equipmentData['next_audit_date'] = now()->addMonths((int) $auditInterval);
         }
 
         if ($request->hasFile('image')) {
@@ -77,7 +77,7 @@ class EquipmentController extends Controller
     {
         $equipment = Equipment::findOrFail($id);
 
-        if ($request->has('nextAuditDate') && !$request->input('nextAuditDate')) {
+        if ($request->has('nextAuditDate') && ! $request->input('nextAuditDate')) {
             $request->merge(['nextAuditDate' => null]);
         }
 
@@ -85,7 +85,7 @@ class EquipmentController extends Controller
             'name' => 'required|string',
             'category' => 'required|string',
             'equipmentType' => 'nullable|string',
-            'serialNumber' => 'nullable|string|unique:equipment,serial_number,' . $equipment->id,
+            'serialNumber' => 'nullable|string|unique:equipment,serial_number,'.$equipment->id,
             'status' => 'required|string',
             'businessUnit' => 'required|string',
             'condition' => 'required|string',
@@ -105,9 +105,9 @@ class EquipmentController extends Controller
 
         $equipmentData = $this->mapFrontendToBackend($data);
 
-        if (!isset($equipmentData['next_audit_date'])) {
+        if (! isset($equipmentData['next_audit_date'])) {
             $auditInterval = Setting::where('key', 'audit_interval_months')->value('value') ?? 6;
-            $equipmentData['next_audit_date'] = now()->addMonths((int)$auditInterval);
+            $equipmentData['next_audit_date'] = now()->addMonths((int) $auditInterval);
         }
 
         // Handle image update via FormData
@@ -248,7 +248,7 @@ class EquipmentController extends Controller
     private function processAndSaveImage($file)
     {
 
-        $manager = new ImageManager(new Driver());
+        $manager = new ImageManager(new Driver);
         $image = $manager->read($file);
 
         // Resize to max 1200px width, maintaining aspect ratio, preventing upsizing
@@ -258,11 +258,11 @@ class EquipmentController extends Controller
         $encoded = $image->toJpeg(quality: 75);
 
         // Generate filename
-        $filename = 'equipment/' . Str::random(40) . '.jpg';
+        $filename = 'equipment/'.Str::random(40).'.jpg';
 
         // Save to public disk
         Storage::disk('public')->put($filename, (string) $encoded);
 
-        return '/storage/' . $filename;
+        return '/storage/'.$filename;
     }
 }

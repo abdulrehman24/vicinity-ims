@@ -14,7 +14,9 @@ class StockTakeReminderMail extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public string $status;
+
     public int $days;
+
     public string $deadline;
 
     public function __construct(string $status, int $days, string $deadline)
@@ -26,9 +28,9 @@ class StockTakeReminderMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        $subject = $this->status === 'overdue' 
-            ? 'URGENT: Stock Take Overdue by ' . $this->days . ' Days'
-            : 'Upcoming Stock Take Reminder (' . $this->days . ' Days Left)';
+        $subject = $this->status === 'overdue'
+            ? 'URGENT: Stock Take Overdue by '.$this->days.' Days'
+            : 'Upcoming Stock Take Reminder ('.$this->days.' Days Left)';
 
         return new Envelope(
             subject: $subject,

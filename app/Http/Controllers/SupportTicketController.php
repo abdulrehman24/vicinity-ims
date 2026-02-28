@@ -129,8 +129,10 @@ class SupportTicketController extends Controller
             if ($supportAddress) {
                 $recipients[] = $supportAddress;
             } else {
-                 $fromAddress = config('mail.from.address');
-                 if ($fromAddress) $recipients[] = $fromAddress;
+                $fromAddress = config('mail.from.address');
+                if ($fromAddress) {
+                    $recipients[] = $fromAddress;
+                }
             }
 
             // Filter unique and valid emails

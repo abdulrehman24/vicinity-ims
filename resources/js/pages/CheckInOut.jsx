@@ -646,45 +646,47 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
                   return Object.entries(grouped)
                     .sort(([a], [b]) => a.toLowerCase().localeCompare(b.toLowerCase()))
                     .map(([category, entries]) => (
-                      <div key={category} className="space-y-2">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">
-                          {category}
-                        </div>
-                        <div className="grid grid-cols-1 gap-4">
-                          {entries.map(({ item, masterItem }) => {
-                            const maxAvail = masterItem
-                              ? getAvailableQty(masterItem, requestedDates, shift, editingBookingIdSet)
-                              : item.qty;
-                            return (
-                              <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                <div className="flex items-center space-x-3">
-                                  <img src={item.image} className="w-10 h-10 rounded-xl object-cover" alt="" />
-                                  <div>
-                                    <p className="text-xs font-bold text-[#4a5a67]">{item.name}</p>
-                                    {masterItem && masterItem.category && (
-                                      <p className="text-[9px] font-black uppercase opacity-50">{masterItem.category}</p>
-                                    )}
+                      <div key={category} className="space-y-3">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                            {category}
+                          </div>
+                          <div className="grid grid-cols-1 gap-4">
+                            {entries.map(({ item, masterItem }) => {
+                              const maxAvail = masterItem
+                                ? getAvailableQty(masterItem, requestedDates, shift, editingBookingIdSet)
+                                : item.qty;
+                              return (
+                                <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                  <div className="flex items-center space-x-4">
+                                    <div className="flex items-center space-x-3">
+                                      <span className="text-[10px] font-black text-gray-400 shrink-0">
+                                        {item.qty}x
+                                      </span>
+                                      <img src={item.image} className="w-10 h-10 rounded-xl object-cover" alt="" />
+                                      <div>
+                                        <p className="text-xs font-bold text-[#4a5a67] uppercase tracking-wide">{item.name}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-3 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
+                                      <button onClick={() => updateQty(item.id, -1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiMinus} /></button>
+                                      <span className="text-sm font-black text-[#4a5a67] w-4 text-center">{item.qty}</span>
+                                      <button onClick={() => updateQty(item.id, 1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiPlus} /></button>
+                                    </div>
+                                    <button 
+                                      onClick={() => removeItem(item.id)} 
+                                      className="p-2 text-gray-300 hover:text-red-400 transition-colors"
+                                      title="Remove Item"
+                                    >
+                                      <SafeIcon icon={FiTrash2} />
+                                    </button>
                                   </div>
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                  <div className="flex items-center space-x-3 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
-                                    <button onClick={() => updateQty(item.id, -1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiMinus} /></button>
-                                    <span className="text-sm font-black text-[#4a5a67] w-4 text-center">{item.qty}</span>
-                                    <button onClick={() => updateQty(item.id, 1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiPlus} /></button>
-                                  </div>
-                                  <button 
-                                    onClick={() => removeItem(item.id)} 
-                                    className="p-2 text-gray-300 hover:text-red-400 transition-colors"
-                                    title="Remove Item"
-                                  >
-                                    <SafeIcon icon={FiTrash2} />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
                     ));
                 })()}
               </div>
@@ -742,14 +744,12 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
   const [returnStates, setReturnStates] = useState({}); // { itemId: { isDamaged: bool, note: str } }
   const [selectedProjectKeys, setSelectedProjectKeys] = useState([]);
   const [deleteModal, setDeleteModal] = useState(null);
+  const [activeTab, setActiveTab] = useState('my_bookings'); // 'my_bookings' or 'my_collaborations'
 
   const projectKey = (project) => `${project.shootName}|${project.quotationNumber || ''}|${project.startDate}|${project.endDate}`;
 
   const visibleBookings = useMemo(() => {
     if (!user) return bookings;
-
-    const isAdmin = user.is_admin >= 1;
-    if (isAdmin) return bookings;
 
     const currentId = user.id;
     const currentEmail = user.email ? user.email.toLowerCase() : null;
@@ -775,9 +775,12 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
         });
       }
 
+      if (activeTab === 'my_bookings') return isOwner;
+      if (activeTab === 'my_collaborations') return isCollaborator;
+
       return isOwner || isCollaborator;
     });
-  }, [bookings, user]);
+  }, [bookings, user, activeTab]);
 
   const activeProjects = useMemo(() => {
     const projects = {};
@@ -793,7 +796,8 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
             bookingIds: new Set(),
             shift: b.shift, // Capture these
             collaborators: b.collaborators,
-            shootType: b.shoot_type || b.shootType
+            shootType: b.shoot_type || b.shootType,
+            remarks: b.remarks
         };
       }
       projects[key].bookingIds.add(b.id);
@@ -936,7 +940,23 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
       />
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       <div className="lg:col-span-4 space-y-4">
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Active Projects</label>
+        <div className="flex flex-col space-y-4 mb-2">
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Check In</label>
+          <div className="flex items-center space-x-2 bg-gray-100/50 p-1 rounded-xl w-full">
+            <button 
+              onClick={() => setActiveTab('my_bookings')}
+              className={`flex-1 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_bookings' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+            >
+              My Bookings
+            </button>
+            <button 
+              onClick={() => setActiveTab('my_collaborations')}
+              className={`flex-1 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_collaborations' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+            >
+              Collabs
+            </button>
+          </div>
+        </div>
         {activeProjects.map(p => {
           const isStarted = !p.startDate || !isBefore(startOfDay(new Date()), startOfDay(parseISO(p.startDate)));
           
@@ -1035,38 +1055,100 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
               <button onClick={() => setSelectedProjectKeys([])} className="p-2 hover:bg-white/10 rounded-full"><SafeIcon icon={FiX} /></button>
             </div>
 
-            <div className="p-8 flex-1 space-y-4">
-              {activeProjects.filter(p => selectedProjectKeys.includes(projectKey(p))).flatMap(p => p.items).map(item => (
-                <div key={`${item.id}-${item.bookingEquipmentId}`} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <img src={item.image} className="w-12 h-12 rounded-xl object-cover border border-white" alt="" />
-                      <div>
-                        <p className="text-sm font-bold text-[#4a5a67]">{item.name}</p>
-                        <p className="text-[9px] font-black text-gray-400 uppercase">{item.serialNumber}</p>
+            <div className="p-8 flex-1 space-y-8">
+              {(() => {
+                const selectedProjects = activeProjects.filter(p => selectedProjectKeys.includes(projectKey(p)));
+                
+                // Show remarks if only one project is selected
+                const firstProject = selectedProjects.length === 1 ? selectedProjects[0] : null;
+                
+                const allItems = selectedProjects.flatMap(p => p.items);
+                
+                // Group by category
+                const grouped = {};
+                allItems.forEach(item => {
+                  const cat = item.category || 'Uncategorized';
+                  if (!grouped[cat]) grouped[cat] = [];
+                  grouped[cat].push(item);
+                });
+
+                return (
+                  <>
+                    {firstProject && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                        <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">User</div>
+                          <div className="text-xs font-black text-[#4a5a67] mt-1">{firstProject.user?.name || firstProject.user || 'Operations Team'}</div>
+                        </div>
+                        <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Collaborators</div>
+                          <div className="text-xs font-black text-[#4a5a67] mt-1">
+                            {Array.isArray(firstProject.collaborators) && firstProject.collaborators.length > 0
+                              ? firstProject.collaborators
+                                  .map((c) => (typeof c === 'string' ? c : c.email))
+                                  .filter(Boolean)
+                                  .join(', ')
+                              : 'None'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {firstProject && firstProject.remarks && (
+                      <div className="p-6 bg-white rounded-2xl border border-gray-100 mb-2">
+                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                          Remarks
+                        </div>
+                        <p className="text-xs text-[#4a5a67] whitespace-pre-wrap leading-relaxed">
+                          {firstProject.remarks}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="p-6 bg-white rounded-2xl border border-gray-100">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6">
+                        Equipment List
+                      </div>
+                      <div className="space-y-8">
+                        {Object.entries(grouped)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([category, items]) => (
+                            <div key={category} className="space-y-4">
+                              <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 border-b border-gray-50 pb-1">
+                                {category}
+                              </div>
+                              <div className="grid grid-cols-1 gap-4">
+                                {items.map(item => (
+                                  <div key={`${item.id}-${item.bookingEquipmentId}`} className="flex items-center justify-between group">
+                                    <div className="flex items-center space-x-4">
+                                      <div className="flex items-center space-x-3">
+                                        <span className="text-[10px] font-black text-gray-400 shrink-0 w-6">
+                                          {item.quantity || 1}x
+                                        </span>
+                                        <img src={item.image} className="w-10 h-10 rounded-xl object-cover border border-gray-100" alt="" />
+                                        <div>
+                                          <p className="text-xs font-bold text-[#4a5a67] uppercase tracking-wide">{item.name}</p>
+                                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{item.serialNumber}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <button 
+                                      onClick={() => toggleDamage(item.id)}
+                                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${returnStates[item.id]?.isDamaged ? 'bg-red-500 text-white shadow-lg' : 'bg-gray-50 text-gray-400 border border-transparent hover:border-red-500 hover:text-red-500 hover:bg-white'}`}
+                                    >
+                                      <SafeIcon icon={FiAlertTriangle} />
+                                      <span>{returnStates[item.id]?.isDamaged ? 'Issue Reported' : 'Report Issue'}</span>
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
                       </div>
                     </div>
-                    <button 
-                      onClick={() => toggleDamage(item.id)}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${returnStates[item.id]?.isDamaged ? 'bg-red-500 text-white shadow-lg' : 'bg-white text-gray-400 border border-gray-100 hover:border-red-500 hover:text-red-500'}`}
-                    >
-                      <SafeIcon icon={FiAlertTriangle} />
-                      <span>{returnStates[item.id]?.isDamaged ? 'Issue Reported' : 'Report Issue'}</span>
-                    </button>
-                  </div>
-                  
-                  {returnStates[item.id]?.isDamaged && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="pt-2">
-                      <textarea 
-                        placeholder="Describe the malfunction or damage..."
-                        value={returnStates[item.id]?.note || ''}
-                        onChange={(e) => updateNote(item.id, e.target.value)}
-                        className="w-full bg-white p-3 rounded-xl border border-red-100 text-xs font-bold outline-none h-20 resize-none"
-                      />
-                    </motion.div>
-                  )}
-                </div>
-              ))}
+                  </>
+                );
+              })()}
             </div>
 
             <div className="p-8 bg-gray-50 border-t border-gray-100">

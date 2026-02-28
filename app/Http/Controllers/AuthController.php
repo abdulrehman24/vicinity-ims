@@ -119,7 +119,7 @@ class AuthController extends Controller
 
     private function processAndSaveAvatar($file)
     {
-        $manager = new ImageManager(new Driver());
+        $manager = new ImageManager(new Driver);
         $image = $manager->read($file);
 
         // Resize to max 500px width/height for avatar
@@ -129,12 +129,12 @@ class AuthController extends Controller
         $encoded = $image->toJpeg(quality: 80);
 
         // Generate filename
-        $filename = 'avatars/' . Str::random(40) . '.jpg';
+        $filename = 'avatars/'.Str::random(40).'.jpg';
 
         // Save to public disk
         Storage::disk('public')->put($filename, (string) $encoded);
 
-        return '/storage/' . $filename;
+        return '/storage/'.$filename;
     }
 
     public function changePassword(Request $request)

@@ -333,14 +333,14 @@ class BookingController extends Controller
         ]);
 
         $booking = Booking::findOrFail($id);
-        
+
         $updateData = [
             'project_title' => $validated['shootName'],
             'quotation_number' => $validated['quotationNumber'],
         ];
 
         if ($request->has('collaborators')) {
-             $updateData['collaborators'] = $validated['collaborators'];
+            $updateData['collaborators'] = $validated['collaborators'];
         }
 
         $booking->update($updateData);
@@ -427,7 +427,7 @@ class BookingController extends Controller
                 'shift' => $validated['shift'] ?? 'Full Day',
                 'shoot_type' => $validated['shootType'] ?? 'Commercial',
                 'collaborators' => $validated['collaborators'] ?? [],
-            'remarks' => $validated['remarks'] ?? $booking->remarks,
+                'remarks' => $validated['remarks'] ?? $booking->remarks,
                 'status' => 'active',
             ]);
 
@@ -476,9 +476,9 @@ class BookingController extends Controller
     {
         $user = User::where('name', $validated['user'])->first();
         $userId = $user ? $user->id : (auth()->id() ?? 1); // Operations fallback
-        
+
         $bookings = [];
-        
+
         $startDate = min($validated['dates']);
         $endDate = max($validated['dates']);
 
@@ -488,7 +488,7 @@ class BookingController extends Controller
             : collect($validated['dates'])->sort()->values();
 
         $sendNotifications = $request->boolean('sendNotifications', true);
-        
+
         $booking = Booking::create([
             'user_id' => $userId,
             'project_title' => $validated['shootName'],
@@ -503,20 +503,20 @@ class BookingController extends Controller
         ]);
 
         foreach ($validated['items'] as $item) {
-             // For each item (qty), attach to booking_equipment
-             // If qty > 1, we attach multiple times? Or pivot has quantity?
-             // Looking at previous reads, there is a quantity field in pivot or just multiple rows?
-             // "totalBooked = relevantBookings.reduce((acc, curr) => acc + (curr.quantity || 1), 0);" 
-             // suggests pivot or booking has quantity.
-             
-             // Let's assume pivot has quantity or we create multiple rows.
-             // Standard pivot: booking_equipment (booking_id, equipment_id, status)
-             // If no quantity column in pivot, we insert N rows.
-             
-             // CORRECTION: The store() method uses 'quantity' column in pivot!
-             // And it uses 'equipmentId' key in item array.
-             // Let's align with store() logic exactly.
-             
+            // For each item (qty), attach to booking_equipment
+            // If qty > 1, we attach multiple times? Or pivot has quantity?
+            // Looking at previous reads, there is a quantity field in pivot or just multiple rows?
+            // "totalBooked = relevantBookings.reduce((acc, curr) => acc + (curr.quantity || 1), 0);"
+            // suggests pivot or booking has quantity.
+
+            // Let's assume pivot has quantity or we create multiple rows.
+            // Standard pivot: booking_equipment (booking_id, equipment_id, status)
+            // If no quantity column in pivot, we insert N rows.
+
+            // CORRECTION: The store() method uses 'quantity' column in pivot!
+            // And it uses 'equipmentId' key in item array.
+            // Let's align with store() logic exactly.
+
             DB::table('booking_equipment')->insert([
                 'booking_id' => $booking->id,
                 'equipment_id' => $item['equipmentId'], // 'id' from frontend replace payload, store uses 'equipmentId'
@@ -532,10 +532,10 @@ class BookingController extends Controller
                 $equipment->save();
             }
         }
-        
+
         // Replicate collaborator logic and email logic from store()
         // ... (truncated for brevity in thought, but must be included in code)
-        
+
         $booking->load(['equipments', 'user']);
 
         if (! empty($validated['collaborators'])) {
