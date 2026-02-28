@@ -182,7 +182,7 @@ function AdminUsers() {
             </select>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div>
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-100">
@@ -252,7 +252,7 @@ function AdminUsers() {
                       </button>
 
                       {openMenuId === user.id && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden text-left">
+                        <div className={`absolute right-0 ${users.indexOf(user) >= users.length - 2 && users.length > 2 ? 'bottom-full mb-2' : 'mt-2'} w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden text-left`}>
                           {!user.is_approved ? (
                             <button
                               onClick={() => handleStatusChange(user, true)}

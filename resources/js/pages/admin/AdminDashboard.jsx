@@ -141,14 +141,14 @@ function AdminDashboard() {
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
           <h3 className="text-lg font-bold text-[#4a5a67]">Recent Bookings</h3>
           <div className="p-2 bg-gray-50 rounded-lg text-gray-400">
             <SafeIcon icon={FiActivity} />
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div>
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs">
               <tr>

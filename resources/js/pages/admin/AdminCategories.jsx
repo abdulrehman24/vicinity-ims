@@ -163,7 +163,7 @@ function AdminCategories() {
             </select>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div>
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-100">
