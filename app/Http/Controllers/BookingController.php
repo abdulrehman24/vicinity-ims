@@ -119,10 +119,10 @@ class BookingController extends Controller
                         // Create new user for collaborator
                         $password = Str::random(10);
                         $user = User::create([
-                            'name' => 'Collaborator', // Or extract from email
+                            'name' => explode('@', $email)[0], // Use email prefix as temporary name
                             'email' => $email,
                             'password' => Hash::make($password),
-                            'is_approved' => true, // Auto-approve invited users
+                            'is_approved' => false, // MUST be approved by admin
                             'must_change_password' => true,
                             'expires_at' => $expiry,
                         ]);

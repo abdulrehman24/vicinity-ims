@@ -107,8 +107,9 @@ function AdminUsers() {
       const response = await axios.patch(`/api/admin/users/${user.id}/approve`, {
         is_approved: newStatus,
       });
+      const updatedUser = response.data;
       setUsers((current) =>
-        current.map((u) => (u.id === user.id ? { ...u, is_approved: newStatus } : u)),
+        current.map((u) => (u.id === user.id ? { ...u, is_approved: updatedUser.is_approved, expires_at: updatedUser.expires_at } : u)),
       );
       toast.success(`User ${user.email} ${newStatus ? 'activated' : 'deactivated'}`);
     } catch (e) {

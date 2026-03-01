@@ -47,7 +47,18 @@ class UserController extends Controller
             'is_approved' => ['required', 'boolean'],
         ]);
 
-        $user->update(['is_approved' => $data['is_approved']]);
+        $isApproved = $data['is_approved'];
+        $user->is_approved = $isApproved;
+
+        if ($isApproved) {
+            // If activating, clear expiry
+            $user->expires_at = null;
+        } else {
+            // If deactivating, set expiry to now
+            $user->expires_at = now();
+        }
+
+        $user->save();
 
         return response()->json([
             'id' => $user->id,
