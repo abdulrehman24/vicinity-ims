@@ -24,7 +24,8 @@ class CalendarController extends Controller
         $categories = \App\Models\Category::all()->pluck('sort_order', 'name')->toArray();
 
         $events = [];
-        $now = gmdate('Ymd\THis\Z');
+        // DTSTAMP should be current generation time in UTC
+        $dtStamp = gmdate('Ymd\THis\Z');
 
         foreach ($bookings as $booking) {
             // Ensure dates are valid
@@ -35,6 +36,10 @@ class CalendarController extends Controller
             try {
                 $startDate = $booking->start_date instanceof Carbon ? $booking->start_date : Carbon::parse($booking->start_date);
                 $endDate = $booking->end_date instanceof Carbon ? $booking->end_date : Carbon::parse($booking->end_date);
+                
+                // Creation and Modification timestamps in UTC
+                $createdUtc = $booking->created_at ? $booking->created_at->copy()->timezone('UTC')->format('Ymd\THis\Z') : $dtStamp;
+                $updatedUtc = $booking->updated_at ? $booking->updated_at->copy()->timezone('UTC')->format('Ymd\THis\Z') : $dtStamp;
             } catch (\Exception $e) {
                 continue;
             }
@@ -48,7 +53,7 @@ class CalendarController extends Controller
             $dtStartParam = 'VALUE=DATE:'.$startDateStr;
             $dtEndParam = 'VALUE=DATE:'.$endDateExclusiveStr;
 
-            // Format equipment as a list grouped and sorted by category
+            // ... grouping logic ...
             $equipmentGrouped = $booking->equipments->groupBy('category');
             
             $equipmentDisplay = "";
@@ -111,7 +116,9 @@ class CalendarController extends Controller
             $eventLines = [
                 'BEGIN:VEVENT',
                 'UID:'.$booking->id.'@ims.vicinity.sg',
-                'DTSTAMP:'.$now,
+                'DTSTAMP:'.$createdUtc, // DTSTAMP should reflect when the object was created
+                'CREATED:'.$createdUtc,
+                'LAST-MODIFIED:'.$updatedUtc,
                 'DTSTART;'.$dtStartParam,
                 'DTEND;'.$dtEndParam,
                 'SUMMARY:'.$summary,
@@ -136,7 +143,6 @@ class CalendarController extends Controller
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
             'X-WR-CALNAME:Vicinity Equipment Schedule',
-            'X-WR-TIMEZONE:UTC',
             'REFRESH-INTERVAL;VALUE=DURATION:PT5M',
             'X-PUBLISHED-TTL:PT5M',
         ];
