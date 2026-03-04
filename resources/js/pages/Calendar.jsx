@@ -5,15 +5,18 @@ import { useInventory } from '../context/InventoryContext';
 import { format, parseISO, isValid } from 'date-fns';
 import * as FiIcons from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
-const { FiCalendar, FiClock, FiUser, FiShare2, FiDownload, FiExternalLink, FiInfo, FiX, FiCopy, FiCheck } = FiIcons;
+const { FiCalendar, FiClock, FiUser, FiShare2, FiDownload, FiExternalLink, FiInfo, FiX, FiCopy, FiCheck, FiLayers, FiTrash2, FiPlus, FiSave } = FiIcons;
 
 function CalendarPage() {
-  const { bookings, equipment, categories: orderedCategories } = useInventory();
+  const { bookings, equipment, categories: orderedCategories, cancelBooking, fetchPersonalBundles } = useInventory();
+  const navigate = useNavigate();
   const categoryOrder = useMemo(() => 
     (orderedCategories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
     [orderedCategories]
@@ -22,9 +25,68 @@ function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Click event chip -> open full details (equipment list)
   const [selectedEvent, setSelectedEvent] = useState(null);
+
+  const handleDuplicate = (event) => {
+    // Transform event to a format CheckInOut can use
+    const duplicateData = {
+      projTitle: `${event.shootName} (Copy)`,
+      quote: event.quotationNumber,
+      remarks: event.remarks,
+      collaborators: event.collaborators,
+      items: (event.items || []).map(i => ({
+        id: i.id, // Using the ID directly from the item
+        qty: i.quantity
+      })).filter(i => i.id)
+    };
+
+    navigate('/', { state: { duplicateProject: duplicateData } });
+  };
+
+  const handleCancel = async (bookingId) => {
+    if (window.confirm('Are you sure you want to cancel this booking?')) {
+      setIsDeleting(true);
+      try {
+        await cancelBooking(bookingId);
+        setSelectedEvent(null);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
+  const handleSaveAsBundle = async (event) => {
+    const bundleName = window.prompt('Enter a name for this personal bundle:', event.shootName);
+    if (!bundleName) return;
+
+    try {
+      const items = (event.items || [])
+        .map(i => ({
+          equipment_id: i.id, // Using the ID directly from the item
+          quantity: i.quantity
+        }))
+        .filter(i => i.equipment_id);
+
+      if (items.length === 0) {
+        toast.error("No valid equipment found to save in bundle");
+        return;
+      }
+
+      await axios.post('/api/personal-bundles', {
+        name: bundleName,
+        items: items
+      });
+      
+      toast.success(`Bundle "${bundleName}" saved to your personal bundles`);
+      fetchPersonalBundles();
+    } catch (error) {
+      console.error("Failed to save bundle", error);
+      toast.error(error.response?.data?.message || "Failed to save personal bundle");
+    }
+  };
 
   // "+X more" modal (show all day bookings)
   const [moreModal, setMoreModal] = useState({ open: false, date: null, events: [] });
@@ -174,7 +236,12 @@ function CalendarPage() {
 
       const key = `${eqCategory}||${eqName}`;
       if (!agg.itemsMap.has(key)) {
-        agg.itemsMap.set(key, { name: eqName, quantity: 0, category: eqCategory });
+        agg.itemsMap.set(key, { 
+          id: b.equipmentId, // Keep original ID for reliable duplication
+          name: eqName, 
+          quantity: 0, 
+          category: eqCategory 
+        });
       }
       const entry = agg.itemsMap.get(key);
       entry.quantity += qty;
@@ -614,6 +681,34 @@ function CalendarPage() {
                         </div>
                       ))}
                   </div>
+                </div>
+
+                {/* Booking Actions */}
+                <div className="pt-4 border-t border-gray-100 flex flex-col space-y-3">
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => handleDuplicate(selectedEvent)}
+                      className="flex-1 flex items-center justify-center space-x-2 py-3 bg-[#4a5a67] text-[#ebc1b6] rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:shadow-lg transition-all"
+                    >
+                      <SafeIcon icon={FiPlus} />
+                      <span>Duplicate List</span>
+                    </button>
+                    <button
+                      onClick={() => handleSaveAsBundle(selectedEvent)}
+                      className="flex-1 flex items-center justify-center space-x-2 py-3 bg-[#ebc1b6] text-[#4a5a67] rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:shadow-lg transition-all"
+                    >
+                      <SafeIcon icon={FiSave} />
+                      <span>Save as Bundle</span>
+                    </button>
+                  </div>
+                  <button
+                    disabled={isDeleting}
+                    onClick={() => handleCancel(selectedEvent.bookingId)}
+                    className="w-full flex items-center justify-center space-x-2 py-3 border-2 border-red-100 text-red-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-50 hover:border-red-200 transition-all disabled:opacity-50"
+                  >
+                    <SafeIcon icon={FiTrash2} />
+                    <span>{isDeleting ? 'Cancelling...' : 'Cancel Booking'}</span>
+                  </button>
                 </div>
               </div>
             </motion.div>

@@ -26,6 +26,7 @@ function CheckInOut() {
   const [projectToEdit, setProjectToEdit] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [initialSelectedKeys, setInitialSelectedKeys] = useState([]);
+  const [duplicateProjectData, setDuplicateProjectData] = useState(null);
   const location = useLocation();
 
   const overdueBookings = useMemo(() => {
@@ -183,6 +184,11 @@ function CheckInOut() {
       if (isAdmin || isOwnerByName || (currentEmail && collaboratorEmails.has(currentEmail))) {
         handleEditRequest(project);
       }
+    } else if (location.state?.duplicateProject) {
+      setDuplicateProjectData(location.state.duplicateProject);
+      setActiveTab('in');
+      // Clear location state safely
+      window.history.replaceState({}, document.title);
     }
   }, [location.state, user]);
 
@@ -272,6 +278,8 @@ function CheckInOut() {
             categories={categories}
             onConfirm={handleManualOutConfirm}
             editingProject={projectToEdit}
+            duplicateProject={duplicateProjectData}
+            onUsedDuplicate={() => setDuplicateProjectData(null)}
             onCancelEdit={() => {
               setProjectToEdit(null);
               setActiveTab('out');
@@ -319,7 +327,7 @@ const groupDates = (dates) => {
   return groups;
 };
 
-function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, editingProject, onCancelEdit, collaboratorSuggestions }) {
+function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, editingProject, duplicateProject, onUsedDuplicate, onCancelEdit, collaboratorSuggestions }) {
   const { personalBundles, fetchPersonalBundles } = useInventory();
   const [selectedItems, setSelectedItems] = useState([]); // Array of {id, qty}
 
@@ -344,7 +352,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
     [editingProject]
   );
 
-  // Pre-fill form if editing
+  // Pre-fill form if editing or duplicating
   React.useEffect(() => {
     if (editingProject) {
         setFormData({
@@ -401,8 +409,38 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
 
         setSelectedItems(aggregatedItems);
         setCollaborators(editingProject.collaborators || []);
+    } else if (duplicateProject) {
+        setFormData({
+            projTitle: duplicateProject.projTitle || '',
+            quote: duplicateProject.quote || '',
+            shootType: duplicateProject.shootType || 'Commercial',
+            remarks: duplicateProject.remarks || ''
+        });
+        setCollaborators(duplicateProject.collaborators || []);
+        
+        // Populate items for duplication
+        const items = (duplicateProject.items || []).map(i => {
+            const eq = equipment.find(e => e.id === i.id);
+            if (eq) {
+                return {
+                    id: eq.id,
+                    qty: i.qty,
+                    name: eq.name,
+                    image: eq.image
+                };
+            }
+            return i;
+        });
+        setSelectedItems(items);
+        
+        // Reset dates for duplication
+        setSelectedDates([]);
+        setShift('Full Day');
+
+        // Mark as used to prevent re-triggering
+        if (onUsedDuplicate) onUsedDuplicate();
     }
-  }, [editingProject]);
+  }, [editingProject, duplicateProject]);
 
 
   // 1. Availability Logic for Multi-Unit & Shifts
