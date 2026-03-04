@@ -13,9 +13,9 @@ createRoot(document.getElementById('root')).render(
         position="top-right"
         toastOptions={{
           duration: 4000,
+          // Remove global background to allow custom toasts to handle their own styling
           style: {
-            background: '#1f2937',
-            color: '#f9fafb',
+            borderRadius: '1rem',
           },
         }}
       />

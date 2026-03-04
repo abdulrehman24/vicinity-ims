@@ -9,6 +9,7 @@ const initialState = {
   equipment: [],
   categories: [],
   bundles: [],
+  personalBundles: [],
   bookings: [],
   records: [],
   stockTakes: [],
@@ -44,6 +45,8 @@ function inventoryReducer(state, action) {
       return { ...state, bookings: action.payload };
     case 'SET_BUNDLES':
       return { ...state, bundles: action.payload };
+    case 'SET_PERSONAL_BUNDLES':
+      return { ...state, personalBundles: action.payload };
     case 'ADD_BOOKING':
       return { ...state, bookings: [...state.bookings, action.payload] };
     case 'UPDATE_BOOKING_STATUS':
@@ -81,6 +84,7 @@ export function InventoryProvider({ children, user }) {
     fetchCategories();
     fetchBookings();
     fetchBundles();
+    fetchPersonalBundles();
   }, []);
 
   useEffect(() => {
@@ -168,6 +172,15 @@ export function InventoryProvider({ children, user }) {
       dispatch({ type: 'SET_BUNDLES', payload: response.data });
     } catch (error) {
       console.error("Failed to fetch bundles", error);
+    }
+  };
+
+  const fetchPersonalBundles = async () => {
+    try {
+      const response = await axios.get('/api/personal-bundles');
+      dispatch({ type: 'SET_PERSONAL_BUNDLES', payload: response.data });
+    } catch (error) {
+      console.error("Failed to fetch personal bundles", error);
     }
   };
 
@@ -374,6 +387,7 @@ export function InventoryProvider({ children, user }) {
         toggleAdmin,
         addStockTake,
         fetchBundles,
+        fetchPersonalBundles,
         fetchEquipmentLogs
     }}>
       {children}

@@ -16,7 +16,11 @@ const {
 } = FiIcons;
 
 function Records() {
-  const { bookings, equipment, cancelBooking, batchCancel, user } = useInventory();
+  const { bookings, equipment, cancelBooking, batchCancel, user, categories: orderedCategories } = useInventory();
+  const categoryOrder = useMemo(() => 
+    (orderedCategories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
+    [orderedCategories]
+  );
   const [view, setView] = useState('list'); // 'list' or 'calendar'
   const [activeTab, setActiveTab] = useState('my_bookings'); // 'my_bookings' or 'my_collaborations'
   const [searchTerm, setSearchTerm] = useState('');
@@ -536,7 +540,7 @@ function Records() {
                                         return acc;
                                       }, {})
                                     )
-                                    .sort(([catA], [catB]) => catA.toLowerCase().localeCompare(catB.toLowerCase()))
+                                    .sort(([catA], [catB]) => (categoryOrder[catA] ?? 999) - (categoryOrder[catB] ?? 999))
                                     .map(([category, items]) => (
                                       <div key={category} className="space-y-0.5">
                                         <div className="text-[8px] font-black uppercase tracking-widest text-white/40">

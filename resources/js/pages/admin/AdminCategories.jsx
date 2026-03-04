@@ -3,8 +3,9 @@ import axios from 'axios';
 import SafeIcon from '../../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import { Reorder, useDragControls } from 'framer-motion';
 
-const { FiPlus, FiTrash2, FiEdit2 } = FiIcons;
+const { FiPlus, FiTrash2, FiEdit2, FiMenu } = FiIcons;
 
 function AdminCategories() {
   const [categories, setCategories] = useState([]);
@@ -109,6 +110,24 @@ function AdminCategories() {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+  const handleReorder = async (newOrder) => {
+    // Optimistically update local state
+    setCategories(newOrder);
+    
+    try {
+      await axios.post('/api/admin/categories/reorder', {
+        order: newOrder.map(c => c.id)
+      });
+      toast.success('Order updated');
+    } catch (e) {
+      toast.error('Failed to update order');
+      loadCategories(); // Rollback
+    }
+  };
+
+  const isSearching = search.trim().length > 0;
+  const canReorder = !isSearching && categories.length > 1;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -167,6 +186,7 @@ function AdminCategories() {
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-100">
+                <th className="py-3 px-3 w-10"></th>
                 <th className="py-3 px-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   Name
                 </th>
@@ -178,9 +198,31 @@ function AdminCategories() {
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <Reorder.Group 
+              axis="y" 
+              values={categories} 
+              onReorder={handleReorder} 
+              as="tbody"
+            >
               {categories.map((category) => (
-                <tr key={category.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                <Reorder.Item 
+                  key={category.id} 
+                  value={category} 
+                  as="tr" 
+                  dragListener={canReorder}
+                  className={`border-b border-gray-50 hover:bg-gray-50/50 transition-colors ${canReorder ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                >
+                  <td className="py-3 px-3 align-top">
+                    {canReorder ? (
+                      <div className="p-2 text-gray-300">
+                        <SafeIcon icon={FiMenu} className="text-sm" />
+                      </div>
+                    ) : (
+                      <div className="p-2 text-gray-100">
+                         <SafeIcon icon={FiMenu} className="text-sm opacity-20" />
+                      </div>
+                    )}
+                  </td>
                   <td className="py-3 px-3 align-top">
                     <p className="text-sm font-bold text-[#4a5a67]">{category.name}</p>
                   </td>
@@ -210,16 +252,16 @@ function AdminCategories() {
                       </button>
                     </div>
                   </td>
-                </tr>
+                </Reorder.Item>
               ))}
               {!loading && categories.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="py-6 text-center text-xs text-gray-400">
+                  <td colSpan={4} className="py-6 text-center text-xs text-gray-400">
                     No categories yet. Use the Add Category button to create one.
                   </td>
                 </tr>
               )}
-            </tbody>
+            </Reorder.Group>
           </table>
         </div>
         <div className="mt-4 flex items-center justify-between text-xs text-gray-500">

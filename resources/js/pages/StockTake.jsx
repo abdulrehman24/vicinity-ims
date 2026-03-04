@@ -12,7 +12,11 @@ import imageCompression from 'browser-image-compression';
 const { FiUpload, FiCamera, FiCheck, FiX, FiSave, FiImage, FiMapPin, FiInfo, FiLayers, FiShield, FiLock, FiClock, FiAlertCircle, FiSearch, FiFilter } = FiIcons;
 
 function StockTake() {
-  const { equipment, stockTakes, addStockTake, updateEquipment, updateLocalEquipment, isAdmin } = useInventory();
+  const { equipment, stockTakes, addStockTake, updateEquipment, updateLocalEquipment, isAdmin, categories: orderedCategories } = useInventory();
+  const categoryOrder = useMemo(() => 
+    (orderedCategories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
+    [orderedCategories]
+  );
   const [selectedEquipment, setSelectedEquipment] = useState([]);
   const [stockTakeData, setStockTakeData] = useState({});
   const [uploadedImages, setUploadedImages] = useState({});
@@ -104,8 +108,8 @@ function StockTake() {
   // Get all unique categories for filter
   const allCategories = useMemo(() => {
     const cats = new Set(equipment.map(item => item.category || 'Uncategorized'));
-    return ['All', ...Array.from(cats).sort()];
-  }, [equipment]);
+    return ['All', ...Array.from(cats).sort((a, b) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))];
+  }, [equipment, categoryOrder]);
 
   // Group items by category
   const groupedSidebarItems = useMemo(() => {
@@ -124,11 +128,13 @@ function StockTake() {
       groups[cat].push(item);
     });
 
-    return Object.keys(groups).sort().map(category => ({
-      category,
-      items: groups[category]
-    }));
-  }, [sidebarItems, selectedCategory]);
+    return Object.keys(groups)
+      .sort((a, b) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))
+      .map(category => ({
+        category,
+        items: groups[category]
+      }));
+  }, [sidebarItems, selectedCategory, categoryOrder]);
 
   // Audit Reminder Logic
   const auditStatus = useMemo(() => {

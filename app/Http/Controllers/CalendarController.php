@@ -36,23 +36,40 @@ class CalendarController extends Controller
                 continue;
             }
 
-            // Format dates as Ymd
+            // Format dates for iCal
+            // All-day events in iCal use VALUE=DATE and the end date is EXCLUSIVE (end date + 1 day)
             $startDateStr = $startDate->format('Ymd');
-            $endDateStr = $endDate->format('Ymd');
+            $endDateExclusiveStr = $endDate->copy()->addDay()->format('Ymd');
 
-            // Default times: 09:00 to 18:00 UTC
-            // Using literal strings to ensure no formatting issues
-            $dtStart = $startDateStr.'T090000Z';
-            $dtEnd = $endDateStr.'T180000Z';
+            $dtStart = 'VALUE=DATE:'.$startDateStr;
+            $dtEnd = 'VALUE=DATE:'.$endDateExclusiveStr;
 
-            // Format equipment as a list
-            $equipmentList = $booking->equipments->pluck('name')->map(function ($name) {
-                return "- {$name}";
-            })->join("\n");
+            // Format equipment as a list grouped and sorted by category
+            $equipmentGrouped = $booking->equipments->groupBy('category');
+            
+            // Get categories with their sort order for sorting the groups
+            $categories = \App\Models\Category::all()->pluck('sort_order', 'name')->toArray();
+            
+            $equipmentDisplay = "";
+            $sortedCategories = $equipmentGrouped->keys()->sort(function($a, $b) use ($categories) {
+                $orderA = $categories[$a] ?? 999;
+                $orderB = $categories[$b] ?? 999;
+                if ($orderA === $orderB) return strcmp($a, $b);
+                return $orderA <=> $orderB;
+            });
 
-            $equipmentDisplay = $booking->equipments->isEmpty()
-                ? 'None'
-                : "\n".$equipmentList;
+            foreach ($sortedCategories as $cat) {
+                $items = $equipmentGrouped->get($cat);
+                $equipmentDisplay .= "\n[" . strtoupper($cat) . "]\n";
+                foreach ($items as $item) {
+                    $qty = $item->pivot->quantity ?? 1;
+                    $equipmentDisplay .= "- {$qty}x {$item->name}\n";
+                }
+            }
+
+            if ($booking->equipments->isEmpty()) {
+                $equipmentDisplay = 'None';
+            }
 
             $userName = $booking->user ? $booking->user->name : 'Unknown User';
             $projectTitle = $booking->project_title ?? $booking->shoot_type ?? 'Untitled Project';

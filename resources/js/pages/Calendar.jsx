@@ -13,7 +13,11 @@ import interactionPlugin from '@fullcalendar/interaction';
 const { FiCalendar, FiClock, FiUser, FiShare2, FiDownload, FiExternalLink, FiInfo, FiX, FiCopy, FiCheck } = FiIcons;
 
 function CalendarPage() {
-  const { bookings, equipment } = useInventory();
+  const { bookings, equipment, categories: orderedCategories } = useInventory();
+  const categoryOrder = useMemo(() => 
+    (orderedCategories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
+    [orderedCategories]
+  );
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showSyncModal, setShowSyncModal] = useState(false);
@@ -382,7 +386,7 @@ function CalendarPage() {
                             return acc;
                           }, {})
                         )
-                          .sort(([a], [b]) => a.localeCompare(b))
+                          .sort(([a], [b]) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))
                           .map(([category, items]) => (
                             <li key={category} className="space-y-1">
                               <div className="text-[8px] font-black uppercase tracking-widest text-white/40">
@@ -586,7 +590,7 @@ function CalendarPage() {
                         return acc;
                       }, {})
                     )
-                      .sort(([a], [b]) => a.localeCompare(b))
+                      .sort(([a], [b]) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))
                       .map(([category, items]) => (
                         <div key={category}>
                           <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">

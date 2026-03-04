@@ -46,6 +46,7 @@ class CategoryController extends Controller
         $total = $query->count();
 
         $categories = $query
+            ->orderBy('sort_order')
             ->orderBy('name')
             ->skip(($page - 1) * $length)
             ->take($length)
@@ -72,6 +73,7 @@ class CategoryController extends Controller
             'slug' => Str::slug($validated['name']),
             'description' => $validated['description'] ?? null,
             'is_active' => $validated['is_active'] ?? true,
+            'sort_order' => Category::max('sort_order') + 1,
         ]);
 
         return response()->json([
@@ -107,6 +109,23 @@ class CategoryController extends Controller
 
         return response()->json([
             'message' => 'Category deleted',
+        ]);
+    }
+
+    public function reorder(Request $request)
+    {
+        $this->ensureSuperAdmin();
+        $request->validate([
+            'order' => ['required', 'array'],
+            'order.*' => ['required', 'exists:categories,id'],
+        ]);
+
+        foreach ($request->order as $index => $id) {
+            Category::where('id', $id)->update(['sort_order' => $index]);
+        }
+
+        return response()->json([
+            'message' => 'Categories reordered',
         ]);
     }
 }

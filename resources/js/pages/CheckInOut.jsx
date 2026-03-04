@@ -13,15 +13,120 @@ import ConfirmationModal from '../components/ConfirmationModal';
 const { 
   FiZap, FiLogIn, FiLogOut, FiPackage, FiBox, FiCalendar, FiClock,
   FiCheck, FiX, FiAlertTriangle, FiInfo, FiLayers, FiSearch, FiChevronRight,
-  FiPlus, FiMinus, FiFileText, FiCheckSquare, FiSquare, FiTrash2, FiEdit2
+  FiPlus, FiMinus, FiFileText, FiCheckSquare, FiSquare, FiTrash2, FiEdit2, FiUser
 } = FiIcons;
 
 function CheckInOut() {
   const { equipment, bookings, bundles, categories, checkOutEquipment, batchCheckIn, isAdmin, replaceBooking, user } = useInventory();
+  const categoryOrder = useMemo(() => 
+    (categories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
+    [categories]
+  );
   const [activeTab, setActiveTab] = useState('in');
   const [projectToEdit, setProjectToEdit] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [initialSelectedKeys, setInitialSelectedKeys] = useState([]);
   const location = useLocation();
+
+  const overdueBookings = useMemo(() => {
+    if (!user) return [];
+    const today = startOfDay(new Date());
+    const currentId = user.id;
+    const currentEmail = user.email ? user.email.toLowerCase() : null;
+
+    return bookings.filter(b => {
+      if (b.status !== 'active' || !b.endDate) return false;
+      const end = parseISO(b.endDate);
+      if (!isBefore(end, today)) return false;
+
+      // Filter by user visibility (same logic as GroupReturnView)
+      let isOwner = b.user?.id === currentId || (typeof b.user === 'string' && b.user === user.name);
+      let isCollaborator = Array.isArray(b.collaborators) && currentEmail && b.collaborators.some(c => 
+        (typeof c === 'string' ? c.toLowerCase() : c?.email?.toLowerCase()) === currentEmail
+      );
+      
+      return isOwner || isCollaborator;
+    });
+  }, [bookings, user]);
+
+  useEffect(() => {
+    if (overdueBookings.length > 0 && activeTab === 'in' && !projectToEdit) {
+      const projects = {};
+      overdueBookings.forEach(b => {
+        const key = `${b.shootName}|${b.quotationNumber || ''}|${b.startDate}|${b.endDate}`;
+        if (!projects[key]) projects[key] = { name: b.shootName, key };
+      });
+
+      const keys = Object.keys(projects);
+      const names = Object.values(projects).map(p => p.name);
+
+      toast.custom((t) => (
+        <div className={`flex flex-col w-[340px] bg-[#4a5a67]/95 backdrop-blur-xl rounded-[2.5rem] shadow-[0_40px_80px_-15px_rgba(0,0,0,0.3)] border border-white/10 overflow-hidden transform transition-all duration-500 ease-out ${t.visible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-8 scale-95 opacity-0'}`}>
+          <div className="relative p-6 pb-0 flex flex-col items-center text-center">
+             <div className="absolute top-4 right-6">
+                <button onClick={() => toast.dismiss(t.id)} className="text-white/20 hover:text-white/60 transition-colors">
+                  <SafeIcon icon={FiX} className="text-sm" />
+                </button>
+             </div>
+
+             <div className="relative mb-4">
+                <div className="absolute inset-0 bg-red-500/20 rounded-full animate-ping opacity-40" />
+                <div className="relative w-12 h-12 bg-red-500 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,0.4)] transform -rotate-12">
+                   <SafeIcon icon={FiAlertTriangle} className="text-xl text-white" />
+                </div>
+             </div>
+
+             <p className="text-[10px] font-black text-[#ebc1b6] uppercase tracking-[0.3em] mb-1">Critical Action Required</p>
+             <h4 className="text-lg font-black text-white leading-tight">
+                {names.length} Project{names.length > 1 ? 's' : ''} Overdue
+             </h4>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            <div className="flex flex-wrap justify-center gap-2">
+              {names.slice(0, 3).map((name, i) => (
+                <div key={i} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl">
+                  <p className="text-[10px] font-bold text-white/70 uppercase tracking-wider truncate max-w-[120px]">
+                    {name}
+                  </p>
+                </div>
+              ))}
+              {names.length > 3 && (
+                <div className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl">
+                  <p className="text-[10px] font-bold text-[#ebc1b6] uppercase tracking-wider">
+                    +{names.length - 3} more
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col space-y-2">
+              <button
+                onClick={() => {
+                  setInitialSelectedKeys(keys);
+                  setActiveTab('out');
+                  toast.dismiss(t.id);
+                }}
+                className="w-full py-4 bg-[#ebc1b6] text-[#4a5a67] rounded-2xl text-[11px] font-black uppercase tracking-[0.25em] shadow-[0_10px_20px_-5px_rgba(235,193,182,0.3)] hover:shadow-[0_15px_30px_-5px_rgba(235,193,182,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+              >
+                Process Returns Now
+              </button>
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="w-full py-3 text-white/40 hover:text-white/80 text-[10px] font-black uppercase tracking-widest transition-colors duration-300"
+              >
+                Dismiss for later
+              </button>
+            </div>
+          </div>
+        </div>
+      ), {
+        duration: 15000,
+        id: 'overdue-checkin-prompt',
+        position: 'top-center'
+      });
+    }
+  }, [overdueBookings, activeTab, projectToEdit]);
 
   const collaboratorSuggestions = useMemo(() => {
     const map = new Map();
@@ -141,6 +246,7 @@ function CheckInOut() {
           onClick={() => {
             setActiveTab('in');
             setProjectToEdit(null); // Reset if manually switching
+            setInitialSelectedKeys([]); // Reset pre-selection when switching to Check Out
           }} 
           icon={FiLogIn} 
           label={projectToEdit ? "Edit Booking" : "Check Out"} 
@@ -177,8 +283,12 @@ function CheckInOut() {
             key="out" 
             equipment={equipment} 
             bookings={bookings} 
-            onConfirm={batchCheckIn}
+            onConfirm={(payload) => {
+              batchCheckIn(payload);
+              setInitialSelectedKeys([]); // Clear pre-selection after success
+            }}
             onEditRequest={handleEditRequest} 
+            initialSelectedKeys={initialSelectedKeys}
           />
         )}
       </AnimatePresence>
@@ -210,7 +320,18 @@ const groupDates = (dates) => {
 };
 
 function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, editingProject, onCancelEdit, collaboratorSuggestions }) {
+  const { personalBundles, fetchPersonalBundles } = useInventory();
   const [selectedItems, setSelectedItems] = useState([]); // Array of {id, qty}
+
+  const categoryOrder = React.useMemo(() => 
+    (categories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
+    [categories]
+  );
+
+  useEffect(() => {
+    fetchPersonalBundles();
+  }, [fetchPersonalBundles]);
+
   const [selectedDates, setSelectedDates] = useState([]);
   const [shift, setShift] = useState('Full Day');
   const [formData, setFormData] = useState({ projTitle: '', quote: '', shootType: 'Commercial', remarks: '' });
@@ -393,6 +514,59 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
     }
   };
 
+  const handleAddPersonalBundle = (bundleId) => {
+    if (!bundleId) return;
+    const bundle = personalBundles?.find(b => b.id === parseInt(bundleId));
+    if (!bundle) return;
+
+    const newItems = [...selectedItems];
+    let addedCount = 0;
+    let unavailableCount = 0;
+
+    bundle.items.forEach(bItem => {
+        const item = equipment.find(e => e.id === bItem.equipment_id);
+        if (!item) return;
+
+        // Skip if maintenance or decommissioned
+        if (item.status === 'maintenance' || item.status === 'decommissioned') {
+            unavailableCount++;
+            return;
+        }
+
+        const avail = getAvailableQty(item, requestedDates, shift, editingBookingIdSet);
+        const existingItemIndex = newItems.findIndex(i => i.id === item.id);
+        const currentQty = existingItemIndex >= 0 ? newItems[existingItemIndex].qty : 0;
+        
+        // Calculate how many we can add
+        const needed = bItem.quantity;
+        const canAdd = Math.min(needed, avail - currentQty);
+
+        if (canAdd > 0) {
+            if (existingItemIndex >= 0) {
+                newItems[existingItemIndex].qty += canAdd;
+            } else {
+                newItems.push({ id: item.id, qty: canAdd, name: item.name, image: item.image });
+            }
+            addedCount++;
+            if (canAdd < needed) unavailableCount++;
+        } else {
+            unavailableCount++;
+        }
+    });
+
+    setSelectedItems(newItems);
+    
+    if (unavailableCount > 0) {
+        toast((t) => (
+            <span>
+                Added partial personal bundle. <b>{unavailableCount} items</b> were unavailable or insufficient stock.
+            </span>
+        ), { icon: '⚠️' });
+    } else if (addedCount > 0) {
+        toast.success(`Personal bundle "${bundle.name}" added!`);
+    }
+  };
+
   const updateQty = (id, delta, max) => {
     setSelectedItems(prev => prev.map(i => {
       if (i.id === id) {
@@ -472,32 +646,34 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
       {/* Sidebar: Selection */}
-      <div className="lg:col-span-4 space-y-6">
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+      <div className="lg:col-span-4 space-y-6 order-2 lg:order-1">
+        <div className="bg-white p-5 lg:p-6 rounded-3xl border border-gray-100 shadow-sm">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 block">1. Set Schedule</label>
-          <div className="flex bg-gray-100 p-1 rounded-xl mb-4">
+          <div className="flex bg-gray-100 p-1 rounded-xl mb-4 overflow-x-auto no-scrollbar">
             {['Full Day', 'AM', 'PM'].map(s => (
-              <button key={s} onClick={() => setShift(s)} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${shift === s ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400'}`}>
+              <button key={s} onClick={() => setShift(s)} className={`flex-1 min-w-[60px] py-2 rounded-lg text-[9px] font-black uppercase transition-all ${shift === s ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400'}`}>
                 {s}
               </button>
             ))}
           </div>
-          <Calendar
-            onClickDay={handleDayClick}
-            value={null}
-            className="mini-calendar"
-            tileClassName={({ date }) => 
-              selectedDates.some(d => isSameDay(d, date)) ? 'react-calendar__tile--active' : null
-            }
-          />
+          <div className="overflow-x-auto">
+            <Calendar
+              onClickDay={handleDayClick}
+              value={null}
+              className="mini-calendar mx-auto"
+              tileClassName={({ date }) => 
+                selectedDates.some(d => isSameDay(d, date)) ? 'react-calendar__tile--active' : null
+              }
+            />
+          </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+        <div className="bg-white p-5 lg:p-6 rounded-3xl border border-gray-100 shadow-sm">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 block">2. Select Equipment</label>
           <div className="space-y-3">
-             {/* Bundles Dropdown */}
+             {/* Bundles Dropdowns */}
             {bundles && bundles.length > 0 && (
                 <div className="relative">
                     <SafeIcon icon={FiPackage} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
@@ -515,6 +691,25 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
                     </select>
                 </div>
             )}
+
+            {personalBundles?.length > 0 && (
+                <div className="relative">
+                    <SafeIcon icon={FiUser} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                    <select
+                        onChange={(e) => {
+                            handleAddPersonalBundle(e.target.value);
+                            e.target.value = ""; // Reset
+                        }}
+                        className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67]"
+                    >
+                        <option value="">Personal Bundles...</option>
+                        {personalBundles.map(b => (
+                            <option key={b.id} value={b.id}>{b.name} ({b.items?.length || 0} items)</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
             <div className="relative">
               <SafeIcon icon={FiSearch} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
               <input
@@ -556,8 +751,8 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
                     <div className="flex items-center space-x-3">
                       <img src={item.image} className="w-8 h-8 rounded-lg object-cover" alt="" />
                       <div>
-                        <p className="text-[11px] font-bold">{item.name}</p>
-                        <p className="text-[8px] font-black uppercase opacity-50">{avail} Available</p>
+                        <p className="text-[11px] font-bold leading-tight">{item.name}</p>
+                        <p className="text-[8px] font-black uppercase opacity-50 mt-0.5">{avail} Available</p>
                       </div>
                     </div>
                     <SafeIcon icon={isSelected ? FiCheckSquare : FiSquare} className="text-sm" />
@@ -575,21 +770,21 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
       </div>
 
       {/* Main Form */}
-      <div className="lg:col-span-8 space-y-6">
-        <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-          <div className="bg-[#4a5a67] p-8 text-white">
-            <h2 className="text-xl font-bold">Checkout Confirmation</h2>
+      <div className="lg:col-span-8 space-y-6 order-1 lg:order-2">
+        <div className="bg-white rounded-[2rem] lg:rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-[#4a5a67] p-6 lg:p-8 text-white">
+            <h2 className="text-lg lg:text-xl font-bold">Checkout Confirmation</h2>
             <p className="text-[10px] font-black text-[#ebc1b6] uppercase tracking-[0.2em] mt-1">Allocation Details</p>
           </div>
-          <div className="p-8 space-y-8">
-            <div className="grid grid-cols-2 gap-6">
+          <div className="p-5 lg:p-8 space-y-6 lg:space-y-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
               <InputGroup label="Project Title">
                 <input value={formData.projTitle} onChange={e => setFormData({...formData, projTitle: e.target.value})} className="w-full bg-gray-50 p-4 rounded-2xl focus:bg-white border border-transparent focus:border-[#ebc1b6] outline-none font-bold text-sm" placeholder="Pepsi Summer '24" />
               </InputGroup>
               <InputGroup label="Quotation #">
                 <input value={formData.quote} onChange={e => setFormData({...formData, quote: e.target.value})} className="w-full bg-gray-50 p-4 rounded-2xl focus:bg-white border border-transparent focus:border-[#ebc1b6] outline-none font-bold text-sm" placeholder="QT-102" />
               </InputGroup>
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <InputGroup label="Booking Dates">
                   <div className="w-full bg-gray-50 p-3 rounded-2xl border border-transparent text-xs font-bold text-[#4a5a67] min-h-[48px]">
                     {requestedDates.length === 0 ? (
@@ -608,7 +803,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
                               className="flex items-center space-x-2 bg-white/70 px-3 py-1 rounded-full border border-white shadow-sm"
                             >
                               <SafeIcon icon={FiCalendar} className="text-[10px] text-[#4a5a67]" />
-                              <span>{label}</span>
+                              <span className="text-[10px]">{label}</span>
                             </div>
                           );
                         })}
@@ -644,35 +839,33 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
                   });
 
                   return Object.entries(grouped)
-                    .sort(([a], [b]) => a.toLowerCase().localeCompare(b.toLowerCase()))
+                    .sort(([a], [b]) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))
                     .map(([category, entries]) => (
                       <div key={category} className="space-y-3">
                           <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">
                             {category}
                           </div>
-                          <div className="grid grid-cols-1 gap-4">
+                          <div className="grid grid-cols-1 gap-3 lg:gap-4">
                             {entries.map(({ item, masterItem }) => {
                               const maxAvail = masterItem
                                 ? getAvailableQty(masterItem, requestedDates, shift, editingBookingIdSet)
                                 : item.qty;
                               return (
-                                <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                  <div className="flex items-center space-x-4">
-                                    <div className="flex items-center space-x-3">
-                                      <span className="text-[10px] font-black text-gray-400 shrink-0">
-                                        {item.qty}x
-                                      </span>
-                                      <img src={item.image} className="w-10 h-10 rounded-xl object-cover" alt="" />
-                                      <div>
-                                        <p className="text-xs font-bold text-[#4a5a67] uppercase tracking-wide">{item.name}</p>
-                                      </div>
+                                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100 gap-4">
+                                  <div className="flex items-center space-x-3">
+                                    <span className="text-[10px] font-black text-gray-400 shrink-0">
+                                      {item.qty}x
+                                    </span>
+                                    <img src={item.image} className="w-10 h-10 rounded-xl object-cover" alt="" />
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-bold text-[#4a5a67] uppercase tracking-wide truncate">{item.name}</p>
                                     </div>
                                   </div>
-                                  <div className="flex items-center space-x-2">
-                                    <div className="flex items-center space-x-3 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
-                                      <button onClick={() => updateQty(item.id, -1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiMinus} /></button>
-                                      <span className="text-sm font-black text-[#4a5a67] w-4 text-center">{item.qty}</span>
-                                      <button onClick={() => updateQty(item.id, 1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67]"><SafeIcon icon={FiPlus} /></button>
+                                  <div className="flex items-center justify-between sm:justify-end space-x-4">
+                                    <div className="flex items-center space-x-4 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
+                                      <button onClick={() => updateQty(item.id, -1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67] p-1"><SafeIcon icon={FiMinus} /></button>
+                                      <span className="text-sm font-black text-[#4a5a67] w-6 text-center">{item.qty}</span>
+                                      <button onClick={() => updateQty(item.id, 1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67] p-1"><SafeIcon icon={FiPlus} /></button>
                                     </div>
                                     <button 
                                       onClick={() => removeItem(item.id)} 
@@ -739,12 +932,43 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
   );
 }
 
-function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
+function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initialSelectedKeys = [] }) {
   const { cancelBooking, user } = useInventory();
   const [returnStates, setReturnStates] = useState({}); // { itemId: { isDamaged: bool, note: str } }
-  const [selectedProjectKeys, setSelectedProjectKeys] = useState([]);
+  const [selectedProjectKeys, setSelectedProjectKeys] = useState(initialSelectedKeys);
   const [deleteModal, setDeleteModal] = useState(null);
   const [activeTab, setActiveTab] = useState('my_bookings'); // 'my_bookings' or 'my_collaborations'
+
+  // Update selection if parent changes it (e.g. clicking overdue toast)
+  useEffect(() => {
+    if (initialSelectedKeys && initialSelectedKeys.length > 0 && user) {
+      setSelectedProjectKeys(initialSelectedKeys);
+      
+      // Auto-switch internal tab if pre-selected projects aren't in current tab
+      const currentId = user.id;
+      const currentEmail = user.email?.toLowerCase();
+      
+      const preSelectedBookings = bookings.filter(b => {
+        const key = `${b.shootName}|${b.quotationNumber || ''}|${b.startDate}|${b.endDate}`;
+        return initialSelectedKeys.includes(key);
+      });
+
+      const hasOwner = preSelectedBookings.some(b => 
+        b.user?.id === currentId || (typeof b.user === 'string' && b.user === user.name)
+      );
+      const hasCollab = preSelectedBookings.some(b => 
+        Array.isArray(b.collaborators) && currentEmail && b.collaborators.some(c => 
+          (typeof c === 'string' ? c.toLowerCase() : c?.email?.toLowerCase()) === currentEmail
+        )
+      );
+
+      if (!hasOwner && hasCollab) {
+        setActiveTab('my_collaborations');
+      } else if (hasOwner && !hasCollab) {
+        setActiveTab('my_bookings');
+      }
+    }
+  }, [initialSelectedKeys, user, bookings]);
 
   const projectKey = (project) => `${project.shootName}|${project.quotationNumber || ''}|${project.startDate}|${project.endDate}`;
 
@@ -938,100 +1162,102 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
         confirmText="Yes, Cancel Booking"
         isDangerous={true}
       />
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
       <div className="lg:col-span-4 space-y-4">
         <div className="flex flex-col space-y-4 mb-2">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Check In</label>
-          <div className="flex items-center space-x-2 bg-gray-100/50 p-1 rounded-xl w-full">
+          <div className="flex items-center space-x-2 bg-gray-100/50 p-1 rounded-xl w-full overflow-x-auto no-scrollbar">
             <button 
               onClick={() => setActiveTab('my_bookings')}
-              className={`flex-1 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_bookings' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+              className={`flex-1 min-w-[100px] px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_bookings' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
             >
               My Bookings
             </button>
             <button 
               onClick={() => setActiveTab('my_collaborations')}
-              className={`flex-1 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_collaborations' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+              className={`flex-1 min-w-[100px] px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_collaborations' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
             >
               Collabs
             </button>
           </div>
         </div>
-        {activeProjects.map(p => {
-          const isStarted = !p.startDate || !isBefore(startOfDay(new Date()), startOfDay(parseISO(p.startDate)));
-          
-          return (
-          <div
-            key={projectKey(p)}
-            onClick={() => isStarted && toggleProjectSelection(p)}
-            className={`w-full text-left p-6 rounded-3xl border transition-all cursor-pointer group relative ${
-              selectedProjectKeys.includes(projectKey(p)) 
-                ? 'bg-[#4a5a67] text-white shadow-xl' 
-                : isStarted 
-                    ? 'bg-white border-gray-100 hover:border-[#ebc1b6]' 
-                    : 'bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed'
-              }`}
-            >
-            {!isStarted && (
-                <div className="absolute top-2 right-6 z-10">
-                    <span className="bg-gray-200 text-gray-500 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider">Future Booking</span>
-                </div>
-            )}
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-bold text-sm mb-1 pr-16">{p.shootName}</h3>
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-50">{p.quotationNumber}</p>
-              </div>
-              <div className="absolute top-6 right-6 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
-                    onClick={(e) => handleEditProject(p, e)}
-                    className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-white/20 text-white' : 'hover:bg-gray-100 text-gray-400'}`}
-                    title="Edit Booking"
-                >
-                    <SafeIcon icon={FiEdit2} />
-                </button>
-                <button 
-                    onClick={(e) => handleCancelProject(p, e)}
-                    className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-red-500/20 text-red-300' : 'hover:bg-red-50 text-red-400'}`}
-                    title="Cancel Booking"
-                >
-                    <SafeIcon icon={FiTrash2} />
-                </button>
-              </div>
-            </div>
-            <div className="flex items-center justify-between mt-4">
-              <div className="flex items-center space-x-2">
-                <div className="flex -space-x-2">
-                  {p.items.slice(0, 3).map(i => (
-                    <img
-                      key={i.id}
-                      src={i.image}
-                      className="w-6 h-6 rounded-full border-2 border-white object-cover"
-                    />
-                  ))}
-                </div>
-                <span className="text-[9px] font-bold opacity-60">+{p.items.length} items</span>
-              </div>
-              {p.startDate && p.endDate && (
-                <div className="flex items-center space-x-1 text-[#ebc1b6]">
-                  <SafeIcon icon={FiCalendar} className="text-[10px]" />
-                  <p className="text-[10px] font-bold">
-                    {format(parseISO(p.startDate), 'MMM d')} - {format(parseISO(p.endDate), 'MMM d')}
-                  </p>
-                </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4 overflow-y-auto lg:max-h-[70vh] pr-1 custom-scrollbar">
+          {activeProjects.map(p => {
+            const isStarted = !p.startDate || !isBefore(startOfDay(new Date()), startOfDay(parseISO(p.startDate)));
+            
+            return (
+            <div
+              key={projectKey(p)}
+              onClick={() => isStarted && toggleProjectSelection(p)}
+              className={`relative p-5 lg:p-6 rounded-[2rem] lg:rounded-3xl border transition-all cursor-pointer group ${
+                selectedProjectKeys.includes(projectKey(p)) 
+                  ? 'bg-[#4a5a67] text-white shadow-xl' 
+                  : isStarted 
+                      ? 'bg-white border-gray-100 hover:border-[#ebc1b6]' 
+                      : 'bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed'
+                }`}
+              >
+              {!isStarted && (
+                  <div className="absolute top-2 right-6 z-10">
+                      <span className="bg-gray-200 text-gray-500 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider">Future Booking</span>
+                  </div>
               )}
+              <div className="flex items-start justify-between">
+                <div className="min-w-0 pr-12">
+                  <h3 className="font-bold text-sm mb-1 truncate">{p.shootName}</h3>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-50">{p.quotationNumber}</p>
+                </div>
+                <div className="absolute top-6 right-6 flex space-x-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                  <button 
+                      onClick={(e) => handleEditProject(p, e)}
+                      className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-white/20 text-white' : 'hover:bg-gray-100 text-gray-400'}`}
+                      title="Edit Booking"
+                  >
+                      <SafeIcon icon={FiEdit2} />
+                  </button>
+                  <button 
+                      onClick={(e) => handleCancelProject(p, e)}
+                      className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-red-500/20 text-red-300' : 'hover:bg-red-50 text-red-400'}`}
+                      title="Cancel Booking"
+                  >
+                      <SafeIcon icon={FiTrash2} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center space-x-2">
+                  <div className="flex -space-x-2">
+                    {p.items.slice(0, 3).map(i => (
+                      <img
+                        key={i.id}
+                        src={i.image}
+                        className="w-6 h-6 rounded-full border-2 border-white object-cover"
+                      />
+                    ))}
+                  </div>
+                  <span className="text-[9px] font-bold opacity-60">+{p.items.length} items</span>
+                </div>
+                {p.startDate && p.endDate && (
+                  <div className="flex items-center space-x-1 text-[#ebc1b6]">
+                    <SafeIcon icon={FiCalendar} className="text-[10px]" />
+                    <p className="text-[10px] font-bold">
+                      {format(parseISO(p.startDate), 'MMM d')} - {format(parseISO(p.endDate), 'MMM d')}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       <div className="lg:col-span-8">
         {selectedProjectKeys.length > 0 ? (
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
-            <div className="bg-[#4a5a67] p-8 text-white flex justify-between items-center">
+          <div className="bg-white rounded-[2rem] lg:rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden min-h-[400px] lg:min-h-[500px] flex flex-col">
+            <div className="bg-[#4a5a67] p-6 lg:p-8 text-white flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold">
+                <h2 className="text-xl lg:text-2xl font-bold leading-tight pr-4">
                   {selectedProjectKeys.length === 1 
                     ? activeProjects.find(p => projectKey(p) === selectedProjectKeys[0])?.shootName 
                     : `Multiple Projects (${selectedProjectKeys.length})`}
@@ -1052,10 +1278,10 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
                    return null;
                 })()}
               </div>
-              <button onClick={() => setSelectedProjectKeys([])} className="p-2 hover:bg-white/10 rounded-full"><SafeIcon icon={FiX} /></button>
+              <button onClick={() => setSelectedProjectKeys([])} className="p-2 hover:bg-white/10 rounded-full shrink-0 self-start"><SafeIcon icon={FiX} /></button>
             </div>
 
-            <div className="p-8 flex-1 space-y-8">
+            <div className="p-5 lg:p-8 flex-1 space-y-6 lg:space-y-8">
               {(() => {
                 const selectedProjects = activeProjects.filter(p => selectedProjectKeys.includes(projectKey(p)));
                 
@@ -1075,14 +1301,14 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
                 return (
                   <>
                     {firstProject && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
-                        <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4 mb-2">
+                        <div className="p-4 lg:p-5 bg-white rounded-2xl border border-gray-100">
                           <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">User</div>
-                          <div className="text-xs font-black text-[#4a5a67] mt-1">{firstProject.user?.name || firstProject.user || 'Operations Team'}</div>
+                          <div className="text-xs font-black text-[#4a5a67] mt-1 truncate">{firstProject.user?.name || firstProject.user || 'Operations Team'}</div>
                         </div>
-                        <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                        <div className="p-4 lg:p-5 bg-white rounded-2xl border border-gray-100">
                           <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Collaborators</div>
-                          <div className="text-xs font-black text-[#4a5a67] mt-1">
+                          <div className="text-xs font-black text-[#4a5a67] mt-1 truncate">
                             {Array.isArray(firstProject.collaborators) && firstProject.collaborators.length > 0
                               ? firstProject.collaborators
                                   .map((c) => (typeof c === 'string' ? c : c.email))
@@ -1095,7 +1321,7 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
                     )}
 
                     {firstProject && firstProject.remarks && (
-                      <div className="p-6 bg-white rounded-2xl border border-gray-100 mb-2">
+                      <div className="p-5 lg:p-6 bg-white rounded-2xl border border-gray-100 mb-2">
                         <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">
                           Remarks
                         </div>
@@ -1105,13 +1331,13 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
                       </div>
                     )}
 
-                    <div className="p-6 bg-white rounded-2xl border border-gray-100">
+                    <div className="p-5 lg:p-6 bg-white rounded-2xl border border-gray-100">
                       <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6">
                         Equipment List
                       </div>
-                      <div className="space-y-8">
+                      <div className="space-y-6 lg:space-y-8">
                         {Object.entries(grouped)
-                          .sort(([a], [b]) => a.localeCompare(b))
+                          .sort(([a], [b]) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))
                           .map(([category, items]) => (
                             <div key={category} className="space-y-4">
                               <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 border-b border-gray-50 pb-1">
@@ -1119,22 +1345,20 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
                               </div>
                               <div className="grid grid-cols-1 gap-4">
                                 {items.map(item => (
-                                  <div key={`${item.id}-${item.bookingEquipmentId}`} className="flex items-center justify-between group">
-                                    <div className="flex items-center space-x-4">
-                                      <div className="flex items-center space-x-3">
-                                        <span className="text-[10px] font-black text-gray-400 shrink-0 w-6">
-                                          {item.quantity || 1}x
-                                        </span>
-                                        <img src={item.image} className="w-10 h-10 rounded-xl object-cover border border-gray-100" alt="" />
-                                        <div>
-                                          <p className="text-xs font-bold text-[#4a5a67] uppercase tracking-wide">{item.name}</p>
-                                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{item.serialNumber}</p>
-                                        </div>
+                                  <div key={`${item.id}-${item.bookingEquipmentId}`} className="flex flex-col sm:flex-row sm:items-center justify-between group gap-4">
+                                    <div className="flex items-center space-x-3">
+                                      <span className="text-[10px] font-black text-gray-400 shrink-0 w-6">
+                                        {item.quantity || 1}x
+                                      </span>
+                                      <img src={item.image} className="w-10 h-10 rounded-xl object-cover border border-gray-100" alt="" />
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-bold text-[#4a5a67] uppercase tracking-wide truncate">{item.name}</p>
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5 truncate">{item.serialNumber}</p>
                                       </div>
                                     </div>
                                     <button 
                                       onClick={() => toggleDamage(item.id)}
-                                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${returnStates[item.id]?.isDamaged ? 'bg-red-500 text-white shadow-lg' : 'bg-gray-50 text-gray-400 border border-transparent hover:border-red-500 hover:text-red-500 hover:bg-white'}`}
+                                      className={`flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all sm:w-auto w-full ${returnStates[item.id]?.isDamaged ? 'bg-red-500 text-white shadow-lg' : 'bg-gray-50 text-gray-400 border border-transparent hover:border-red-500 hover:text-red-500 hover:bg-white'}`}
                                     >
                                       <SafeIcon icon={FiAlertTriangle} />
                                       <span>{returnStates[item.id]?.isDamaged ? 'Issue Reported' : 'Report Issue'}</span>
@@ -1151,7 +1375,7 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
               })()}
             </div>
 
-            <div className="p-8 bg-gray-50 border-t border-gray-100">
+            <div className="p-6 lg:p-8 bg-gray-50 border-t border-gray-100">
               <div className="flex items-center space-x-3 text-blue-500 bg-blue-50 p-4 rounded-2xl border border-blue-100 mb-6">
                 <SafeIcon icon={FiInfo} />
                 <p className="text-[10px] font-bold leading-relaxed italic">
@@ -1160,14 +1384,14 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest }) {
               </div>
               <button 
                 onClick={handleBatchReturn}
-                className="w-full py-5 bg-[#4a5a67] text-[#ebc1b6] rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-lg hover:shadow-xl transition-all"
+                className="w-full py-5 bg-[#4a5a67] text-[#ebc1b6] rounded-2xl lg:rounded-[1.5rem] font-black text-[11px] lg:text-xs uppercase tracking-[0.2em] shadow-lg hover:shadow-xl transition-all"
               >
                 Complete Return ({activeProjects.filter(p => selectedProjectKeys.includes(projectKey(p))).reduce((acc, p) => acc + p.items.length, 0)} Items)
               </button>
             </div>
           </div>
         ) : (
-          <div className="h-[500px] border-2 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center text-center p-12 bg-white">
+          <div className="h-[400px] lg:h-[500px] border-2 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center text-center p-8 lg:p-12 bg-white">
             <SafeIcon icon={FiLayers} className="text-5xl text-gray-200 mb-4" />
             <h3 className="text-lg font-bold text-[#4a5a67]">Batch Return Management</h3>
             <p className="text-xs text-gray-400 max-w-xs leading-relaxed mt-2">Select active projects from the list to begin the return inspection process.</p>

@@ -82,6 +82,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/change-password', [AuthController::class, 'changePassword']);
     Route::post('/profile/update', [AuthController::class, 'updateProfile']);
     Route::get('/api/bundles', [BundleController::class, 'index']);
+    Route::apiResource('/api/personal-bundles', App\Http\Controllers\PersonalBundleController::class);
     Route::get('/equipment/{equipment}/logs', [EquipmentLogController::class, 'index']);
     Route::get('/stock-takes', [App\Http\Controllers\StockTakeController::class, 'index']);
     Route::post('/stock-takes', [App\Http\Controllers\StockTakeController::class, 'store']);
@@ -93,6 +94,7 @@ Route::get('/api/login-settings', [SettingController::class, 'publicLoginSetting
 
 Route::middleware(['auth'])->prefix('api/admin')->group(function () {
     Route::get('/categories', [CategoryController::class, 'index']);
+    Route::post('/categories/reorder', [CategoryController::class, 'reorder']);
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::post('/categories', [CategoryController::class, 'store']);
     Route::put('/categories/{category}', [CategoryController::class, 'update']);
