@@ -9,3 +9,71 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* React Calendar Dark Mode Overrides */
+.dark .react-calendar,
+.dark .react-calendar *,
+.dark .react-calendar__viewContainer,
+.dark .react-calendar__month-view,
+.dark .react-calendar__month-view > div,
+.dark .react-calendar__month-view > div > div {
+    background: transparent !important;
+    background-color: transparent !important;
+    border-color: #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+.dark .react-calendar {
+    width: 350px !important;
+    max-width: 100% !important;
+    border: 1px solid #334155 !important;
+    font-family: 'Arial', 'Helvetica', sans-serif !important;
+    line-height: 1.125em !important;
+}
+
+.dark .react-calendar__navigation {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+.dark .react-calendar__navigation button {
+    color: #f1f5f9 !important;
+}
+
+.dark .react-calendar__navigation button:enabled:hover,
+.dark .react-calendar__navigation button:enabled:focus {
+    background-color: #334155 !important;
+}
+
+.dark .react-calendar__month-view__weekdays__weekday {
+    color: #475569 !important;
+}
+
+.dark .react-calendar__tile {
+    color: #cbd5e1 !important;
+}
+
+.dark .react-calendar__tile:enabled:hover,
+.dark .react-calendar__tile:enabled:focus {
+    background-color: #1e293b !important;
+    color: #ebc1b6 !important;
+}
+
+.dark .react-calendar__tile--active {
+    background: #ebc1b6 !important;
+    color: #1e293b !important;
+}
+
+.dark .react-calendar__tile--now {
+    background: #ebc1b622 !important;
+    color: #f1f5f9 !important;
+}
+
+.dark .react-calendar__month-view__days__day--neighboringMonth {
+    color: #334155 !important;
+}
+
+.dark .react-calendar__tile:disabled {
+    background-color: transparent !important;
+    color: #334155 !important;
+}

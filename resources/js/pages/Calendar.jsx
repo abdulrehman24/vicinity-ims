@@ -300,28 +300,52 @@ function CalendarPage() {
   }, [bookingBars, selectedDate]);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="p-8 max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-[95%] mx-auto px-4 py-8 lg:py-12 space-y-8">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
         <div>
-          <h1 className="text-4xl font-black text-[#4a5a67] uppercase tracking-tight mb-2">Schedule</h1>
-          <div className="w-12 h-1 bg-[#ebc1b6] rounded-full" />
+          <h1 className="text-4xl lg:text-5xl font-black text-[#4a5a67] dark:text-white uppercase tracking-tighter leading-none mb-3 transition-colors">
+            FLEET<br />SCHEDULE
+          </h1>
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-1.5 bg-[#ebc1b6] rounded-full" />
+            <p className="text-[10px] font-black text-gray-600 dark:text-gray-400 uppercase tracking-[0.3em]">Deployment Timeline</p>
+          </div>
         </div>
-        <div className="flex items-center space-x-3">
-          <button
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <button 
             onClick={() => setShowSyncModal(true)}
-            className="flex items-center space-x-2 px-6 py-3 bg-[#4a5a67] text-[#ebc1b6] rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:shadow-xl hover:scale-105 transition-all"
+            className="group flex items-center space-x-3 px-6 py-4 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-[1.5rem] shadow-sm hover:shadow-md transition-all"
           >
-            <SafeIcon icon={FiShare2} />
-            <span>Sync to External</span>
+            <div className="w-8 h-8 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <SafeIcon icon={FiShare2} className="text-blue-500 text-sm" />
+            </div>
+            <div className="text-left">
+              <p className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase leading-none mb-1">Calendar Sync</p>
+              <p className="text-[11px] font-bold text-[#4a5a67] dark:text-[#ebc1b6]">Google / Outlook</p>
+            </div>
+          </button>
+
+          <button 
+            onClick={() => navigate('/')}
+            className="group flex items-center space-x-3 px-6 py-4 bg-[#4a5a67] dark:bg-slate-900 rounded-[1.5rem] shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
+            <div className="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center group-hover:rotate-12 transition-transform">
+              <SafeIcon icon={FiCalendar} className="text-[#ebc1b6] text-sm" />
+            </div>
+            <div className="text-left">
+              <p className="text-[9px] font-black text-white/60 uppercase leading-none mb-1">New Request</p>
+              <p className="text-[11px] font-bold text-[#ebc1b6]">Book Equipment</p>
+            </div>
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Calendar Main */}
-        <div className="lg:col-span-9">
-          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-6 md:p-8">
+        {/* Main Calendar Section */}
+        <div className="lg:col-span-8">
+          <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden p-6 lg:p-10 transition-colors">
             <div className="fc-wrap">
               <FullCalendar
                 plugins={[dayGridPlugin, interactionPlugin]}
@@ -388,118 +412,110 @@ function CalendarPage() {
         </div>
 
         {/* Sidebar Info */}
-        <div className="lg:col-span-3 space-y-6">
-          <div className="bg-[#4a5a67] rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#ebc1b6] opacity-5 rounded-full -mr-16 -mt-16" />
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ebc1b6] mb-4">
-              {format(selectedDate, 'EEEE, MMMM do')}
-            </h3>
+        <div className="lg:col-span-4 space-y-6">
+          <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden transition-colors">
+            <div className="p-8">
+              <h4 className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6 ml-1">
+                {format(selectedDate, 'EEEE, MMMM do')}
+              </h4>
 
-            <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-              {selectedDateBars.length > 0 ? (
-                selectedDateBars.map((b) => (
-                  <button
-                    key={String(b.bookingId)}
-                    type="button"
-                    className="w-full text-left bg-white/5 p-4 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors"
-                    onClick={() => {
-                      setSelectedEvent({
-                        bookingId: b.bookingId,
-                        shootName: b.shootName,
-                        quotationNumber: b.quotationNumber,
-                        userName: b.userName,
-                        createdAt: b.createdAt,
-                        items: b.items,
-                        remarks: b.remarks,
-                        collaborators: b.collaborators,
-                        start: dateOnlyStr(b.start),
-                        endInclusive: dateOnlyStr(b.endInclusive),
-                      });
-                    }}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="text-xs font-bold text-[#ebc1b6] mb-1">{b.shootName}</p>
-                        {b.quotationNumber && <p className="text-[10px] font-medium text-white/60">{b.quotationNumber}</p>}
-                      </div>
-                      <span className="px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest bg-[#ebc1b6] text-[#4a5a67]">
-                        OUT
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col space-y-1 mb-3">
-                      <div className="flex items-center space-x-2 text-[9px] text-white/40">
-                        <SafeIcon icon={FiUser} />
-                        <span>{b.userName}</span>
-                      </div>
-                      {b.createdAt && (
-                        <div className="flex items-center space-x-2 text-[9px] text-white/40">
-                          <SafeIcon icon={FiClock} />
-                          <span>Booked: {format(new Date(b.createdAt), 'MMM d, HH:mm')}</span>
+              <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
+                {selectedDateBars.length > 0 ? (
+                  selectedDateBars.map((b) => (
+                    <button
+                      key={String(b.bookingId)}
+                      type="button"
+                      className="w-full text-left p-6 bg-[#4a5a67] dark:bg-slate-900 rounded-[2rem] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md"
+                      onClick={() => {
+                        setSelectedEvent({
+                          bookingId: b.bookingId,
+                          shootName: b.shootName,
+                          quotationNumber: b.quotationNumber,
+                          userName: b.userName,
+                          createdAt: b.createdAt,
+                          items: b.items,
+                          remarks: b.remarks,
+                          collaborators: b.collaborators,
+                          start: dateOnlyStr(b.start),
+                          endInclusive: dateOnlyStr(b.endInclusive),
+                        });
+                      }}
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#ebc1b6]" />
+                          <span className="text-[9px] font-black text-[#ebc1b6] uppercase tracking-widest">Active Now</span>
                         </div>
-                      )}
-                    </div>
+                        <SafeIcon icon={FiExternalLink} className="text-white/40 text-xs" />
+                      </div>
 
-                    <div className="border-t border-white/10 pt-3">
-                      <p className="text-[9px] font-bold text-white/60 mb-2">
-                        {b.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} Items
-                      </p>
-                      <ul className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                        {Object.entries(
-                          b.items.reduce((acc, item) => {
-                            const category = item.category || 'Uncategorized';
-                            if (!acc[category]) acc[category] = [];
-                            acc[category].push(item);
-                            return acc;
-                          }, {})
-                        )
-                          .sort(([a], [b]) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))
-                          .map(([category, items]) => (
-                            <li key={category} className="space-y-1">
-                              <div className="text-[8px] font-black uppercase tracking-widest text-white/40">
-                                {category}
-                              </div>
-                              {items
-                                .slice()
-                                .sort((a, b) => a.name.localeCompare(b.name))
-                                .map((item, idx) => (
-                                  <div
-                                    key={`${category}-${item.name}-${idx}`}
-                                    className="text-[9px] text-white/40 truncate flex items-center space-x-2"
-                                  >
-                                    <span className="w-5 shrink-0 opacity-60">
-                                      {item.quantity || 1}x
-                                    </span>
-                                    <span className="uppercase tracking-tight font-medium">
-                                      {item.name}
-                                    </span>
-                                  </div>
-                                ))}
-                            </li>
-                          ))}
-                      </ul>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="text-center py-12 opacity-30">
-                  <SafeIcon icon={FiCalendar} className="text-4xl mx-auto mb-4" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">No deployments</p>
-                </div>
-              )}
+                      <h5 className="text-white font-bold text-sm leading-tight mb-1 truncate">{b.shootName}</h5>
+                      <div className="flex items-center space-x-2 text-white/60 mb-6">
+                        <SafeIcon icon={FiUser} className="text-[10px]" />
+                        <span className="text-[10px] font-bold">{b.userName}</span>
+                      </div>
+
+                      <div className="pt-6 border-t border-white/10">
+                        <p className="text-[9px] font-bold text-white/60 mb-3 uppercase tracking-wider">
+                          {b.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} Items
+                        </p>
+                        <ul className="space-y-4">
+                          {Object.entries(
+                            b.items.reduce((acc, item) => {
+                              const category = item.category || 'Uncategorized';
+                              if (!acc[category]) acc[category] = [];
+                              acc[category].push(item);
+                              return acc;
+                            }, {})
+                          )
+                            .sort(([a], [b]) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))
+                            .map(([category, items]) => (
+                              <li key={category} className="space-y-1">
+                                <div className="text-[8px] font-black uppercase tracking-widest text-white/60">
+                                  {category}
+                                </div>
+                                {items
+                                  .slice()
+                                  .sort((a, b) => a.name.localeCompare(b.name))
+                                  .map((item, idx) => (
+                                    <div
+                                      key={`${category}-${item.name}-${idx}`}
+                                      className="text-[9px] text-white/60 truncate flex items-center space-x-2"
+                                    >
+                                      <span className="w-5 shrink-0 opacity-80">
+                                        {item.quantity || 1}x
+                                      </span>
+                                      <span className="uppercase tracking-tight font-bold">
+                                        {item.name}
+                                      </span>
+                                    </div>
+                                  ))}
+                              </li>
+                            ))}
+                        </ul>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="text-center py-12 opacity-50 dark:opacity-40">
+                    <SafeIcon icon={FiCalendar} className="text-4xl mx-auto mb-4 dark:text-gray-300" />
+                    <p className="text-[10px] font-black uppercase tracking-widest dark:text-gray-300">No deployments</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm">
-            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 ml-1">Fleet Overview</h4>
+          <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 border border-gray-100 dark:border-slate-700 shadow-sm transition-colors">
+            <h4 className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4 ml-1">Fleet Overview</h4>
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-50 rounded-2xl">
-                <p className="text-[9px] font-black text-gray-400 uppercase">Active Bookings</p>
-                <p className="text-2xl font-black text-[#4a5a67]">{activeBookingCount}</p>
+              <div className="p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl transition-colors">
+                <p className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase">Active Bookings</p>
+                <p className="text-2xl font-black text-[#4a5a67] dark:text-[#ebc1b6]">{activeBookingCount}</p>
               </div>
-              <div className="p-4 bg-gray-50 rounded-2xl">
-                <p className="text-[9px] font-black text-gray-400 uppercase">Current Month</p>
-                <p className="text-2xl font-black text-[#4a5a67]">{currentMonthBookingCount}</p>
+              <div className="p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl transition-colors">
+                <p className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase">Current Month</p>
+                <p className="text-2xl font-black text-[#4a5a67] dark:text-[#ebc1b6]">{currentMonthBookingCount}</p>
               </div>
             </div>
           </div>
@@ -521,10 +537,10 @@ function CalendarPage() {
               initial={{ opacity: 0, scale: 0.96, y: 14 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 14 }}
-              className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="relative w-full max-w-lg bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-[#4a5a67] p-6 text-white relative">
+              <div className="bg-[#4a5a67] dark:bg-slate-900 p-6 text-white relative transition-colors">
                 <button
                   onClick={() => setMoreModal({ open: false, date: null, events: [] })}
                   className="absolute top-5 right-5 text-white/50 hover:text-white transition-colors"
@@ -547,22 +563,22 @@ function CalendarPage() {
                 {moreModal.events.map((ev) => (
                   <button
                     key={ev.id}
-                    className="w-full text-left p-4 rounded-2xl border border-gray-100 hover:bg-gray-50 transition-colors"
+                    className="w-full text-left p-4 rounded-2xl border border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
                     onClick={() => {
                       setMoreModal({ open: false, date: null, events: [] });
                       setSelectedDate(new Date(moreModal.date));
                       setSelectedEvent(ev.extendedProps);
                     }}
                   >
-                    <div className="text-xs font-black text-[#4a5a67] truncate">
+                    <div className="text-xs font-black text-[#4a5a67] dark:text-[#ebc1b6] truncate transition-colors">
                       {ev.title}
                     </div>
                     {ev.extendedProps?.quotationNumber && (
-                      <div className="text-[10px] font-bold text-gray-400 mt-0.5">
+                      <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mt-0.5 transition-colors">
                         {ev.extendedProps.quotationNumber}
                       </div>
                     )}
-                    <div className="text-[10px] font-bold text-gray-400 mt-1">
+                    <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mt-1 transition-colors">
                       {ev.extendedProps?.start}
                       {ev.extendedProps?.endInclusive ? ` → ${ev.extendedProps.endInclusive}` : ''}
                     </div>
@@ -589,10 +605,10 @@ function CalendarPage() {
               initial={{ opacity: 0, scale: 0.96, y: 14 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 14 }}
-              className="relative w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="relative w-full max-w-xl bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-[#4a5a67] p-6 text-white relative">
+              <div className="bg-[#4a5a67] dark:bg-slate-900 p-6 text-white relative transition-colors">
                 <button
                   onClick={() => setSelectedEvent(null)}
                   className="absolute top-5 right-5 text-white/50 hover:text-white transition-colors"
@@ -603,22 +619,22 @@ function CalendarPage() {
                   Booking Details
                 </div>
                 <div className="text-xl font-black mt-1">{selectedEvent.shootName}</div>
-                <div className="text-[10px] font-bold text-white/60 mt-1">
+                <div className="text-[10px] font-bold text-white/70 mt-1">
                   {selectedEvent.start}
                   {selectedEvent.endInclusive ? ` → ${selectedEvent.endInclusive}` : ''}
                   {selectedEvent.quotationNumber ? ` • ${selectedEvent.quotationNumber}` : ''}
                 </div>
               </div>
 
-              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto transition-colors">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-4 bg-gray-50 rounded-2xl">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">User</div>
-                    <div className="text-xs font-black text-[#4a5a67] mt-1">{selectedEvent.userName}</div>
+                  <div className="p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl transition-colors">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">User</div>
+                    <div className="text-xs font-black text-[#4a5a67] dark:text-[#ebc1b6] mt-1">{selectedEvent.userName}</div>
                   </div>
-                  <div className="p-4 bg-gray-50 rounded-2xl">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-400">Collaborators</div>
-                    <div className="text-xs font-black text-[#4a5a67] mt-1">
+                  <div className="p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl transition-colors">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Collaborators</div>
+                    <div className="text-xs font-black text-[#4a5a67] dark:text-[#ebc1b6] mt-1">
                       {Array.isArray(selectedEvent.collaborators) && selectedEvent.collaborators.length > 0
                         ? selectedEvent.collaborators
                             .map((c) => {
@@ -633,19 +649,19 @@ function CalendarPage() {
                   </div>
                 </div>
 
-                <div className="p-5 bg-white rounded-2xl border border-gray-100">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-700 transition-colors">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-3">
                     Remarks
                   </div>
-                  <div className="text-xs text-[#4a5a67] whitespace-pre-wrap">
+                  <div className="text-xs text-[#4a5a67] dark:text-gray-200 font-bold whitespace-pre-wrap">
                     {selectedEvent.remarks && String(selectedEvent.remarks).trim().length > 0
                       ? selectedEvent.remarks
                       : 'No remarks'}
                   </div>
                 </div>
 
-                <div className="p-5 bg-white rounded-2xl border border-gray-100">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-700 transition-colors">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-3">
                     Equipment List
                   </div>
                   <div className="space-y-3">
@@ -660,7 +676,7 @@ function CalendarPage() {
                       .sort(([a], [b]) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))
                       .map(([category, items]) => (
                         <div key={category}>
-                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">
                             {category}
                           </div>
                           <ul className="space-y-1">
@@ -669,10 +685,10 @@ function CalendarPage() {
                               .sort((a, b) => a.name.localeCompare(b.name))
                               .map((item, idx) => (
                                 <li key={`${category}-${item.name}-${idx}`} className="flex items-start gap-3">
-                                  <span className="text-[10px] font-black text-gray-400 shrink-0">
+                                  <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 shrink-0">
                                     {item.quantity > 1 ? `${item.quantity}x` : '1x'}
                                   </span>
-                                  <span className="text-xs font-bold text-[#4a5a67] truncate uppercase tracking-wide">
+                                  <span className="text-xs font-bold text-[#4a5a67] dark:text-[#ebc1b6] truncate uppercase tracking-wide">
                                     {item.name}
                                   </span>
                                 </li>
@@ -684,18 +700,18 @@ function CalendarPage() {
                 </div>
 
                 {/* Booking Actions */}
-                <div className="pt-4 border-t border-gray-100 flex flex-col space-y-3">
+                <div className="pt-4 border-t border-gray-100 dark:border-slate-700 flex flex-col space-y-3 transition-colors">
                   <div className="flex space-x-3">
                     <button
                       onClick={() => handleDuplicate(selectedEvent)}
-                      className="flex-1 flex items-center justify-center space-x-2 py-3 bg-[#4a5a67] text-[#ebc1b6] rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:shadow-lg transition-all"
+                      className="flex-1 flex items-center justify-center space-x-2 py-3 bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:shadow-lg transition-all"
                     >
                       <SafeIcon icon={FiPlus} />
                       <span>Duplicate List</span>
                     </button>
                     <button
                       onClick={() => handleSaveAsBundle(selectedEvent)}
-                      className="flex-1 flex items-center justify-center space-x-2 py-3 bg-[#ebc1b6] text-[#4a5a67] rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:shadow-lg transition-all"
+                      className="flex-1 flex items-center justify-center space-x-2 py-3 bg-[#ebc1b6] dark:bg-[#ebc1b6] text-[#4a5a67] dark:text-[#4a5a67] rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:shadow-lg transition-all"
                     >
                       <SafeIcon icon={FiSave} />
                       <span>Save as Bundle</span>
@@ -704,7 +720,7 @@ function CalendarPage() {
                   <button
                     disabled={isDeleting}
                     onClick={() => handleCancel(selectedEvent.bookingId)}
-                    className="w-full flex items-center justify-center space-x-2 py-3 border-2 border-red-100 text-red-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-50 hover:border-red-200 transition-all disabled:opacity-50"
+                    className="w-full flex items-center justify-center space-x-2 py-3 border-2 border-red-100 dark:border-red-900/30 text-red-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 transition-all disabled:opacity-50"
                   >
                     <SafeIcon icon={FiTrash2} />
                     <span>{isDeleting ? 'Cancelling...' : 'Cancel Booking'}</span>
@@ -742,7 +758,7 @@ function CalendarPage() {
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-[#4a5a67] mb-1">Live Subscription</h4>
-                    <p className="text-[10px] text-gray-500 leading-relaxed font-medium">
+                    <p className="text-[10px] text-gray-600 leading-relaxed font-bold">
                       Copy the URL below and subscribe in your calendar app (Google Calendar: "Add from URL"). This keeps your schedule automatically updated.
                     </p>
                   </div>
@@ -754,7 +770,7 @@ function CalendarPage() {
                       type="text"
                       readOnly
                       value={feedUrl}
-                      className="flex-1 bg-transparent text-[10px] font-mono text-gray-600 focus:outline-none px-2"
+                      className="flex-1 bg-transparent text-[10px] font-mono text-gray-700 font-bold focus:outline-none px-2"
                     />
                     <button
                       onClick={handleCopyUrl}
@@ -825,6 +841,10 @@ function CalendarPage() {
           color: #4a5a67;
         }
 
+        .dark .fc-wrap .fc .fc-toolbar-title {
+          color: #f1f5f9;
+        }
+
         .fc-wrap .fc .fc-button {
           background: transparent;
           border: 0;
@@ -837,8 +857,17 @@ function CalendarPage() {
           border-radius: 0.9rem;
         }
 
+        .dark .fc-wrap .fc .fc-button {
+          color: #f1f5f9;
+        }
+
         .fc-wrap .fc .fc-button:hover {
           background: #f8fafc;
+          color: #ebc1b6;
+        }
+
+        .dark .fc-wrap .fc .fc-button:hover {
+          background: #1e293b;
           color: #ebc1b6;
         }
 
@@ -846,13 +875,21 @@ function CalendarPage() {
           border-color: #eef2f7;
         }
 
+        .dark .fc-wrap .fc .fc-daygrid-day {
+          border-color: #334155;
+        }
+
         .fc-wrap .fc .fc-col-header-cell-cushion {
           font-size: 0.7rem;
           font-weight: 900;
           text-transform: uppercase;
-          color: #cbd5e1;
+          color: #64748b; /* More prominent than #cbd5e1 */
           letter-spacing: 0.12em;
           padding: 0.8rem 0;
+        }
+
+        .dark .fc-wrap .fc .fc-col-header-cell-cushion {
+          color: #94a3b8;
         }
 
         .fc-wrap .fc .fc-daygrid-day-frame {
@@ -863,7 +900,11 @@ function CalendarPage() {
         .fc-wrap .fc .fc-daygrid-day-number {
           font-weight: 900;
           color: #4a5a67;
-          opacity: 0.9;
+          opacity: 1; /* More prominent than 0.9 */
+        }
+
+        .dark .fc-wrap .fc .fc-daygrid-day-number {
+          color: #f1f5f9;
         }
 
         .fc-wrap .fc .fc-daygrid-event {
@@ -879,6 +920,11 @@ function CalendarPage() {
           box-shadow: 0 8px 18px rgba(235, 193, 182, 0.25);
         }
 
+        .dark .fc-wrap .fc .fc-daygrid-event {
+          background: #ebc1b6;
+          color: #1e293b; /* Darker text on pink for better contrast in dark mode */
+        }
+
         .fc-wrap .fc .fc-daygrid-event:hover {
           filter: brightness(0.98);
           transform: translateY(-1px);
@@ -888,9 +934,13 @@ function CalendarPage() {
         .fc-wrap .fc .fc-daygrid-more-link {
           font-size: 10px;
           font-weight: 900;
-          color: #64748b;
+          color: #4a5a67; /* More prominent than #64748b */
           text-transform: uppercase;
           letter-spacing: 0.08em;
+        }
+
+        .dark .fc-wrap .fc .fc-daygrid-more-link {
+          color: #ebc1b6;
         }
 
         .fc-wrap .fc .fc-daygrid-more-link:hover {
@@ -899,6 +949,10 @@ function CalendarPage() {
 
         .fc-wrap .fc .fc-day-today {
           background: rgba(235, 193, 182, 0.12) !important;
+        }
+
+        .dark .fc-wrap .fc .fc-day-today {
+          background: rgba(235, 193, 182, 0.08) !important;
         }
       `}</style>
     </motion.div>

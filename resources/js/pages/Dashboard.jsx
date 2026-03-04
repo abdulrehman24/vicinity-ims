@@ -112,22 +112,22 @@ function Dashboard() {
   }, [timeRange, bookings]);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="p-8 max-w-7xl mx-auto space-y-8">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="p-8 max-w-7xl mx-auto space-y-8 transition-colors">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-bold text-[#4a5a67] tracking-tight">Dashboard</h1>
+          <h1 className="text-4xl font-bold text-[#4a5a67] dark:text-slate-200 tracking-tight transition-colors">Dashboard</h1>
           <div className="w-12 h-1 bg-[#ebc1b6] rounded-full mt-2" />
         </div>
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center bg-white shadow-sm border border-gray-100 rounded-2xl px-4 py-2">
+          <div className="flex items-center bg-white dark:bg-slate-800 shadow-sm border border-gray-100 dark:border-slate-700 rounded-2xl px-4 py-2 transition-colors">
             <SafeIcon icon={FiCalendar} className="text-[#ebc1b6] mr-3" />
             <div className="flex flex-col">
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Snapshot Date</span>
-              <input type="date" value={format(selectedDate, 'yyyy-MM-dd')} onChange={(e) => setSelectedDate(new Date(e.target.value))} className="text-xs font-bold text-[#4a5a67] bg-transparent outline-none" />
+              <span className="text-[9px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest transition-colors">Snapshot Date</span>
+              <input type="date" value={format(selectedDate, 'yyyy-MM-dd')} onChange={(e) => setSelectedDate(new Date(e.target.value))} className="text-xs font-bold text-[#4a5a67] dark:text-slate-200 bg-transparent outline-none transition-colors" />
             </div>
           </div>
-          <div className="flex bg-[#4a5a67] p-1 rounded-xl shadow-inner">
+          <div className="flex bg-[#4a5a67] dark:bg-slate-900 p-1 rounded-xl shadow-inner transition-colors">
             {['1W', '1M', '6M', '1Y'].map(range => (
               <button key={range} onClick={() => setTimeRange(range)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${timeRange === range ? 'bg-[#ebc1b6] text-[#4a5a67]' : 'text-[#ebc1b6]/50 hover:text-[#ebc1b6]'}`}>
                 {range}
@@ -139,7 +139,7 @@ function Dashboard() {
 
       {/* Analytics Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-[#4a5a67] rounded-3xl p-8 shadow-xl border border-[#5a6a77]">
+        <div className="lg:col-span-2 bg-[#4a5a67] dark:bg-slate-900 rounded-3xl p-8 shadow-xl border border-[#5a6a77] dark:border-slate-800 transition-colors">
           <div className="flex items-center space-x-3 mb-6">
             <div className="p-2 bg-[#ebc1b6] rounded-lg"><SafeIcon icon={FiActivity} className="text-[#4a5a67]" /></div>
             <div>
@@ -151,25 +151,25 @@ function Dashboard() {
             <ReactECharts option={analyticsData.usageOption} style={{ height: '100%' }} />
           </div>
         </div>
-        <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col justify-between transition-colors">
           <div>
             <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-gray-100 rounded-lg"><SafeIcon icon={FiTrendingUp} className="text-[#4a5a67]" /></div>
-              <h2 className="text-lg font-bold text-[#4a5a67]">Fleet Readiness</h2>
+              <div className="p-2 bg-gray-100 dark:bg-slate-900 rounded-lg transition-colors"><SafeIcon icon={FiTrendingUp} className="text-[#4a5a67] dark:text-[#ebc1b6]" /></div>
+              <h2 className="text-lg font-bold text-[#4a5a67] dark:text-slate-200 transition-colors">Fleet Readiness</h2>
             </div>
             <div className="space-y-6">
               <div>
                 <div className="flex justify-between items-end mb-2">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Available Assets</span>
-                  <span className="text-xl font-bold text-[#4a5a67]">{currentReadiness}%</span>
+                  <span className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest transition-colors">Available Assets</span>
+                  <span className="text-xl font-bold text-[#4a5a67] dark:text-slate-200 transition-colors">{currentReadiness}%</span>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-2 bg-gray-100 dark:bg-slate-900 rounded-full overflow-hidden transition-colors">
                   <motion.div initial={{ width: 0 }} animate={{ width: `${currentReadiness}%` }} className="h-full bg-[#ebc1b6]" />
                 </div>
               </div>
             </div>
           </div>
-          <Link to="/inventory" className="w-full py-4 bg-[#4a5a67] text-[#ebc1b6] rounded-2xl font-black text-[10px] uppercase tracking-widest text-center shadow-lg hover:shadow-xl transition-all">
+          <Link to="/inventory" className="w-full py-4 bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] rounded-2xl font-black text-[10px] uppercase tracking-widest text-center shadow-lg hover:shadow-xl transition-all">
             View Full Inventory
           </Link>
         </div>
@@ -181,34 +181,34 @@ function Dashboard() {
           <div className="flex items-center space-x-3">
             <div className="bg-[#ebc1b6] p-2 rounded-xl"><SafeIcon icon={FiClock} className="text-[#4a5a67]" /></div>
             <div>
-              <h2 className="text-2xl font-bold text-[#4a5a67]">Log for {format(selectedDate, 'MMMM do')}</h2>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Viewing all active records including multi-day bookings</p>
+              <h2 className="text-2xl font-bold text-[#4a5a67] dark:text-slate-200 transition-colors">Log for {format(selectedDate, 'MMMM do')}</h2>
+              <p className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest transition-colors">Viewing all active records including multi-day bookings</p>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm min-h-[400px]">
-            <h3 className="text-sm font-black text-[#4a5a67] uppercase tracking-widest mb-6">Active Deployments ({statusOnDate.bookedOnDate.length})</h3>
+          <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 border border-gray-100 dark:border-slate-700 shadow-sm min-h-[400px] transition-colors">
+            <h3 className="text-sm font-black text-[#4a5a67] dark:text-slate-200 uppercase tracking-widest mb-6 transition-colors">Active Deployments ({statusOnDate.bookedOnDate.length})</h3>
             <div className="space-y-4">
               {statusOnDate.bookedOnDate.length > 0 ? (
                 statusOnDate.bookedOnDate.map((booking) => (
                   <div
                     key={booking.bookingEquipmentId ?? `${booking.id}-${booking.equipmentId}` ?? booking.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-[#ebc1b6] transition-all"
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl border border-transparent hover:border-[#ebc1b6] transition-all"
                   >
                     <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-[#4a5a67] rounded-xl flex items-center justify-center text-[#ebc1b6]"><SafeIcon icon={FiBox} /></div>
+                      <div className="w-10 h-10 bg-[#4a5a67] dark:bg-slate-800 rounded-xl flex items-center justify-center text-[#ebc1b6] transition-colors"><SafeIcon icon={FiBox} /></div>
                       <div>
-                        <p className="font-bold text-[#4a5a67] text-sm">{booking.equipmentName}</p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase">{booking.shootName}</p>
+                        <p className="font-bold text-[#4a5a67] dark:text-slate-200 text-sm transition-colors">{booking.equipmentName}</p>
+                        <p className="text-[10px] text-gray-400 dark:text-slate-500 font-bold uppercase transition-colors">{booking.shootName}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-bold text-[#4a5a67]">
+                      <p className="text-[10px] font-bold text-[#4a5a67] dark:text-slate-200 transition-colors">
                         {booking.user?.name || booking.user || 'Operations'}
                       </p>
-                      <p className="text-[9px] text-gray-400 font-medium">Quote: {booking.quotationNumber}</p>
+                      <p className="text-[9px] text-gray-400 dark:text-slate-500 font-medium transition-colors">Quote: {booking.quotationNumber}</p>
                     </div>
                   </div>
                 ))
@@ -218,32 +218,32 @@ function Dashboard() {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm min-h-[400px]">
-            <h3 className="text-sm font-black text-[#4a5a67] uppercase tracking-widest mb-6">Service Bay</h3>
+          <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 border border-gray-100 dark:border-slate-700 shadow-sm min-h-[400px] transition-colors">
+            <h3 className="text-sm font-black text-[#4a5a67] dark:text-slate-200 uppercase tracking-widest mb-6 transition-colors">Service Bay</h3>
             <div className="space-y-4">
               {statusOnDate.repairingOnDate.length > 0 ? (
                 statusOnDate.repairingOnDate.map((item) => (
-                  <div key={item.id} className="flex flex-col p-4 bg-gray-50 rounded-2xl">
+                  <div key={item.id} className="flex flex-col p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl transition-colors">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-4">
                         <img src={item.image} className="w-12 h-12 rounded-xl object-cover" alt="" />
                         <div>
-                          <p className="font-bold text-[#4a5a67] text-sm">{item.name}</p>
-                          <p className="text-[10px] text-red-500 font-bold uppercase">In Repair</p>
+                          <p className="font-bold text-[#4a5a67] dark:text-slate-200 text-sm transition-colors">{item.name}</p>
+                          <p className="text-[10px] text-red-500 font-bold uppercase transition-colors">In Repair</p>
                         </div>
                       </div>
                       {item.totalQuantity > 1 && (
                         <div className="text-right">
-                          <p className="text-[10px] font-bold text-[#4a5a67]">
+                          <p className="text-[10px] font-bold text-[#4a5a67] dark:text-slate-200 transition-colors">
                             {Math.max(0, (item.totalQuantity || 0) - (item.maintenanceQuantity || 0))}/{item.totalQuantity || 0} available
                           </p>
-                          <p className="text-[9px] text-blue-500 font-semibold">
+                          <p className="text-[9px] text-blue-500 font-semibold transition-colors">
                             {item.maintenanceQuantity || 0} in repair
                           </p>
                         </div>
                       )}
                     </div>
-                    <p className="text-[11px] text-gray-500 italic leading-relaxed pt-2 border-t border-gray-100">{item.remarks}</p>
+                    <p className="text-[11px] text-gray-500 dark:text-slate-400 italic leading-relaxed pt-2 border-t border-gray-100 dark:border-slate-700 transition-colors">{item.remarks}</p>
                   </div>
                 ))
               ) : (
@@ -260,8 +260,8 @@ function Dashboard() {
 function EmptyState({ icon, message }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="p-4 rounded-full mb-4 bg-gray-50"><SafeIcon icon={icon} className="text-3xl text-gray-200" /></div>
-      <p className="text-xs font-medium text-gray-300 max-w-[150px] mx-auto">{message}</p>
+      <div className="p-4 rounded-full mb-4 bg-gray-50 dark:bg-slate-900 transition-colors"><SafeIcon icon={icon} className="text-3xl text-gray-200 dark:text-slate-700" /></div>
+      <p className="text-xs font-medium text-gray-300 dark:text-slate-600 max-w-[150px] mx-auto transition-colors">{message}</p>
     </div>
   );
 }

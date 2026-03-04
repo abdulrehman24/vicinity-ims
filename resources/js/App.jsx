@@ -131,7 +131,7 @@ function App() {
 
   return (
     <InventoryProvider user={user}>
-      <div className="min-h-screen flex flex-col bg-[#fcfaf9]">
+      <div className="min-h-screen flex flex-col bg-[#fcfaf9] dark:bg-slate-900 transition-colors duration-300">
         {!isAdminRoute && <Navbar onLogout={handleLogout} user={user} />}
         <main className={`${isAdminRoute ? '' : 'pt-16'} flex-grow`}>
           <AnimatePresence mode="wait">

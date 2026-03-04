@@ -4,12 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 import { useInventory } from '../context/InventoryContext';
+import { useTheme } from '../context/ThemeContext';
 import SecurityModal from './SecurityModal';
 
 const { 
   FiPackage, FiCamera, FiRefreshCw, FiCalendar, 
   FiClipboard, FiFileText, FiMenu, FiX, FiLogOut, 
-  FiShield, FiAlertOctagon, FiUser, FiSettings 
+  FiShield, FiAlertOctagon, FiUser, FiSettings,
+  FiSun, FiMoon 
 } = FiIcons;
 
 // Updated navItems: Operations (Check In/Out) is now the root path
@@ -28,6 +30,7 @@ function Navbar({ onLogout, user }) {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const location = useLocation();
   const { isAdmin, toggleAdmin } = useInventory();
+  const { darkMode, toggleDarkMode } = useTheme();
 
   const handleAdminToggle = () => {
     if (!user?.is_admin) {
@@ -42,7 +45,7 @@ function Navbar({ onLogout, user }) {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 bg-[#4a5a67] shadow-xl z-50">
+    <nav className="fixed top-0 left-0 right-0 bg-[#4a5a67] dark:bg-slate-900 shadow-xl z-50 transition-colors duration-300">
       <div className="max-w-[95%] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo Section */}
@@ -82,6 +85,13 @@ function Navbar({ onLogout, user }) {
 
           {/* Right Side Actions */}
           <div className="hidden md:flex items-center space-x-3 flex-shrink-0">
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 rounded-full text-gray-300 hover:text-white hover:bg-white/10 transition-all"
+              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              <SafeIcon icon={darkMode ? FiSun : FiMoon} className="text-lg" />
+            </button>
             {user?.is_admin > 0 && (
               <>
                 <Link
@@ -165,6 +175,16 @@ function Navbar({ onLogout, user }) {
                   <SafeIcon icon={FiUser} className="text-xl" />
                   <span className="font-medium">My Profile</span>
                 </Link>
+                <button
+                  onClick={() => {
+                    toggleDarkMode();
+                    setIsOpen(false);
+                  }}
+                  className="w-full flex items-center space-x-3 px-4 py-3 text-gray-400 hover:text-[#ebc1b6] transition-colors"
+                >
+                  <SafeIcon icon={darkMode ? FiSun : FiMoon} className="text-xl" />
+                  <span className="font-medium">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                </button>
                 <button
                   onClick={onLogout}
                   className="w-full flex items-center space-x-3 px-4 py-3 text-gray-400 hover:text-[#ebc1b6] transition-colors"

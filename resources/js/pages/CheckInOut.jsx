@@ -12,7 +12,8 @@ import ConfirmationModal from '../components/ConfirmationModal';
 
 const { 
   FiZap, FiLogIn, FiLogOut, FiPackage, FiBox, FiCalendar, FiClock,
-  FiCheck, FiX, FiAlertTriangle, FiInfo, FiLayers, FiSearch, FiChevronRight,
+  FiCheck, FiX, FiAlertTriangle, FiInfo, FiLayers, FiSearch, FiChevronRight, FiChevronLeft,
+  FiChevronsRight, FiChevronsLeft,
   FiPlus, FiMinus, FiFileText, FiCheckSquare, FiSquare, FiTrash2, FiEdit2, FiUser
 } = FiIcons;
 
@@ -230,23 +231,23 @@ function CheckInOut() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 max-w-7xl mx-auto relative">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 max-w-7xl mx-auto relative transition-colors">
       {isProcessing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-2xl px-8 py-6 shadow-lg flex items-center space-x-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl px-8 py-6 shadow-lg flex items-center space-x-3 transition-colors">
             <div className="w-5 h-5 border-2 border-[#ebc1b6] border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs font-black tracking-widest text-[#4a5a67] uppercase">Processing booking...</span>
+            <span className="text-xs font-black tracking-widest text-[#4a5a67] dark:text-slate-200 uppercase">Processing booking...</span>
           </div>
         </div>
       )}
       <div className="flex justify-between items-center mb-10">
         <div>
-          <h1 className="text-4xl font-black text-[#4a5a67] uppercase tracking-tight mb-2">OPERATIONS</h1>
+          <h1 className="text-4xl font-black text-[#4a5a67] dark:text-slate-200 uppercase tracking-tight mb-2">OPERATIONS</h1>
           <div className="w-12 h-1 bg-[#ebc1b6] rounded-full" />
         </div>
       </div>
 
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl mb-10 w-fit">
+      <div className="flex space-x-1 bg-gray-100 dark:bg-slate-800/50 p-1 rounded-xl mb-10 w-fit transition-colors">
         <TabButton 
           active={activeTab === 'in'} 
           onClick={() => {
@@ -300,6 +301,7 @@ function CheckInOut() {
           />
         )}
       </AnimatePresence>
+
     </motion.div>
   );
 }
@@ -687,11 +689,11 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
       {/* Sidebar: Selection */}
       <div className="lg:col-span-4 space-y-6 order-2 lg:order-1">
-        <div className="bg-white p-5 lg:p-6 rounded-3xl border border-gray-100 shadow-sm">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 block">1. Set Schedule</label>
-          <div className="flex bg-gray-100 p-1 rounded-xl mb-4 overflow-x-auto no-scrollbar">
+        <div className="bg-white dark:bg-slate-800 p-5 lg:p-6 rounded-3xl border border-gray-100 dark:border-slate-700 shadow-sm transition-colors">
+          <label className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-4 block">1. Set Schedule</label>
+          <div className="flex bg-gray-100 dark:bg-slate-900 p-1 rounded-xl mb-4 overflow-x-auto no-scrollbar transition-colors">
             {['Full Day', 'AM', 'PM'].map(s => (
-              <button key={s} onClick={() => setShift(s)} className={`flex-1 min-w-[60px] py-2 rounded-lg text-[9px] font-black uppercase transition-all ${shift === s ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400'}`}>
+              <button key={s} onClick={() => setShift(s)} className={`flex-1 min-w-[60px] py-2 rounded-lg text-[9px] font-black uppercase transition-all ${shift === s ? 'bg-white dark:bg-slate-800 text-[#4a5a67] dark:text-[#ebc1b6] shadow-sm' : 'text-gray-400 dark:text-slate-500 hover:text-[#4a5a67] dark:hover:text-slate-200'}`}>
                 {s}
               </button>
             ))}
@@ -704,27 +706,31 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
               tileClassName={({ date }) => 
                 selectedDates.some(d => isSameDay(d, date)) ? 'react-calendar__tile--active' : null
               }
+              prevLabel={<SafeIcon icon={FiChevronLeft} />}
+              nextLabel={<SafeIcon icon={FiChevronRight} />}
+              prev2Label={<SafeIcon icon={FiChevronsLeft} />}
+              next2Label={<SafeIcon icon={FiChevronsRight} />}
             />
           </div>
         </div>
 
-        <div className="bg-white p-5 lg:p-6 rounded-3xl border border-gray-100 shadow-sm">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 block">2. Select Equipment</label>
+        <div className="bg-white dark:bg-slate-800 p-5 lg:p-6 rounded-3xl border border-gray-100 dark:border-slate-700 shadow-sm transition-colors">
+          <label className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-4 block">2. Select Equipment</label>
           <div className="space-y-3">
              {/* Bundles Dropdowns */}
             {bundles && bundles.length > 0 && (
                 <div className="relative">
-                    <SafeIcon icon={FiPackage} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                    <SafeIcon icon={FiPackage} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 text-xs" />
                     <select
                         onChange={(e) => {
                             handleAddBundle(e.target.value);
                             e.target.value = ""; // Reset
                         }}
-                        className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67]"
+                        className="w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-slate-900 border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67] dark:text-slate-200 transition-colors"
                     >
-                        <option value="">Load Bundle...</option>
+                        <option value="" className="dark:bg-slate-900">Load Bundle...</option>
                         {bundles.map(b => (
-                            <option key={b.id} value={b.id}>{b.name} ({b.items?.length || 0} items)</option>
+                            <option key={b.id} value={b.id} className="dark:bg-slate-900">{b.name} ({b.items?.length || 0} items)</option>
                         ))}
                     </select>
                 </div>
@@ -732,41 +738,41 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
 
             {personalBundles?.length > 0 && (
                 <div className="relative">
-                    <SafeIcon icon={FiUser} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                    <SafeIcon icon={FiUser} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 text-xs" />
                     <select
                         onChange={(e) => {
                             handleAddPersonalBundle(e.target.value);
                             e.target.value = ""; // Reset
                         }}
-                        className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67]"
+                        className="w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-slate-900 border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67] dark:text-slate-200 transition-colors"
                     >
-                        <option value="">Personal Bundles...</option>
+                        <option value="" className="dark:bg-slate-900">Personal Bundles...</option>
                         {personalBundles.map(b => (
-                            <option key={b.id} value={b.id}>{b.name} ({b.items?.length || 0} items)</option>
+                            <option key={b.id} value={b.id} className="dark:bg-slate-900">{b.name} ({b.items?.length || 0} items)</option>
                         ))}
                     </select>
                 </div>
             )}
 
             <div className="relative">
-              <SafeIcon icon={FiSearch} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+              <SafeIcon icon={FiSearch} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 text-xs" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search gear..."
-                className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67]"
+                className="w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-slate-900 border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67] dark:text-slate-200 transition-colors"
               />
             </div>
             <div>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 border border-transparent focus:bg-white focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67]"
+                className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-900 border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67] dark:text-slate-200 transition-colors"
               >
-                <option value="all">All Categories</option>
+                <option value="all" className="dark:bg-slate-900">All Categories</option>
                 {categories.map((c) => (
-                  <option key={c} value={c}>
+                  <option key={c} value={c} className="dark:bg-slate-900">
                     {c}
                   </option>
                 ))}
@@ -783,14 +789,14 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
                   key={item.id}
                   disabled={avail <= 0 && requestedDates.length > 0}
                   onClick={() => toggleItem(item)}
-                  className={`w-full text-left p-3 rounded-2xl border transition-all ${isSelected ? 'bg-[#ebc1b6] border-[#ebc1b6] text-[#4a5a67]' : avail <= 0 && requestedDates.length > 0 ? 'opacity-30 grayscale cursor-not-allowed' : 'bg-gray-50 border-transparent hover:border-gray-200'}`}
+                  className={`w-full text-left p-3 rounded-2xl border transition-all ${isSelected ? 'bg-[#ebc1b6] dark:bg-[#ebc1b6] border-[#ebc1b6] text-[#4a5a67]' : avail <= 0 && requestedDates.length > 0 ? 'opacity-30 grayscale cursor-not-allowed' : 'bg-gray-50 dark:bg-slate-900 border-transparent dark:border-slate-700 hover:border-gray-200 dark:hover:border-slate-500 text-[#4a5a67] dark:text-slate-200'}`}
                 >
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-3">
                       <img src={item.image} className="w-8 h-8 rounded-lg object-cover" alt="" />
                       <div>
                         <p className="text-[11px] font-bold leading-tight">{item.name}</p>
-                        <p className="text-[8px] font-black uppercase opacity-50 mt-0.5">{avail} Available</p>
+                        <p className={`text-[8px] font-black uppercase mt-0.5 ${isSelected ? 'text-[#4a5a67]/60' : 'text-gray-400 dark:text-slate-500'}`}>{avail} Available</p>
                       </div>
                     </div>
                     <SafeIcon icon={isSelected ? FiCheckSquare : FiSquare} className="text-sm" />
@@ -799,7 +805,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
               );
             })}
             {filteredEquipment.length === 0 && (
-              <p className="text-[10px] text-gray-400 italic py-2 text-center">
+              <p className="text-[10px] text-gray-400 dark:text-slate-500 italic py-2 text-center">
                 No matching equipment found
               </p>
             )}
@@ -809,22 +815,22 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
 
       {/* Main Form */}
       <div className="lg:col-span-8 space-y-6 order-1 lg:order-2">
-        <div className="bg-white rounded-[2rem] lg:rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-          <div className="bg-[#4a5a67] p-6 lg:p-8 text-white">
+        <div className="bg-white dark:bg-slate-800 rounded-[2rem] lg:rounded-[2.5rem] border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden transition-colors">
+          <div className="bg-[#4a5a67] dark:bg-slate-900 p-6 lg:p-8 text-white transition-colors">
             <h2 className="text-lg lg:text-xl font-bold">Checkout Confirmation</h2>
             <p className="text-[10px] font-black text-[#ebc1b6] uppercase tracking-[0.2em] mt-1">Allocation Details</p>
           </div>
           <div className="p-5 lg:p-8 space-y-6 lg:space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
               <InputGroup label="Project Title">
-                <input value={formData.projTitle} onChange={e => setFormData({...formData, projTitle: e.target.value})} className="w-full bg-gray-50 p-4 rounded-2xl focus:bg-white border border-transparent focus:border-[#ebc1b6] outline-none font-bold text-sm" placeholder="Pepsi Summer '24" />
+                <input value={formData.projTitle} onChange={e => setFormData({...formData, projTitle: e.target.value})} className="w-full bg-gray-50 dark:bg-slate-900 p-4 rounded-2xl focus:bg-white dark:focus:bg-slate-800 border border-transparent focus:border-[#ebc1b6] outline-none font-bold text-sm text-[#4a5a67] dark:text-[#ebc1b6] transition-colors" placeholder="Pepsi Summer '24" />
               </InputGroup>
               <InputGroup label="Quotation #">
-                <input value={formData.quote} onChange={e => setFormData({...formData, quote: e.target.value})} className="w-full bg-gray-50 p-4 rounded-2xl focus:bg-white border border-transparent focus:border-[#ebc1b6] outline-none font-bold text-sm" placeholder="QT-102" />
+                <input value={formData.quote} onChange={e => setFormData({...formData, quote: e.target.value})} className="w-full bg-gray-50 dark:bg-slate-900 p-4 rounded-2xl focus:bg-white dark:focus:bg-slate-800 border border-transparent focus:border-[#ebc1b6] outline-none font-bold text-sm text-[#4a5a67] dark:text-[#ebc1b6] transition-colors" placeholder="QT-102" />
               </InputGroup>
               <div className="sm:col-span-2">
                 <InputGroup label="Booking Dates">
-                  <div className="w-full bg-gray-50 p-3 rounded-2xl border border-transparent text-xs font-bold text-[#4a5a67] min-h-[48px]">
+                  <div className="w-full bg-gray-50 dark:bg-slate-900 p-3 rounded-2xl border border-transparent text-xs font-bold text-[#4a5a67] dark:text-[#ebc1b6] min-h-[48px] transition-colors">
                     {requestedDates.length === 0 ? (
                       <span className="text-gray-400">No dates selected</span>
                     ) : (
@@ -838,9 +844,9 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
                           return (
                             <div
                               key={start + idx}
-                              className="flex items-center space-x-2 bg-white/70 px-3 py-1 rounded-full border border-white shadow-sm"
+                              className="flex items-center space-x-2 bg-white/70 dark:bg-slate-800/70 px-3 py-1 rounded-full border border-white dark:border-slate-700 shadow-sm"
                             >
-                              <SafeIcon icon={FiCalendar} className="text-[10px] text-[#4a5a67]" />
+                              <SafeIcon icon={FiCalendar} className="text-[10px] text-[#4a5a67] dark:text-[#ebc1b6]" />
                               <span className="text-[10px]">{label}</span>
                             </div>
                           );
@@ -858,14 +864,14 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
                   value={formData.remarks}
                   onChange={e => setFormData({ ...formData, remarks: e.target.value })}
                   maxLength={500}
-                  className="w-full bg-gray-50 p-4 rounded-2xl focus:bg-white border border-transparent focus:border-[#ebc1b6] outline-none font-bold text-xs min-h-[60px]"
+                  className="w-full bg-gray-50 dark:bg-slate-900 p-4 rounded-2xl focus:bg-white dark:focus:bg-slate-800 border border-transparent focus:border-[#ebc1b6] outline-none font-bold text-xs text-[#4a5a67] dark:text-[#ebc1b6] min-h-[60px] transition-colors"
                   placeholder="Any special notes or additional information for this booking"
                 />
               </InputGroup>
             </div>
 
             <div className="space-y-4">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Selected Cart</label>
+              <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Selected Cart</label>
               <div className="space-y-4">
                 {(() => {
                   const grouped = {};
@@ -880,7 +886,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
                     .sort(([a], [b]) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))
                     .map(([category, entries]) => (
                       <div key={category} className="space-y-3">
-                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1">
                             {category}
                           </div>
                           <div className="grid grid-cols-1 gap-3 lg:gap-4">
@@ -889,25 +895,25 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
                                 ? getAvailableQty(masterItem, requestedDates, shift, editingBookingIdSet)
                                 : item.qty;
                               return (
-                                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100 gap-4">
+                                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-700 gap-4 transition-colors">
                                   <div className="flex items-center space-x-3">
-                                    <span className="text-[10px] font-black text-gray-400 shrink-0">
+                                    <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 shrink-0">
                                       {item.qty}x
                                     </span>
                                     <img src={item.image} className="w-10 h-10 rounded-xl object-cover" alt="" />
                                     <div className="min-w-0">
-                                      <p className="text-xs font-bold text-[#4a5a67] uppercase tracking-wide truncate">{item.name}</p>
+                                      <p className="text-xs font-bold text-[#4a5a67] dark:text-[#ebc1b6] uppercase tracking-wide truncate">{item.name}</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center justify-between sm:justify-end space-x-4">
-                                    <div className="flex items-center space-x-4 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
-                                      <button onClick={() => updateQty(item.id, -1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67] p-1"><SafeIcon icon={FiMinus} /></button>
-                                      <span className="text-sm font-black text-[#4a5a67] w-6 text-center">{item.qty}</span>
-                                      <button onClick={() => updateQty(item.id, 1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67] p-1"><SafeIcon icon={FiPlus} /></button>
+                                    <div className="flex items-center space-x-4 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm transition-colors">
+                                      <button onClick={() => updateQty(item.id, -1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67] dark:hover:text-white p-1"><SafeIcon icon={FiMinus} /></button>
+                                      <span className="text-sm font-black text-[#4a5a67] dark:text-[#ebc1b6] w-6 text-center">{item.qty}</span>
+                                      <button onClick={() => updateQty(item.id, 1, maxAvail)} className="text-[#ebc1b6] hover:text-[#4a5a67] dark:hover:text-white p-1"><SafeIcon icon={FiPlus} /></button>
                                     </div>
                                     <button 
                                       onClick={() => removeItem(item.id)} 
-                                      className="p-2 text-gray-300 hover:text-red-400 transition-colors"
+                                      className="p-2 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors"
                                       title="Remove Item"
                                     >
                                       <SafeIcon icon={FiTrash2} />
@@ -923,7 +929,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
               </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-100">
+            <div className="pt-4 border-t border-gray-100 dark:border-slate-700">
               <CollaboratorList
                 collaborators={collaborators}
                 suggestions={collaboratorSuggestions}
@@ -951,14 +957,14 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
             <button 
               onClick={handleBooking}
               disabled={selectedItems.length === 0 || !formData.projTitle || requestedDates.length === 0}
-              className="w-full py-5 bg-[#4a5a67] text-[#ebc1b6] rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-lg disabled:opacity-30 transition-all hover:scale-[1.01]"
+              className="w-full py-5 bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-lg disabled:opacity-30 transition-all hover:scale-[1.01]"
             >
               {editingProject ? 'Update Booking' : 'Confirm Deployment'}
             </button>
             {editingProject && (
                  <button 
                    onClick={onCancelEdit}
-                   className="w-full py-3 bg-transparent text-gray-400 font-bold text-[10px] uppercase tracking-widest hover:text-[#4a5a67] mt-2"
+                   className="w-full py-3 bg-transparent text-gray-400 dark:text-gray-500 font-bold text-[10px] uppercase tracking-widest hover:text-[#4a5a67] dark:hover:text-white mt-2 transition-colors"
                  >
                    Cancel Edit
                  </button>
@@ -1203,17 +1209,17 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initia
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
       <div className="lg:col-span-4 space-y-4">
         <div className="flex flex-col space-y-4 mb-2">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Check In</label>
-          <div className="flex items-center space-x-2 bg-gray-100/50 p-1 rounded-xl w-full overflow-x-auto no-scrollbar">
+          <label className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest ml-1">Check In</label>
+          <div className="flex items-center space-x-2 bg-gray-100/50 dark:bg-slate-800/50 p-1 rounded-xl w-full overflow-x-auto no-scrollbar transition-colors">
             <button 
               onClick={() => setActiveTab('my_bookings')}
-              className={`flex-1 min-w-[100px] px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_bookings' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+              className={`flex-1 min-w-[100px] px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_bookings' ? 'bg-white dark:bg-slate-800 text-[#4a5a67] dark:text-[#ebc1b6] shadow-sm' : 'text-gray-400 dark:text-slate-500 hover:text-[#4a5a67] dark:hover:text-slate-200'}`}
             >
               My Bookings
             </button>
             <button 
               onClick={() => setActiveTab('my_collaborations')}
-              className={`flex-1 min-w-[100px] px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_collaborations' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+              className={`flex-1 min-w-[100px] px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_collaborations' ? 'bg-white dark:bg-slate-800 text-[#4a5a67] dark:text-[#ebc1b6] shadow-sm' : 'text-gray-400 dark:text-slate-500 hover:text-[#4a5a67] dark:hover:text-slate-200'}`}
             >
               Collabs
             </button>
@@ -1229,15 +1235,15 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initia
               onClick={() => isStarted && toggleProjectSelection(p)}
               className={`relative p-5 lg:p-6 rounded-[2rem] lg:rounded-3xl border transition-all cursor-pointer group ${
                 selectedProjectKeys.includes(projectKey(p)) 
-                  ? 'bg-[#4a5a67] text-white shadow-xl' 
+                  ? 'bg-[#4a5a67] dark:bg-[#ebc1b6] text-white dark:text-[#4a5a67] shadow-xl' 
                   : isStarted 
-                      ? 'bg-white border-gray-100 hover:border-[#ebc1b6]' 
-                      : 'bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed'
+                      ? 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 hover:border-[#ebc1b6] text-[#4a5a67] dark:text-[#ebc1b6]' 
+                      : 'bg-gray-50 dark:bg-slate-900 border-gray-100 dark:border-slate-800 opacity-60 cursor-not-allowed text-gray-400 dark:text-slate-500'
                 }`}
               >
               {!isStarted && (
                   <div className="absolute top-2 right-6 z-10">
-                      <span className="bg-gray-200 text-gray-500 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider">Future Booking</span>
+                      <span className="bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-gray-400 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider">Future Booking</span>
                   </div>
               )}
               <div className="flex items-start justify-between">
@@ -1248,14 +1254,14 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initia
                 <div className="absolute top-6 right-6 flex space-x-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                   <button 
                       onClick={(e) => handleEditProject(p, e)}
-                      className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-white/20 text-white' : 'hover:bg-gray-100 text-gray-400'}`}
+                      className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-white/20 dark:hover:bg-black/20 text-current' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-400'}`}
                       title="Edit Booking"
                   >
                       <SafeIcon icon={FiEdit2} />
                   </button>
                   <button 
                       onClick={(e) => handleCancelProject(p, e)}
-                      className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-red-500/20 text-red-300' : 'hover:bg-red-50 text-red-400'}`}
+                      className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-red-500/20 text-red-300' : 'hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400'}`}
                       title="Cancel Booking"
                   >
                       <SafeIcon icon={FiTrash2} />
@@ -1269,14 +1275,14 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initia
                       <img
                         key={i.id}
                         src={i.image}
-                        className="w-6 h-6 rounded-full border-2 border-white object-cover"
+                        className="w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 object-cover"
                       />
                     ))}
                   </div>
                   <span className="text-[9px] font-bold opacity-60">+{p.items.length} items</span>
                 </div>
                 {p.startDate && p.endDate && (
-                  <div className="flex items-center space-x-1 text-[#ebc1b6]">
+                  <div className="flex items-center space-x-1 text-[#ebc1b6] dark:text-[#ebc1b6]">
                     <SafeIcon icon={FiCalendar} className="text-[10px]" />
                     <p className="text-[10px] font-bold">
                       {format(parseISO(p.startDate), 'MMM d')} - {format(parseISO(p.endDate), 'MMM d')}
@@ -1292,8 +1298,8 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initia
 
       <div className="lg:col-span-8">
         {selectedProjectKeys.length > 0 ? (
-          <div className="bg-white rounded-[2rem] lg:rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden min-h-[400px] lg:min-h-[500px] flex flex-col">
-            <div className="bg-[#4a5a67] p-6 lg:p-8 text-white flex justify-between items-center">
+          <div className="bg-white dark:bg-slate-800 rounded-[2rem] lg:rounded-[2.5rem] border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden min-h-[400px] lg:min-h-[500px] flex flex-col transition-colors">
+            <div className="bg-[#4a5a67] dark:bg-slate-900 p-6 lg:p-8 text-white flex justify-between items-center transition-colors">
               <div>
                 <h2 className="text-xl lg:text-2xl font-bold leading-tight pr-4">
                   {selectedProjectKeys.length === 1 
@@ -1316,7 +1322,7 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initia
                    return null;
                 })()}
               </div>
-              <button onClick={() => setSelectedProjectKeys([])} className="p-2 hover:bg-white/10 rounded-full shrink-0 self-start"><SafeIcon icon={FiX} /></button>
+              <button onClick={() => setSelectedProjectKeys([])} className="p-2 hover:bg-white/10 rounded-full shrink-0 self-start transition-colors"><SafeIcon icon={FiX} /></button>
             </div>
 
             <div className="p-5 lg:p-8 flex-1 space-y-6 lg:space-y-8">
@@ -1340,13 +1346,13 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initia
                   <>
                     {firstProject && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4 mb-2">
-                        <div className="p-4 lg:p-5 bg-white rounded-2xl border border-gray-100">
-                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">User</div>
-                          <div className="text-xs font-black text-[#4a5a67] mt-1 truncate">{firstProject.user?.name || firstProject.user || 'Operations Team'}</div>
+                        <div className="p-4 lg:p-5 bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-700 transition-colors">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1">User</div>
+                          <div className="text-xs font-black text-[#4a5a67] dark:text-[#ebc1b6] mt-1 truncate">{firstProject.user?.name || firstProject.user || 'Operations Team'}</div>
                         </div>
-                        <div className="p-4 lg:p-5 bg-white rounded-2xl border border-gray-100">
-                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Collaborators</div>
-                          <div className="text-xs font-black text-[#4a5a67] mt-1 truncate">
+                        <div className="p-4 lg:p-5 bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-700 transition-colors">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1">Collaborators</div>
+                          <div className="text-xs font-black text-[#4a5a67] dark:text-[#ebc1b6] mt-1 truncate">
                             {Array.isArray(firstProject.collaborators) && firstProject.collaborators.length > 0
                               ? firstProject.collaborators
                                   .map((c) => (typeof c === 'string' ? c : c.email))
@@ -1359,18 +1365,18 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initia
                     )}
 
                     {firstProject && firstProject.remarks && (
-                      <div className="p-5 lg:p-6 bg-white rounded-2xl border border-gray-100 mb-2">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                      <div className="p-5 lg:p-6 bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-700 mb-2 transition-colors">
+                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
                           Remarks
                         </div>
-                        <p className="text-xs text-[#4a5a67] whitespace-pre-wrap leading-relaxed">
+                        <p className="text-xs text-[#4a5a67] dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
                           {firstProject.remarks}
                         </p>
                       </div>
                     )}
 
-                    <div className="p-5 lg:p-6 bg-white rounded-2xl border border-gray-100">
-                      <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6">
+                    <div className="p-5 lg:p-6 bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-700 transition-colors">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-6">
                         Equipment List
                       </div>
                       <div className="space-y-6 lg:space-y-8">
@@ -1378,25 +1384,25 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initia
                           .sort(([a], [b]) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))
                           .map(([category, items]) => (
                             <div key={category} className="space-y-4">
-                              <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 border-b border-gray-50 pb-1">
+                              <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1 border-b border-gray-50 dark:border-slate-800 pb-1">
                                 {category}
                               </div>
                               <div className="grid grid-cols-1 gap-4">
                                 {items.map(item => (
                                   <div key={`${item.id}-${item.bookingEquipmentId}`} className="flex flex-col sm:flex-row sm:items-center justify-between group gap-4">
                                     <div className="flex items-center space-x-3">
-                                      <span className="text-[10px] font-black text-gray-400 shrink-0 w-6">
+                                      <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 shrink-0 w-6">
                                         {item.quantity || 1}x
                                       </span>
-                                      <img src={item.image} className="w-10 h-10 rounded-xl object-cover border border-gray-100" alt="" />
+                                      <img src={item.image} className="w-10 h-10 rounded-xl object-cover border border-gray-100 dark:border-slate-700" alt="" />
                                       <div className="min-w-0">
-                                        <p className="text-xs font-bold text-[#4a5a67] uppercase tracking-wide truncate">{item.name}</p>
-                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5 truncate">{item.serialNumber}</p>
+                                        <p className="text-xs font-bold text-[#4a5a67] dark:text-[#ebc1b6] uppercase tracking-wide truncate">{item.name}</p>
+                                        <p className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-0.5 truncate">{item.serialNumber}</p>
                                       </div>
                                     </div>
                                     <button 
                                       onClick={() => toggleDamage(item.id)}
-                                      className={`flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all sm:w-auto w-full ${returnStates[item.id]?.isDamaged ? 'bg-red-500 text-white shadow-lg' : 'bg-gray-50 text-gray-400 border border-transparent hover:border-red-500 hover:text-red-500 hover:bg-white'}`}
+                                      className={`flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all sm:w-auto w-full ${returnStates[item.id]?.isDamaged ? 'bg-red-500 text-white shadow-lg' : 'bg-gray-50 dark:bg-slate-800 text-gray-400 dark:text-gray-500 border border-transparent hover:border-red-500 hover:text-red-500 hover:bg-white dark:hover:bg-slate-700'}`}
                                     >
                                       <SafeIcon icon={FiAlertTriangle} />
                                       <span>{returnStates[item.id]?.isDamaged ? 'Issue Reported' : 'Report Issue'}</span>
@@ -1413,8 +1419,8 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initia
               })()}
             </div>
 
-            <div className="p-6 lg:p-8 bg-gray-50 border-t border-gray-100">
-              <div className="flex items-center space-x-3 text-blue-500 bg-blue-50 p-4 rounded-2xl border border-blue-100 mb-6">
+            <div className="p-6 lg:p-8 bg-gray-50 dark:bg-slate-900/50 border-t border-gray-100 dark:border-slate-700 transition-colors">
+              <div className="flex items-center space-x-3 text-blue-500 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 mb-6 transition-colors">
                 <SafeIcon icon={FiInfo} />
                 <p className="text-[10px] font-bold leading-relaxed italic">
                   Completing return will reset item availability. All items flagged with issues will be automatically sent to the Service Bay.
@@ -1422,17 +1428,17 @@ function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initia
               </div>
               <button 
                 onClick={handleBatchReturn}
-                className="w-full py-5 bg-[#4a5a67] text-[#ebc1b6] rounded-2xl lg:rounded-[1.5rem] font-black text-[11px] lg:text-xs uppercase tracking-[0.2em] shadow-lg hover:shadow-xl transition-all"
+                className="w-full py-5 bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] rounded-2xl lg:rounded-[1.5rem] font-black text-[11px] lg:text-xs uppercase tracking-[0.2em] shadow-lg hover:shadow-xl transition-all"
               >
                 Complete Return ({activeProjects.filter(p => selectedProjectKeys.includes(projectKey(p))).reduce((acc, p) => acc + p.items.length, 0)} Items)
               </button>
             </div>
           </div>
         ) : (
-          <div className="h-[400px] lg:h-[500px] border-2 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center text-center p-8 lg:p-12 bg-white">
-            <SafeIcon icon={FiLayers} className="text-5xl text-gray-200 mb-4" />
-            <h3 className="text-lg font-bold text-[#4a5a67]">Batch Return Management</h3>
-            <p className="text-xs text-gray-400 max-w-xs leading-relaxed mt-2">Select active projects from the list to begin the return inspection process.</p>
+          <div className="h-[400px] lg:h-[500px] border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-[2.5rem] flex flex-col items-center justify-center text-center p-8 lg:p-12 bg-white dark:bg-slate-800/50 transition-colors">
+            <SafeIcon icon={FiLayers} className="text-5xl text-gray-200 dark:text-slate-700 mb-4" />
+            <h3 className="text-lg font-bold text-[#4a5a67] dark:text-gray-400">Batch Return Management</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500 max-w-xs leading-relaxed mt-2">Select active projects from the list to begin the return inspection process.</p>
           </div>
         )}
       </div>
@@ -1454,7 +1460,7 @@ function InputGroup({ label, children }) {
 
 function TabButton({ active, onClick, icon, label }) {
   return (
-    <button onClick={onClick} className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${active ? 'bg-[#4a5a67] text-[#ebc1b6] shadow-lg' : 'text-gray-500 hover:text-[#4a5a67]'}`}>
+    <button onClick={onClick} className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${active ? 'bg-[#4a5a67] dark:bg-[#ebc1b6] text-[#ebc1b6] dark:text-[#4a5a67] shadow-lg' : 'text-gray-500 hover:text-[#4a5a67] dark:hover:text-white'}`}>
       <SafeIcon icon={icon} />
       <span>{label}</span>
     </button>

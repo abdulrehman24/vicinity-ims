@@ -7,11 +7,11 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { useInventory } from '../context/InventoryContext';
 import { format, isSameDay, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
 import * as FiIcons from 'react-icons/fi';
-import 'react-calendar/dist/Calendar.css';
 
 const { 
   FiSearch, FiCalendar, FiList, FiClock, FiCamera, 
   FiLogIn, FiLogOut, FiAlertTriangle, FiFilter, FiDownload, FiChevronDown, FiChevronUp,
+  FiChevronLeft, FiChevronRight, FiChevronsLeft, FiChevronsRight,
   FiEdit2, FiXCircle
 } = FiIcons;
 
@@ -345,39 +345,39 @@ function Records() {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto min-h-screen">
+    <div className="p-8 max-w-7xl mx-auto min-h-screen transition-colors">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-6">
         <div>
-          <h1 className="text-4xl font-black text-[#4a5a67] uppercase tracking-tight mb-2">Archives</h1>
+          <h1 className="text-4xl font-black text-[#4a5a67] dark:text-slate-200 uppercase tracking-tight mb-2">Archives</h1>
           <div className="w-12 h-1 bg-[#ebc1b6] rounded-full mb-6" />
           
-          <div className="flex items-center space-x-2 bg-gray-100/50 p-1 rounded-xl w-fit">
+          <div className="flex items-center space-x-2 bg-gray-100/50 dark:bg-slate-800/50 p-1 rounded-xl w-fit">
             <button 
               onClick={() => setActiveTab('my_bookings')}
-              className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_bookings' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+              className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_bookings' ? 'bg-white dark:bg-slate-700 text-[#4a5a67] dark:text-slate-200 shadow-sm' : 'text-gray-400 dark:text-slate-500 hover:text-[#4a5a67] dark:hover:text-slate-300'}`}
             >
               My Bookings
             </button>
             <button 
               onClick={() => setActiveTab('my_collaborations')}
-              className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_collaborations' ? 'bg-white text-[#4a5a67] shadow-sm' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+              className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_collaborations' ? 'bg-white dark:bg-slate-700 text-[#4a5a67] dark:text-slate-200 shadow-sm' : 'text-gray-400 dark:text-slate-500 hover:text-[#4a5a67] dark:hover:text-slate-300'}`}
             >
               Collaborations
             </button>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3 bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="flex items-center space-x-3 bg-white dark:bg-slate-800 p-1.5 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm transition-colors">
           <button 
             onClick={() => setView('list')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'list' ? 'bg-[#4a5a67] text-[#ebc1b6] shadow-md' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'list' ? 'bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] shadow-md' : 'text-gray-400 dark:text-slate-500 hover:text-[#4a5a67] dark:hover:text-slate-300'}`}
           >
             <SafeIcon icon={FiList} />
             <span>List View</span>
           </button>
           <button 
             onClick={() => setView('calendar')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'calendar' ? 'bg-[#4a5a67] text-[#ebc1b6] shadow-md' : 'text-gray-400 hover:text-[#4a5a67]'}`}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'calendar' ? 'bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] shadow-md' : 'text-gray-400 dark:text-slate-500 hover:text-[#4a5a67] dark:hover:text-slate-300'}`}
           >
             <SafeIcon icon={FiCalendar} />
             <span>Calendar</span>
@@ -395,13 +395,13 @@ function Records() {
             className="space-y-6"
           >
             <div className="relative max-w-md">
-              <SafeIcon icon={FiSearch} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <SafeIcon icon={FiSearch} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
               <input 
                 type="text" 
                 placeholder="Search by gear, project or quote..." 
                 value={searchTerm} 
                 onChange={(e) => setSearchTerm(e.target.value)} 
-                className="w-full pl-12 pr-4 py-3 bg-white border border-gray-100 rounded-2xl outline-none focus:border-[#ebc1b6] transition-all text-xs font-bold shadow-sm"
+                className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl outline-none focus:border-[#ebc1b6] dark:focus:border-[#ebc1b6] transition-all text-xs font-bold shadow-sm text-[#4a5a67] dark:text-slate-200"
               />
             </div>
 
@@ -427,7 +427,7 @@ function Records() {
             className="grid grid-cols-1 lg:grid-cols-12 gap-8"
           >
             <div className="lg:col-span-7">
-              <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 border border-gray-100 dark:border-slate-700 shadow-sm transition-colors">
                 <Calendar 
                   onChange={setSelectedDate} 
                   value={selectedDate} 
@@ -438,17 +438,21 @@ function Records() {
                     if (isSameDay(date, selectedDate)) classes.push('react-calendar__tile--active');
                     return classes.join(' ');
                   }}
+                  prevLabel={<SafeIcon icon={FiChevronLeft} />}
+                  nextLabel={<SafeIcon icon={FiChevronRight} />}
+                  prev2Label={<SafeIcon icon={FiChevronsLeft} />}
+                  next2Label={<SafeIcon icon={FiChevronsRight} />}
                 />
               </div>
             </div>
 
             <div className="lg:col-span-5 space-y-6">
-              <div className="bg-[#4a5a67] rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden">
+              <div className="bg-[#4a5a67] dark:bg-slate-900 rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden transition-colors">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#ebc1b6] opacity-5 rounded-full -mr-16 -mt-16" />
                 <div className="flex justify-between items-center mb-6">
                   <div>
                     <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ebc1b6]">Archive Day</h3>
-                    <p className="text-lg font-bold">{format(selectedDate, 'MMMM do, yyyy')}</p>
+                    <p className="text-lg font-bold text-white">{format(selectedDate, 'MMMM do, yyyy')}</p>
                   </div>
                   <div className="bg-[#ebc1b6] text-[#4a5a67] px-3 py-1 rounded-full text-[10px] font-black uppercase">
                     {selectedDayRecords.length} Actions
@@ -467,7 +471,7 @@ function Records() {
                             {(group.type || 'checkout').replace('_', ' ')}
                           </span>
                         </div>
-                        <h4 className="text-sm font-bold mb-1">{group.shootName}</h4>
+                        <h4 className="text-sm font-bold mb-1 text-white">{group.shootName}</h4>
                         {group.quotationNumber && <p className="text-[10px] font-medium text-white/60 mb-2">{group.quotationNumber}</p>}
                         
                         <div className="flex flex-col space-y-1 mb-3">
@@ -579,6 +583,21 @@ function Records() {
       </AnimatePresence>
 
       <style jsx>{`
+        .archive-calendar,
+        .archive-calendar *,
+        :global(.react-calendar),
+        :global(.react-calendar *) {
+          background: transparent !important;
+          background-color: transparent !important;
+        }
+        :global(.dark) .archive-calendar,
+        :global(.dark) .archive-calendar *,
+        :global(.dark .react-calendar),
+        :global(.dark .react-calendar *) {
+          background: transparent !important;
+          background-color: transparent !important;
+          border-color: #334155 !important;
+        }
         .archive-calendar {
           width: 100% !important;
           border: none !important;
@@ -590,6 +609,14 @@ function Records() {
           color: #4a5a67 !important;
           text-transform: uppercase !important;
           letter-spacing: 0.1em !important;
+          border-radius: 0.75rem !important;
+        }
+        :global(.dark) .archive-calendar .react-calendar__navigation button {
+          color: #f1f5f9 !important;
+        }
+        :global(.dark) .archive-calendar .react-calendar__navigation button:enabled:hover,
+        :global(.dark) .archive-calendar .react-calendar__navigation button:enabled:focus {
+          background-color: #334155 !important;
         }
         .archive-calendar .react-calendar__tile {
           padding: 1.5rem 0.5rem !important;
@@ -600,8 +627,15 @@ function Records() {
           position: relative !important;
           overflow: visible !important;
         }
+        :global(.dark) .archive-calendar .react-calendar__tile {
+          color: #cbd5e1 !important;
+        }
         .archive-calendar .react-calendar__tile:enabled:hover {
-          background-color: #f8fafc !important;
+          background-color: #f1f5f9 !important;
+          color: #ebc1b6 !important;
+        }
+        :global(.dark) .archive-calendar .react-calendar__tile:enabled:hover {
+          background-color: #1e293b !important;
           color: #ebc1b6 !important;
         }
         .archive-calendar .react-calendar__tile--active {
@@ -609,9 +643,24 @@ function Records() {
           color: #ebc1b6 !important;
           box-shadow: 0 10px 15px -3px rgba(74,90,103,0.2) !important;
         }
+        :global(.dark) .archive-calendar .react-calendar__tile--active {
+          background: #ebc1b6 !important;
+          color: #1e293b !important;
+          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3) !important;
+        }
         .archive-calendar .react-calendar__tile--now {
           background: #ebc1b622 !important;
           color: #4a5a67 !important;
+        }
+        :global(.dark) .archive-calendar .react-calendar__tile--now {
+          background: #ebc1b622 !important;
+          color: #f1f5f9 !important;
+        }
+        :global(.dark) .react-calendar__month-view__days__day--neighboringMonth {
+          color: #334155 !important;
+        }
+        :global(.dark) .archive-calendar .react-calendar__month-view__weekdays__weekday {
+          color: #475569 !important;
         }
       `}</style>
       
@@ -692,25 +741,25 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
   }, [currentUser, group.items]);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:border-[#ebc1b6] transition-all group-card">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden hover:border-[#ebc1b6] dark:hover:border-[#ebc1b6] transition-all group-card">
        <div 
          className="p-6 flex flex-col md:flex-row items-center justify-between cursor-pointer"
          onClick={() => setExpanded(!expanded)}
        >
         <div className="flex items-center space-x-6 w-full md:w-auto">
-          <div className={`p-4 rounded-xl shrink-0 ${isReturned ? 'bg-green-50 text-green-600' : isCancelled ? 'bg-red-50 text-red-600' : 'bg-[#ebc1b622] text-[#4a5a67]'}`}>
+          <div className={`p-4 rounded-xl shrink-0 ${isReturned ? 'bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400' : isCancelled ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-[#ebc1b622] text-[#4a5a67] dark:text-[#ebc1b6]'}`}>
             <SafeIcon icon={isReturned ? FiLogIn : isCancelled ? FiXCircle : FiLogOut} className="text-xl" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-3 mb-1">
-              <h3 className="text-lg font-bold text-[#4a5a67] truncate">{group.shootName}</h3>
+              <h3 className="text-lg font-bold text-[#4a5a67] dark:text-slate-200 truncate">{group.shootName}</h3>
               {group.quotationNumber && (
-                <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-black uppercase tracking-widest shrink-0">
+                <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 px-2 py-0.5 rounded-full font-black uppercase tracking-widest shrink-0">
                   {group.quotationNumber}
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest">
               <div className="flex items-center space-x-1">
                 <SafeIcon icon={FiCamera} />
                 <span className="truncate max-w-[150px]">
@@ -723,8 +772,8 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
                   <span>{group.user}</span>
                 </div>
               )}
-              <div className="flex items-center space-x-1 text-[#4a5a67]">
-                <div className="w-1.5 h-1.5 bg-[#4a5a67] rounded-full" />
+              <div className="flex items-center space-x-1 text-[#4a5a67] dark:text-[#ebc1b6]">
+                <div className="w-1.5 h-1.5 bg-[#4a5a67] dark:bg-[#ebc1b6] rounded-full" />
                 <span>
                   {aggregatedItems.reduce((sum, item) => sum + (item.displayQuantity || 1), 0)} Items
                 </span>
@@ -733,16 +782,16 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
           </div>
         </div>
         
-        <div className="flex items-center space-x-6 mt-4 md:mt-0 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 border-gray-50 justify-between md:justify-end">
+        <div className="flex items-center space-x-6 mt-4 md:mt-0 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 border-gray-50 dark:border-slate-700 justify-between md:justify-end">
           <div className="text-right">
-            <p className="text-xs font-bold text-[#4a5a67]">
+            <p className="text-xs font-bold text-[#4a5a67] dark:text-slate-200">
                 {group.startDate && format(new Date(group.startDate), 'MMM d')}
                 {group.endDate && group.endDate !== group.startDate && ` - ${format(new Date(group.endDate), 'MMM d, yyyy')}`}
                 {!group.endDate && group.startDate && `, ${format(new Date(group.startDate), 'yyyy')}`}
             </p>
-            <p className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">
+            <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase font-black tracking-tighter">
                 {group.createdAt && (
-                    <span className="block text-[9px] text-gray-300 mt-0.5">
+                    <span className="block text-[9px] text-gray-300 dark:text-slate-600 mt-0.5">
                         Booked: {format(new Date(group.createdAt), 'MMM d, HH:mm')}
                     </span>
                 )}
@@ -778,7 +827,7 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
                             };
                             onEdit(editProject);
                           }}
-                          className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-[#4a5a67] transition-colors"
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg text-gray-400 dark:text-slate-500 hover:text-[#4a5a67] dark:hover:text-slate-300 transition-colors"
                           title="Edit Booking"
                       >
                           <SafeIcon icon={FiEdit2} />
@@ -786,7 +835,7 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
                     )}
                     <button 
                         onClick={onCancel}
-                        className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
+                        className="p-2 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                         title="Cancel Booking"
                     >
                         <SafeIcon icon={FiXCircle} />
@@ -794,7 +843,7 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
                 </>
              )}
              <div className={`transition-transform duration-300 ${expanded ? 'rotate-180' : ''} ml-2`}>
-                <SafeIcon icon={FiChevronDown} className="text-gray-400" />
+                <SafeIcon icon={FiChevronDown} className="text-gray-400 dark:text-slate-500" />
              </div>
           </div>
         </div>
@@ -806,17 +855,17 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
               initial={{ height: 0, opacity: 0 }} 
               animate={{ height: 'auto', opacity: 1 }} 
               exit={{ height: 0, opacity: 0 }}
-              className="bg-gray-50 border-t border-gray-100"
+              className="bg-gray-50 dark:bg-slate-900/50 border-t border-gray-100 dark:border-slate-700"
             >
                <div className="p-6 space-y-4">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div className="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">User</div>
-                     <div className="text-xs font-black text-[#4a5a67] mt-1">{group.user || 'Operations Team'}</div>
+                   <div className="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-1">User</div>
+                     <div className="text-xs font-black text-[#4a5a67] dark:text-slate-200 mt-1">{group.user || 'Operations Team'}</div>
                    </div>
-                   <div className="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Collaborators</div>
-                     <div className="text-xs font-black text-[#4a5a67] mt-1">
+                   <div className="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-1">Collaborators</div>
+                     <div className="text-xs font-black text-[#4a5a67] dark:text-slate-200 mt-1">
                        {Array.isArray(group.collaborators) && group.collaborators.length > 0
                          ? group.collaborators
                              .map((c) => (typeof c === 'string' ? c : c.email))
@@ -828,18 +877,18 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
                  </div>
 
                  {group.remarks && (
-                   <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                   <div className="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-3">
                        Remarks
                      </div>
-                     <div className="text-xs text-[#4a5a67] whitespace-pre-wrap leading-relaxed">
+                     <div className="text-xs text-[#4a5a67] dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
                        {group.remarks}
                      </div>
                    </div>
                  )}
 
-                 <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                   <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-6">
+                 <div className="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                   <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-6">
                      Equipment List
                    </div>
                    <div className="space-y-8">
@@ -854,7 +903,7 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
                        .sort(([a], [b]) => a.localeCompare(b))
                        .map(([category, items]) => (
                          <div key={category} className="space-y-4">
-                           <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 border-b border-gray-50 pb-1">
+                           <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-1 border-b border-gray-50 dark:border-slate-700 pb-1">
                              {category}
                            </div>
                            <ul className="space-y-3">
@@ -863,10 +912,10 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
                                .sort((a, b) => a.equipmentName.localeCompare(b.equipmentName))
                                .map((item, idx) => (
                                  <li key={`${category}-${item.equipmentName}-${idx}`} className="flex items-center space-x-3">
-                                   <span className="text-[10px] font-black text-gray-400 shrink-0 w-6">
+                                   <span className="text-[10px] font-black text-gray-400 dark:text-slate-500 shrink-0 w-6">
                                      {item.displayQuantity || 1}x
                                    </span>
-                                   <span className="text-xs font-bold text-[#4a5a67] uppercase tracking-wide">
+                                   <span className="text-xs font-bold text-[#4a5a67] dark:text-slate-200 uppercase tracking-wide">
                                      {item.equipmentName}
                                    </span>
                                  </li>
@@ -886,9 +935,9 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
 
 function EmptyState() {
   return (
-    <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
-      <SafeIcon icon={FiClock} className="text-4xl text-gray-200 mx-auto mb-4" />
-      <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No matching records found</p>
+    <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-gray-200 dark:border-slate-700 transition-colors">
+      <SafeIcon icon={FiClock} className="text-4xl text-gray-200 dark:text-slate-700 mx-auto mb-4" />
+      <p className="text-gray-400 dark:text-slate-500 font-bold uppercase tracking-widest text-xs">No matching records found</p>
     </div>
   );
 }
