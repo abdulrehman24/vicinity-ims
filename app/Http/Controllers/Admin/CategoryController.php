@@ -118,10 +118,16 @@ class CategoryController extends Controller
         $request->validate([
             'order' => ['required', 'array'],
             'order.*' => ['required', 'exists:categories,id'],
+            'page' => ['integer', 'min:1'],
+            'length' => ['integer', 'min:1'],
         ]);
 
+        $page = (int) $request->input('page', 1);
+        $length = (int) $request->input('length', 10);
+        $offset = ($page - 1) * $length;
+
         foreach ($request->order as $index => $id) {
-            Category::where('id', $id)->update(['sort_order' => $index]);
+            Category::where('id', $id)->update(['sort_order' => $offset + $index]);
         }
 
         return response()->json([

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { eachDayOfInterval, parseISO, format } from 'date-fns';
@@ -10,6 +10,7 @@ const initialState = {
   categories: [],
   bundles: [],
   personalBundles: [],
+  drafts: [],
   bookings: [],
   records: [],
   stockTakes: [],
@@ -32,10 +33,7 @@ function inventoryReducer(state, action) {
         )
       };
     case 'DELETE_EQUIPMENT':
-      return {
-        ...state,
-        equipment: state.equipment.filter(item => item.id !== action.payload)
-      };
+      return { ...state, equipment: state.equipment.filter(item => item.id !== action.payload) };
     case 'SET_ADMIN':
       return { ...state, isAdmin: action.payload };
     case 'ADD_STOCK_TAKE':
@@ -47,6 +45,8 @@ function inventoryReducer(state, action) {
       return { ...state, bundles: action.payload };
     case 'SET_PERSONAL_BUNDLES':
       return { ...state, personalBundles: action.payload };
+    case 'SET_DRAFTS':
+      return { ...state, drafts: action.payload };
     case 'ADD_BOOKING':
       return { ...state, bookings: [...state.bookings, action.payload] };
     case 'UPDATE_BOOKING_STATUS':
@@ -79,19 +79,7 @@ function inventoryReducer(state, action) {
 export function InventoryProvider({ children, user }) {
   const [state, dispatch] = useReducer(inventoryReducer, initialState);
 
-  useEffect(() => {
-    fetchEquipment();
-    fetchCategories();
-    fetchBookings();
-    fetchBundles();
-    fetchPersonalBundles();
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('isAdmin', state.isAdmin);
-  }, [state.isAdmin]);
-
-  const fetchEquipment = async () => {
+  const fetchEquipment = useCallback(async () => {
     try {
       const response = await axios.get('/equipment', {
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
@@ -102,20 +90,19 @@ export function InventoryProvider({ children, user }) {
       console.error("Failed to fetch equipment", error);
       toast.error("Failed to load inventory");
     }
-  };
+  }, []);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const response = await axios.get('/api/admin/categories', { params: { length: 1000 } });
       const list = (response.data.data || []).filter(c => c.is_active).map(c => c.name);
       dispatch({ type: 'SET_CATEGORIES', payload: list });
     } catch (error) {
       console.error("Failed to fetch categories", error);
-      // Fallback or empty? Let's leave it empty so components can fallback or show empty
     }
-  };
+  }, []);
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
       const response = await axios.get('/bookings', {
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
@@ -164,27 +151,79 @@ export function InventoryProvider({ children, user }) {
     } catch (error) {
       console.error("Failed to fetch bookings", error);
     }
-  };
+  }, []);
 
-  const fetchBundles = async () => {
+  const fetchBundles = useCallback(async () => {
     try {
       const response = await axios.get('/api/bundles');
       dispatch({ type: 'SET_BUNDLES', payload: response.data });
     } catch (error) {
       console.error("Failed to fetch bundles", error);
     }
-  };
+  }, []);
 
-  const fetchPersonalBundles = async () => {
+  const fetchPersonalBundles = useCallback(async () => {
     try {
       const response = await axios.get('/api/personal-bundles');
       dispatch({ type: 'SET_PERSONAL_BUNDLES', payload: response.data });
     } catch (error) {
       console.error("Failed to fetch personal bundles", error);
     }
-  };
+  }, []);
 
-  const addEquipment = async (newItem) => {
+  const fetchDrafts = useCallback(async () => {
+    try {
+      const response = await axios.get('/api/drafts');
+      dispatch({ type: 'SET_DRAFTS', payload: response.data });
+    } catch (error) {
+      console.error("Failed to fetch drafts", error);
+    }
+  }, []);
+
+  const savePersonalBundle = useCallback(async (bundleData) => {
+    try {
+      await axios.post('/api/personal-bundles', bundleData);
+      toast.success("Personal bundle saved successfully");
+      fetchPersonalBundles();
+      return true;
+    } catch (error) {
+      console.error("Failed to save personal bundle", error);
+      toast.error("Failed to save personal bundle");
+      return false;
+    }
+  }, [fetchPersonalBundles]);
+
+  const saveDraft = useCallback(async (draftData) => {
+    try {
+      if (draftData.id) {
+        await axios.put(`/api/drafts/${draftData.id}`, draftData);
+      } else {
+        await axios.post('/api/drafts', draftData);
+      }
+      toast.success("Draft saved successfully");
+      fetchDrafts();
+      return true;
+    } catch (error) {
+      console.error("Failed to save draft", error);
+      toast.error("Failed to save draft");
+      return false;
+    }
+  }, [fetchDrafts]);
+
+  const deleteDraft = useCallback(async (id) => {
+    try {
+      await axios.delete(`/api/drafts/${id}`);
+      toast.success("Draft deleted");
+      fetchDrafts();
+      return true;
+    } catch (error) {
+      console.error("Failed to delete draft", error);
+      toast.error("Failed to delete draft");
+      return false;
+    }
+  }, [fetchDrafts]);
+
+  const addEquipment = useCallback(async (newItem) => {
     try {
       let response;
       if (newItem.imageFile) {
@@ -212,9 +251,9 @@ export function InventoryProvider({ children, user }) {
       toast.error(error.response?.data?.message || "Failed to add equipment");
       return false;
     }
-  };
+  }, []);
 
-  const updateEquipment = async (updatedItem) => {
+  const updateEquipment = useCallback(async (updatedItem) => {
     try {
       let response;
       if (updatedItem.imageFile) {
@@ -243,13 +282,13 @@ export function InventoryProvider({ children, user }) {
       toast.error(error.response?.data?.message || "Failed to update equipment");
       return false;
     }
-  };
+  }, []);
 
-  const updateLocalEquipment = (updatedItem) => {
+  const updateLocalEquipment = useCallback((updatedItem) => {
     dispatch({ type: 'UPDATE_EQUIPMENT', payload: updatedItem });
-  };
+  }, []);
 
-  const deleteEquipment = async (id) => {
+  const deleteEquipment = useCallback(async (id) => {
       try {
           await axios.delete(`/equipment/${id}`);
           dispatch({ type: 'DELETE_EQUIPMENT', payload: id });
@@ -258,9 +297,9 @@ export function InventoryProvider({ children, user }) {
           console.error("Failed to delete equipment", error);
           toast.error("Failed to delete equipment");
       }
-  };
+  }, []);
 
-  const checkOutEquipment = async (bookingData, options = {}) => {
+  const checkOutEquipment = useCallback(async (bookingData, options = {}) => {
       const { showToast = true } = options;
       try {
           const response = await axios.post('/bookings', bookingData);
@@ -273,9 +312,9 @@ export function InventoryProvider({ children, user }) {
           console.error("Checkout failed", error);
           toast.error("Failed to check out equipment");
       }
-  };
+  }, [fetchEquipment, fetchBookings]);
 
-  const batchCheckIn = async (payload) => {
+  const batchCheckIn = useCallback(async (payload) => {
       try {
           await axios.post('/bookings/return', payload);
           toast.success("Items returned successfully");
@@ -285,9 +324,9 @@ export function InventoryProvider({ children, user }) {
           console.error("Return failed", error);
           toast.error("Failed to return items");
       }
-  };
+  }, [fetchEquipment, fetchBookings]);
 
-  const cancelBooking = async (id) => {
+  const cancelBooking = useCallback(async (id) => {
       try {
           await axios.post(`/bookings/${id}/cancel`);
           toast.success("Booking cancelled");
@@ -297,9 +336,9 @@ export function InventoryProvider({ children, user }) {
           console.error("Cancel failed", error);
           toast.error(error.response?.data?.message || "Failed to cancel booking");
       }
-  };
+  }, [fetchBookings, fetchEquipment]);
 
-  const batchCancel = async (ids) => {
+  const batchCancel = useCallback(async (ids) => {
     try {
         await Promise.all(ids.map(id => axios.post(`/bookings/${id}/cancel`)));
         toast.success("Bookings cancelled successfully");
@@ -310,9 +349,9 @@ export function InventoryProvider({ children, user }) {
         toast.error("Failed to cancel some bookings");
         fetchBookings();
     }
-  };
+  }, [fetchBookings, fetchEquipment]);
 
-  const updateBooking = async (id, data) => {
+  const updateBooking = useCallback(async (id, data) => {
       try {
           await axios.put(`/bookings/${id}`, data);
           toast.success("Booking updated");
@@ -321,9 +360,9 @@ export function InventoryProvider({ children, user }) {
           console.error("Update failed", error);
           toast.error(error.response?.data?.message || "Failed to update booking");
       }
-  };
+  }, [fetchBookings]);
 
-  const replaceBooking = async (ids, payload, options = {}) => {
+  const replaceBooking = useCallback(async (ids, payload, options = {}) => {
     const { showToast = true } = options;
     try {
         await axios.post('/bookings/replace', { ids, ...payload });
@@ -335,9 +374,9 @@ export function InventoryProvider({ children, user }) {
         console.error("Replace failed", error);
         toast.error(error.response?.data?.message || "Failed to update booking");
     }
-  };
+  }, [fetchBookings]);
 
-  const reportProblem = async (report) => {
+  const reportProblem = useCallback(async (report) => {
     try {
       const response = await axios.post('/support-tickets', report);
       const ticket = response.data?.data;
@@ -351,14 +390,16 @@ export function InventoryProvider({ children, user }) {
       console.error("Support ticket failed", error);
       toast.error("Failed to create support ticket");
     }
-  };
-  const toggleAdmin = (val) => dispatch({ type: 'SET_ADMIN', payload: val });
-  const addStockTake = (record) => {
+  }, []);
+
+  const toggleAdmin = useCallback((val) => dispatch({ type: 'SET_ADMIN', payload: val }), []);
+
+  const addStockTake = useCallback((record) => {
     dispatch({ type: 'ADD_STOCK_TAKE', payload: record });
     toast.success("Stock take saved");
-  };
+  }, []);
 
-  const fetchEquipmentLogs = async (equipmentId) => {
+  const fetchEquipmentLogs = useCallback(async (equipmentId) => {
     try {
         const response = await axios.get(`/equipment/${equipmentId}/logs`);
         return response.data.data;
@@ -367,7 +408,20 @@ export function InventoryProvider({ children, user }) {
         toast.error("Failed to fetch equipment logs");
         return [];
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchEquipment();
+    fetchCategories();
+    fetchBookings();
+    fetchBundles();
+    fetchPersonalBundles();
+    fetchDrafts();
+  }, [fetchEquipment, fetchCategories, fetchBookings, fetchBundles, fetchPersonalBundles, fetchDrafts]);
+
+  useEffect(() => {
+    localStorage.setItem('isAdmin', state.isAdmin);
+  }, [state.isAdmin]);
 
   return (
     <InventoryContext.Provider value={{ 
@@ -388,6 +442,10 @@ export function InventoryProvider({ children, user }) {
         addStockTake,
         fetchBundles,
         fetchPersonalBundles,
+        fetchDrafts,
+        savePersonalBundle,
+        saveDraft,
+        deleteDraft,
         fetchEquipmentLogs
     }}>
       {children}

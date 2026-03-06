@@ -25,7 +25,6 @@ function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Click event chip -> open full details (equipment list)
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -44,18 +43,6 @@ function CalendarPage() {
     };
 
     navigate('/', { state: { duplicateProject: duplicateData } });
-  };
-
-  const handleCancel = async (bookingId) => {
-    if (window.confirm('Are you sure you want to cancel this booking?')) {
-      setIsDeleting(true);
-      try {
-        await cancelBooking(bookingId);
-        setSelectedEvent(null);
-      } finally {
-        setIsDeleting(false);
-      }
-    }
   };
 
   const handleSaveAsBundle = async (event) => {
@@ -717,14 +704,7 @@ function CalendarPage() {
                       <span>Save as Bundle</span>
                     </button>
                   </div>
-                  <button
-                    disabled={isDeleting}
-                    onClick={() => handleCancel(selectedEvent.bookingId)}
-                    className="w-full flex items-center justify-center space-x-2 py-3 border-2 border-red-100 dark:border-red-900/30 text-red-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 transition-all disabled:opacity-50"
-                  >
-                    <SafeIcon icon={FiTrash2} />
-                    <span>{isDeleting ? 'Cancelling...' : 'Cancel Booking'}</span>
-                  </button>
+                  
                 </div>
               </div>
             </motion.div>

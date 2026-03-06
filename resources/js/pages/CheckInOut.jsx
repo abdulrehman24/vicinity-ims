@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import Calendar from 'react-calendar';
@@ -26,6 +26,7 @@ function CheckInOut() {
   const [activeTab, setActiveTab] = useState('in');
   const [projectToEdit, setProjectToEdit] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState("Processing booking...");
   const [initialSelectedKeys, setInitialSelectedKeys] = useState([]);
   const [duplicateProjectData, setDuplicateProjectData] = useState(null);
   const location = useLocation();
@@ -52,6 +53,14 @@ function CheckInOut() {
   }, [bookings, user]);
 
   useEffect(() => {
+    const lastDismissed = localStorage.getItem('overdue_toast_dismissed_at');
+    if (lastDismissed) {
+      const tenMinutes = 10 * 60 * 1000;
+      if (Date.now() - parseInt(lastDismissed) < tenMinutes) {
+        return;
+      }
+    }
+
     if (overdueBookings.length > 0 && activeTab === 'in' && !projectToEdit) {
       const projects = {};
       overdueBookings.forEach(b => {
@@ -114,7 +123,10 @@ function CheckInOut() {
                 Process Returns Now
               </button>
               <button
-                onClick={() => toast.dismiss(t.id)}
+                onClick={() => {
+                  localStorage.setItem('overdue_toast_dismissed_at', Date.now().toString());
+                  toast.dismiss(t.id);
+                }}
                 className="w-full py-3 text-white/40 hover:text-white/80 text-[10px] font-black uppercase tracking-widest transition-colors duration-300"
               >
                 Dismiss for later
@@ -201,6 +213,7 @@ function CheckInOut() {
   const handleManualOutConfirm = async (payloadOrPayloads) => {
     const payloads = Array.isArray(payloadOrPayloads) ? payloadOrPayloads : [payloadOrPayloads];
 
+    setProcessingMessage("Processing booking...");
     setIsProcessing(true);
     try {
       if (projectToEdit) {
@@ -236,7 +249,7 @@ function CheckInOut() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-800 rounded-2xl px-8 py-6 shadow-lg flex items-center space-x-3 transition-colors">
             <div className="w-5 h-5 border-2 border-[#ebc1b6] border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs font-black tracking-widest text-[#4a5a67] dark:text-slate-200 uppercase">Processing booking...</span>
+            <span className="text-xs font-black tracking-widest text-[#4a5a67] dark:text-slate-200 uppercase">{processingMessage}</span>
           </div>
         </div>
       )}
@@ -278,6 +291,8 @@ function CheckInOut() {
             bundles={bundles} 
             categories={categories}
             onConfirm={handleManualOutConfirm}
+            setIsProcessing={setIsProcessing}
+            setProcessingMessage={setProcessingMessage}
             editingProject={projectToEdit}
             duplicateProject={duplicateProjectData}
             onUsedDuplicate={() => setDuplicateProjectData(null)}
@@ -329,18 +344,16 @@ const groupDates = (dates) => {
   return groups;
 };
 
-function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, editingProject, duplicateProject, onUsedDuplicate, onCancelEdit, collaboratorSuggestions }) {
-  const { personalBundles, fetchPersonalBundles } = useInventory();
+function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, setIsProcessing, setProcessingMessage, editingProject, duplicateProject, onUsedDuplicate, onCancelEdit, collaboratorSuggestions }) {
+  const { personalBundles, fetchPersonalBundles, drafts, fetchDrafts, saveDraft, savePersonalBundle, deleteDraft } = useInventory();
   const [selectedItems, setSelectedItems] = useState([]); // Array of {id, qty}
+  const [selectedDraftId, setSelectedDraftId] = useState(null);
+  const location = useLocation();
 
   const categoryOrder = React.useMemo(() => 
     (categories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
     [categories]
   );
-
-  useEffect(() => {
-    fetchPersonalBundles();
-  }, [fetchPersonalBundles]);
 
   const [selectedDates, setSelectedDates] = useState([]);
   const [shift, setShift] = useState('Full Day');
@@ -354,9 +367,49 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
     [editingProject]
   );
 
-  // Pre-fill form if editing or duplicating
+  const lastLoadedDraftId = React.useRef(null);
+
+  const handleLoadDraft = useCallback((draftId) => {
+    if (!draftId || lastLoadedDraftId.current === draftId) return;
+    const draft = drafts?.find(d => d.id === parseInt(draftId));
+    if (!draft) return;
+
+    lastLoadedDraftId.current = draftId;
+    setSelectedDraftId(draft.id);
+    setFormData({
+      projTitle: draft.project_title || '',
+      quote: draft.quotation_number || '',
+      shoot_type: draft.shoot_type || 'Commercial',
+      remarks: draft.remarks || ''
+    });
+    setShift(draft.shift || 'Full Day');
+    setCollaborators(draft.collaborators || []);
+    
+    if (draft.start_date && draft.end_date) {
+      const start = parseISO(draft.start_date);
+      const end = parseISO(draft.end_date);
+      setSelectedDates(eachDayOfInterval({ start, end }));
+    } else {
+      setSelectedDates([]);
+    }
+
+    const items = draft.items.map(di => ({
+      id: di.equipment_id,
+      qty: di.quantity,
+      name: di.equipment?.name || 'Unknown',
+      image: di.equipment?.image || ''
+    }));
+    setSelectedItems(items);
+    toast.success(`Draft "${draft.project_title || 'Untitled'}" loaded!`);
+  }, [drafts]);
+
+  // Pre-fill form if editing, duplicating, or loading a draft from navigation
   React.useEffect(() => {
-    if (editingProject) {
+    if (location.state?.loadDraftId && drafts.length > 0) {
+      handleLoadDraft(location.state.loadDraftId);
+      // Clear state after loading to prevent reload on every render
+      window.history.replaceState({}, document.title);
+    } else if (editingProject) {
         setFormData({
             projTitle: editingProject.shootName,
             quote: editingProject.quotationNumber,
@@ -442,7 +495,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
         // Mark as used to prevent re-triggering
         if (onUsedDuplicate) onUsedDuplicate();
     }
-  }, [editingProject, duplicateProject]);
+  }, [editingProject, duplicateProject, location.state, drafts, handleLoadDraft]);
 
 
   // 1. Availability Logic for Multi-Unit & Shifts
@@ -621,6 +674,82 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
     setSelectedItems(prev => prev.filter(i => i.id !== id));
   };
 
+  const resetForm = () => {
+    setSelectedItems([]);
+    setSelectedDates([]);
+    setShift('Full Day');
+    setFormData({ projTitle: '', quote: '', shootType: 'Commercial', remarks: '' });
+    setCollaborators([]);
+    setSearchTerm('');
+    setSelectedCategory('all');
+    setSelectedDraftId(null);
+    lastLoadedDraftId.current = null;
+  };
+
+  const handleSaveDraft = async () => {
+    if (selectedItems.length === 0) {
+      toast.error("Add some equipment first!");
+      return;
+    }
+
+    setProcessingMessage("Saving draft...");
+    setIsProcessing(true);
+    try {
+      const draftData = {
+        id: selectedDraftId,
+        project_title: formData.projTitle,
+        quotation_number: formData.quote,
+        shoot_type: formData.shootType,
+        remarks: formData.remarks,
+        shift,
+        start_date: selectedDates.length > 0 ? format(selectedDates[0], 'yyyy-MM-dd') : null,
+        end_date: selectedDates.length > 0 ? format(selectedDates[selectedDates.length - 1], 'yyyy-MM-dd') : null,
+        collaborators: collaborators,
+        items: selectedItems.map(i => ({ id: i.id, qty: i.qty }))
+      };
+
+      const success = await saveDraft(draftData);
+      if (success) {
+        if (!selectedDraftId) {
+          // Refresh the dropdown and select the newly created draft
+          const updatedDrafts = await fetchDrafts();
+          if (updatedDrafts && updatedDrafts.length > 0) {
+            setSelectedDraftId(updatedDrafts[0].id);
+          }
+        }
+        resetForm();
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSavePersonalBundle = async () => {
+    if (selectedItems.length === 0) {
+      toast.error("Add some equipment first!");
+      return;
+    }
+
+    const name = window.prompt("Enter a name for this personal bundle:");
+    if (!name) return;
+
+    setProcessingMessage("Saving bundle...");
+    setIsProcessing(true);
+    try {
+      const bundleData = {
+        name,
+        items: selectedItems.map(i => ({ equipment_id: i.id, quantity: i.qty }))
+      };
+
+      const success = await savePersonalBundle(bundleData);
+      if (success) {
+        resetForm();
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleBooking = async () => {
     const dateGroups = groupDates(requestedDates);
 
@@ -647,13 +776,13 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
     }));
 
     await onConfirm(payloads);
-    setSelectedItems([]);
-    setSelectedDates([]);
-    setShift('Full Day');
-    setFormData({ projTitle: '', quote: '', shootType: 'Commercial', remarks: '' });
-    setCollaborators([]);
-    setSearchTerm('');
-    setSelectedCategory('all');
+    
+    // If we were using a draft, delete it after successful booking
+    if (selectedDraftId) {
+      await deleteDraft(selectedDraftId);
+    }
+
+    resetForm();
   };
 
   const filteredEquipment = useMemo(() => {
@@ -717,7 +846,25 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
         <div className="bg-white dark:bg-slate-800 p-5 lg:p-6 rounded-3xl border border-gray-100 dark:border-slate-700 shadow-sm transition-colors">
           <label className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-4 block">2. Select Equipment</label>
           <div className="space-y-3">
-             {/* Bundles Dropdowns */}
+             {/* Drafts, Bundles Dropdowns */}
+            {drafts && drafts.length > 0 && (
+                <div className="relative">
+                    <SafeIcon icon={FiFileText} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#ebc1b6] text-xs" />
+                    <select
+                        onChange={(e) => {
+                            handleLoadDraft(e.target.value);
+                            e.target.value = ""; // Reset
+                        }}
+                        className="w-full pl-9 pr-3 py-2 bg-[#ebc1b6]/10 dark:bg-[#ebc1b6]/5 border border-[#ebc1b6]/20 focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] rounded-xl outline-none text-[11px] font-bold text-[#4a5a67] dark:text-[#ebc1b6] transition-colors"
+                    >
+                        <option value="" className="dark:bg-slate-900">Load Draft...</option>
+                        {drafts.map(d => (
+                            <option key={d.id} value={d.id} className="dark:bg-slate-900">{d.project_title || 'Untitled'} ({d.items?.length || 0} items)</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
             {bundles && bundles.length > 0 && (
                 <div className="relative">
                     <SafeIcon icon={FiPackage} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 text-xs" />
@@ -954,13 +1101,36 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, ed
               />
             </div>
 
-            <button 
-              onClick={handleBooking}
-              disabled={selectedItems.length === 0 || !formData.projTitle || requestedDates.length === 0}
-              className="w-full py-5 bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-lg disabled:opacity-30 transition-all hover:scale-[1.01]"
-            >
-              {editingProject ? 'Update Booking' : 'Confirm Deployment'}
-            </button>
+            <div className="flex flex-col space-y-3">
+              <button 
+                onClick={handleBooking}
+                disabled={selectedItems.length === 0 || !formData.projTitle || requestedDates.length === 0}
+                className="w-full py-5 bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-lg disabled:opacity-30 transition-all hover:scale-[1.01]"
+              >
+                {editingProject ? 'Update Booking' : 'Confirm Deployment'}
+              </button>
+
+              {!editingProject && (
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={handleSaveDraft}
+                    disabled={selectedItems.length === 0}
+                    className="flex items-center justify-center space-x-2 py-4 bg-gray-100 dark:bg-slate-900/50 text-[#4a5a67] dark:text-[#ebc1b6] rounded-[1.2rem] font-black text-[10px] uppercase tracking-widest disabled:opacity-30 transition-all hover:bg-gray-200 dark:hover:bg-slate-800"
+                  >
+                    <SafeIcon icon={FiFileText} />
+                    <span>Save Draft</span>
+                  </button>
+                  <button 
+                    onClick={handleSavePersonalBundle}
+                    disabled={selectedItems.length === 0}
+                    className="flex items-center justify-center space-x-2 py-4 bg-gray-100 dark:bg-slate-900/50 text-[#4a5a67] dark:text-[#ebc1b6] rounded-[1.2rem] font-black text-[10px] uppercase tracking-widest disabled:opacity-30 transition-all hover:bg-gray-200 dark:hover:bg-slate-800"
+                  >
+                    <SafeIcon icon={FiPackage} />
+                    <span>Save Bundle</span>
+                  </button>
+                </div>
+              )}
+            </div>
             {editingProject && (
                  <button 
                    onClick={onCancelEdit}

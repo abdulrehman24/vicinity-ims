@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Calendar from 'react-calendar';
@@ -12,17 +12,178 @@ const {
   FiSearch, FiCalendar, FiList, FiClock, FiCamera, 
   FiLogIn, FiLogOut, FiAlertTriangle, FiFilter, FiDownload, FiChevronDown, FiChevronUp,
   FiChevronLeft, FiChevronRight, FiChevronsLeft, FiChevronsRight,
-  FiEdit2, FiXCircle
+  FiEdit2, FiXCircle, FiFileText, FiTrash2
 } = FiIcons;
 
+function DraftRecord({ draft, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
+  const navigate = useNavigate();
+
+  const handleEditDraft = () => {
+    // Navigate to CheckInOut with the draft data to load it
+    navigate('/', { state: { loadDraftId: draft.id } });
+  };
+
+  const totalItems = useMemo(() => 
+    (draft.items || []).reduce((sum, item) => sum + (item.quantity || 1), 0)
+  , [draft.items]);
+
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden hover:border-[#ebc1b6] dark:hover:border-[#ebc1b6] transition-all group-card">
+       <div 
+         className="p-6 flex flex-col md:flex-row items-center justify-between cursor-pointer"
+         onClick={() => setExpanded(!expanded)}
+       >
+        <div className="flex items-center space-x-6 w-full md:w-auto">
+          <div className="p-4 rounded-xl shrink-0 bg-[#ebc1b622] text-[#4a5a67] dark:text-[#ebc1b6]">
+            <SafeIcon icon={FiFileText} className="text-xl" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center space-x-3 mb-1">
+              <h3 className="text-lg font-bold text-[#4a5a67] dark:text-slate-200 truncate">{draft.project_title || 'Untitled Draft'}</h3>
+              {draft.quotation_number && (
+                <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 px-2 py-0.5 rounded-full font-black uppercase tracking-widest shrink-0">
+                  {draft.quotation_number}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest">
+              <div className="flex items-center space-x-1">
+                <SafeIcon icon={FiClock} />
+                <span>Last Updated: {draft.updated_at ? format(new Date(draft.updated_at), 'MMM d, HH:mm') : 'N/A'}</span>
+              </div>
+              <div className="flex items-center space-x-1 text-[#4a5a67] dark:text-[#ebc1b6]">
+                <div className="w-1.5 h-1.5 bg-[#4a5a67] dark:bg-[#ebc1b6] rounded-full" />
+                <span>{totalItems} Items</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-6 mt-4 md:mt-0 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 border-gray-50 dark:border-slate-700 justify-between md:justify-end">
+          <div className="text-right">
+            <p className="text-xs font-bold text-[#4a5a67] dark:text-slate-200">
+                {draft.start_date && format(new Date(draft.start_date), 'MMM d')}
+                {draft.end_date && draft.end_date !== draft.start_date && ` - ${format(new Date(draft.end_date), 'MMM d, yyyy')}`}
+            </p>
+            <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase font-black tracking-tighter">
+                {draft.shift || 'Full Day'}
+            </p>
+          </div>
+          
+          <div className="flex items-center space-x-2" onClick={e => e.stopPropagation()}>
+             <button 
+                 onClick={handleEditDraft}
+                 className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg text-gray-400 dark:text-slate-500 hover:text-[#4a5a67] dark:hover:text-slate-300 transition-colors"
+                 title="Edit Draft"
+             >
+                 <SafeIcon icon={FiEdit2} />
+             </button>
+             <button 
+                 onClick={onDelete}
+                 className="p-2 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                 title="Delete Draft"
+             >
+                 <SafeIcon icon={FiTrash2} />
+             </button>
+             <div className={`transition-transform duration-300 ${expanded ? 'rotate-180' : ''} ml-2`}>
+                <SafeIcon icon={FiChevronDown} className="text-gray-400 dark:text-slate-500" />
+             </div>
+          </div>
+        </div>
+       </div>
+
+       <AnimatePresence>
+         {expanded && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }} 
+              animate={{ height: 'auto', opacity: 1 }} 
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-gray-50 dark:bg-slate-900/50 border-t border-gray-100 dark:border-slate-700"
+            >
+               <div className="p-6 space-y-4">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div className="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-1">Collaborators</div>
+                     <div className="text-xs font-black text-[#4a5a67] dark:text-slate-200 mt-1">
+                       {Array.isArray(draft.collaborators) && draft.collaborators.length > 0
+                         ? draft.collaborators
+                             .map((c) => (typeof c === 'string' ? c : c.email))
+                             .filter(Boolean)
+                             .join(', ')
+                         : 'None'}
+                     </div>
+                   </div>
+                   <div className="p-5 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-1">Shoot Type</div>
+                     <div className="text-xs font-black text-[#4a5a67] dark:text-slate-200 mt-1">{draft.shoot_type || 'N/A'}</div>
+                   </div>
+                 </div>
+
+                 {draft.remarks && (
+                   <div className="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-3">
+                       Remarks
+                     </div>
+                     <div className="text-xs text-[#4a5a67] dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                       {draft.remarks}
+                     </div>
+                   </div>
+                 )}
+
+                 <div className="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                   <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-6">
+                     Draft Equipment
+                   </div>
+                   <div className="space-y-4">
+                     {Object.entries(
+                       (draft.items || []).reduce((acc, item) => {
+                         const cat = item.equipment?.category || 'Uncategorized';
+                         if (!acc[cat]) acc[cat] = [];
+                         acc[cat].push(item);
+                         return acc;
+                       }, {})
+                     )
+                       .sort(([a], [b]) => a.localeCompare(b))
+                       .map(([category, items]) => (
+                         <div key={category} className="space-y-2">
+                           <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-1 border-b border-gray-50 dark:border-slate-700 pb-1">
+                             {category}
+                           </div>
+                           <ul className="space-y-2">
+                             {items
+                               .sort((a, b) => (a.equipment?.name || '').localeCompare(b.equipment?.name || ''))
+                               .map((item, idx) => (
+                                 <li key={`${category}-${idx}`} className="flex items-center space-x-3">
+                                   <span className="text-[10px] font-black text-gray-400 dark:text-slate-500 shrink-0 w-6">
+                                     {item.quantity || 1}x
+                                   </span>
+                                   <span className="text-xs font-bold text-[#4a5a67] dark:text-slate-200 uppercase tracking-wide">
+                                     {item.equipment?.name || 'Unknown Equipment'}
+                                   </span>
+                                 </li>
+                               ))}
+                           </ul>
+                         </div>
+                       ))}
+                   </div>
+                 </div>
+               </div>
+            </motion.div>
+         )}
+       </AnimatePresence>
+    </div>
+  );
+}
+
 function Records() {
-  const { bookings, equipment, cancelBooking, batchCancel, user, categories: orderedCategories } = useInventory();
+  const { bookings, equipment, drafts, deleteDraft, cancelBooking, batchCancel, user, categories: orderedCategories } = useInventory();
   const categoryOrder = useMemo(() => 
     (orderedCategories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
     [orderedCategories]
   );
   const [view, setView] = useState('list'); // 'list' or 'calendar'
-  const [activeTab, setActiveTab] = useState('my_bookings'); // 'my_bookings' or 'my_collaborations'
+  const [activeTab, setActiveTab] = useState('my_bookings'); // 'my_bookings' or 'my_collaborations' or 'drafts'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
@@ -41,11 +202,26 @@ function Records() {
     });
   };
 
+  const handleDeleteDraft = (draft) => {
+    setModalConfig({
+        isOpen: true,
+        title: 'Delete Draft',
+        message: `Are you sure you want to delete the draft for "${draft.project_title || 'Untitled'}"? This action cannot be undone.`,
+        isDangerous: true,
+        confirmText: 'Yes, Delete',
+        onConfirm: async () => {
+            await deleteDraft(draft.id);
+        }
+    });
+  };
+
   const visibleBookings = useMemo(() => {
     if (!user) return bookings;
 
     const currentId = user.id;
     const currentEmail = user.email ? user.email.toLowerCase() : null;
+
+    if (activeTab === 'drafts') return [];
 
     return bookings.filter(b => {
       let isOwner = false;
@@ -74,6 +250,11 @@ function Records() {
       return isOwner || isCollaborator;
     });
   }, [bookings, user, activeTab]);
+
+  const visibleDrafts = useMemo(() => {
+    if (activeTab !== 'drafts') return [];
+    return drafts || [];
+  }, [drafts, activeTab]);
 
   const stockByCategory = useMemo(() => {
     const stock = {};
@@ -254,6 +435,22 @@ function Records() {
     });
   }, [groupedRecords, searchTerm]);
 
+  const filteredDrafts = useMemo(() => {
+    if (activeTab !== 'drafts') return [];
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return visibleDrafts;
+
+    return visibleDrafts.filter(d => {
+      const title = (d.project_title || '').toLowerCase();
+      const quote = (d.quotation_number || '').toLowerCase();
+      const hasMatchingItem = (d.items || []).some(i => 
+        (i.equipment?.name || '').toLowerCase().includes(term)
+      );
+
+      return title.includes(term) || quote.includes(term) || hasMatchingItem;
+    });
+  }, [visibleDrafts, searchTerm, activeTab]);
+
   const selectedDayRecords = useMemo(() => {
     return groupedRecords
       .filter(group => {
@@ -364,6 +561,12 @@ function Records() {
             >
               Collaborations
             </button>
+            <button 
+              onClick={() => setActiveTab('drafts')}
+              className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'drafts' ? 'bg-white dark:bg-slate-700 text-[#4a5a67] dark:text-slate-200 shadow-sm' : 'text-gray-400 dark:text-slate-500 hover:text-[#4a5a67] dark:hover:text-slate-300'}`}
+            >
+              Draft Bookings
+            </button>
           </div>
         </div>
 
@@ -406,16 +609,22 @@ function Records() {
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              {filteredRecords.map((group) => (
-                <RecordGroup 
-                  key={group.id} 
-                  group={group} 
-                  currentUser={user}
-                  onEdit={(editProject) => navigate('/', { state: { editProject } })}
-                  onCancel={() => handleCancelRequest(group)}
-                />
-              ))}
-              {filteredRecords.length === 0 && <EmptyState />}
+              {activeTab === 'drafts' ? (
+                filteredDrafts.map((draft) => (
+                  <DraftRecord key={draft.id} draft={draft} onDelete={() => handleDeleteDraft(draft)} />
+                ))
+              ) : (
+                filteredRecords.map((group) => (
+                  <RecordGroup 
+                    key={group.id} 
+                    group={group} 
+                    currentUser={user}
+                    onEdit={(editProject) => navigate('/', { state: { editProject } })}
+                    onCancel={() => handleCancelRequest(group)}
+                  />
+                ))
+              )}
+              {((activeTab === 'drafts' && filteredDrafts.length === 0) || (activeTab !== 'drafts' && filteredRecords.length === 0)) && <EmptyState />}
             </div>
           </motion.div>
         ) : (

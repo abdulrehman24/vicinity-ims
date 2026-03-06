@@ -51,6 +51,12 @@ function AdminCategories() {
 
   useEffect(() => {
     loadCategories();
+    // Clear any pending reorder timeout on unmount
+    return () => {
+      if (reorderTimerRef.current) {
+        clearTimeout(reorderTimerRef.current);
+      }
+    };
   }, [page, pageSize, search]);
 
   const handleSubmit = async (e) => {
@@ -110,19 +116,33 @@ function AdminCategories() {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const handleReorder = async (newOrder) => {
-    // Optimistically update local state
+  // Use a ref to store the timeout ID for debouncing reorder API calls
+  const reorderTimerRef = React.useRef(null);
+
+  const handleReorder = (newOrder) => {
+    // Optimistically update local state immediately for smooth UI
     setCategories(newOrder);
     
-    try {
-      await axios.post('/api/admin/categories/reorder', {
-        order: newOrder.map(c => c.id)
-      });
-      toast.success('Order updated');
-    } catch (e) {
-      toast.error('Failed to update order');
-      loadCategories(); // Rollback
+    // Clear any pending API call
+    if (reorderTimerRef.current) {
+      clearTimeout(reorderTimerRef.current);
     }
+
+    // Debounce the API call by 500ms to avoid spamming the server and multiple toasts
+    reorderTimerRef.current = setTimeout(async () => {
+      try {
+        await axios.post('/api/admin/categories/reorder', {
+          order: newOrder.map(c => c.id),
+          page,
+          length: pageSize
+        });
+        // Using a unique ID ensures only one toast is shown/updated
+        toast.success('Order updated', { id: 'reorder-categories' });
+      } catch (e) {
+        toast.error('Failed to update order', { id: 'reorder-categories' });
+        loadCategories(); // Rollback on error
+      }
+    }, 500);
   };
 
   const isSearching = search.trim().length > 0;
@@ -193,6 +213,9 @@ function AdminCategories() {
                 <th className="py-3 px-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   Description
                 </th>
+                <th className="py-3 px-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  Order
+                </th>
                 <th className="py-3 px-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">
                   Actions
                 </th>
@@ -233,6 +256,11 @@ function AdminCategories() {
                       <p className="text-[11px] text-gray-300 italic">No description</p>
                     )}
                   </td>
+                  <td className="py-3 px-3 align-middle">
+                    <span className="text-xs font-bold text-[#4a5a67] bg-gray-100 px-2 py-1 rounded-md">
+                      {category.sort_order}
+                    </span>
+                  </td>
                   <td className="py-3 px-3 align-top">
                     <div className="flex justify-end items-center space-x-2">
                       <button
@@ -256,7 +284,7 @@ function AdminCategories() {
               ))}
               {!loading && categories.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="py-6 text-center text-xs text-gray-400">
+                  <td colSpan={5} className="py-6 text-center text-xs text-gray-400">
                     No categories yet. Use the Add Category button to create one.
                   </td>
                 </tr>
