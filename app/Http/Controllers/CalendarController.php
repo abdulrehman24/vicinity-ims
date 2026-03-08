@@ -14,14 +14,14 @@ class CalendarController extends Controller
             ob_end_clean();
         }
 
+        // Get categories with their sort order outside the loop for efficiency
+        $categories = \App\Models\Category::all()->pluck('sort_order', 'name')->toArray();
+
         $bookings = Booking::with(['user', 'equipments'])
             ->where('status', '!=', 'cancelled')
             ->whereNotNull('start_date')
             ->whereNotNull('end_date')
             ->get();
-
-        // Get categories with their sort order outside the loop for efficiency
-        $categories = \App\Models\Category::all()->pluck('sort_order', 'name')->toArray();
 
         $events = [];
         // DTSTAMP should be current generation time in UTC

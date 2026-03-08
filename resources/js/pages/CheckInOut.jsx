@@ -19,10 +19,6 @@ const {
 
 function CheckInOut() {
   const { equipment, bookings, bundles, categories, checkOutEquipment, batchCheckIn, isAdmin, replaceBooking, user } = useInventory();
-  const categoryOrder = useMemo(() => 
-    (categories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
-    [categories]
-  );
   const [activeTab, setActiveTab] = useState('in');
   const [projectToEdit, setProjectToEdit] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -307,6 +303,7 @@ function CheckInOut() {
             key="out" 
             equipment={equipment} 
             bookings={bookings} 
+            categories={categories}
             onConfirm={(payload) => {
               batchCheckIn(payload);
               setInitialSelectedKeys([]); // Clear pre-selection after success
@@ -350,7 +347,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, se
   const [selectedDraftId, setSelectedDraftId] = useState(null);
   const location = useLocation();
 
-  const categoryOrder = React.useMemo(() => 
+  const categoryOrder = useMemo(() => 
     (categories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
     [categories]
   );
@@ -1146,12 +1143,17 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, se
   );
 }
 
-function GroupReturnView({ equipment, bookings, onConfirm, onEditRequest, initialSelectedKeys = [] }) {
+function GroupReturnView({ equipment, bookings, categories, onConfirm, onEditRequest, initialSelectedKeys = [] }) {
   const { cancelBooking, user } = useInventory();
   const [returnStates, setReturnStates] = useState({}); // { itemId: { isDamaged: bool, note: str } }
   const [selectedProjectKeys, setSelectedProjectKeys] = useState(initialSelectedKeys);
   const [deleteModal, setDeleteModal] = useState(null);
   const [activeTab, setActiveTab] = useState('my_bookings'); // 'my_bookings' or 'my_collaborations'
+
+  const categoryOrder = useMemo(() => 
+    (categories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
+    [categories]
+  );
 
   // Update selection if parent changes it (e.g. clicking overdue toast)
   useEffect(() => {

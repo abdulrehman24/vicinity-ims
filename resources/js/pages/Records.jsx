@@ -15,7 +15,7 @@ const {
   FiEdit2, FiXCircle, FiFileText, FiTrash2
 } = FiIcons;
 
-function DraftRecord({ draft, onDelete }) {
+function DraftRecord({ draft, onDelete, categoryOrder }) {
   const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
 
@@ -144,7 +144,7 @@ function DraftRecord({ draft, onDelete }) {
                          return acc;
                        }, {})
                      )
-                       .sort(([a], [b]) => a.localeCompare(b))
+                       .sort(([catA], [catB]) => (categoryOrder[catA] ?? 999) - (categoryOrder[catB] ?? 999))
                        .map(([category, items]) => (
                          <div key={category} className="space-y-2">
                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-1 border-b border-gray-50 dark:border-slate-700 pb-1">
@@ -178,10 +178,12 @@ function DraftRecord({ draft, onDelete }) {
 
 function Records() {
   const { bookings, equipment, drafts, deleteDraft, cancelBooking, batchCancel, user, categories: orderedCategories } = useInventory();
+  
   const categoryOrder = useMemo(() => 
     (orderedCategories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
     [orderedCategories]
   );
+
   const [view, setView] = useState('list'); // 'list' or 'calendar'
   const [activeTab, setActiveTab] = useState('my_bookings'); // 'my_bookings' or 'my_collaborations' or 'drafts'
   const [searchTerm, setSearchTerm] = useState('');
@@ -611,7 +613,7 @@ function Records() {
             <div className="grid grid-cols-1 gap-4">
               {activeTab === 'drafts' ? (
                 filteredDrafts.map((draft) => (
-                  <DraftRecord key={draft.id} draft={draft} onDelete={() => handleDeleteDraft(draft)} />
+                  <DraftRecord key={draft.id} draft={draft} onDelete={() => handleDeleteDraft(draft)} categoryOrder={categoryOrder} />
                 ))
               ) : (
                 filteredRecords.map((group) => (
@@ -621,6 +623,7 @@ function Records() {
                     currentUser={user}
                     onEdit={(editProject) => navigate('/', { state: { editProject } })}
                     onCancel={() => handleCancelRequest(group)}
+                    categoryOrder={categoryOrder}
                   />
                 ))
               )}
@@ -886,7 +889,7 @@ function Records() {
   );
 }
 
-function RecordGroup({ group, onEdit, onCancel, currentUser }) {
+function RecordGroup({ group, onEdit, onCancel, currentUser, categoryOrder }) {
   const [expanded, setExpanded] = useState(false);
   
   // Aggregate items by name and sum quantities to prevent duplicates
@@ -1109,7 +1112,7 @@ function RecordGroup({ group, onEdit, onCancel, currentUser }) {
                          return acc;
                        }, {})
                      )
-                       .sort(([a], [b]) => a.localeCompare(b))
+                       .sort(([catA], [catB]) => (categoryOrder[catA] ?? 999) - (categoryOrder[catB] ?? 999))
                        .map(([category, items]) => (
                          <div key={category} className="space-y-4">
                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-1 border-b border-gray-50 dark:border-slate-700 pb-1">
