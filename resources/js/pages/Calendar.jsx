@@ -132,6 +132,45 @@ function CalendarPage() {
     return d;
   };
 
+  const groupDatesIntoRanges = (dates) => {
+    if (!dates || dates.length === 0) return [];
+    
+    // Create unique date objects (ignoring time) and sort them
+    const dateMap = new Map();
+    dates.forEach(d => {
+      const key = dateOnlyStr(d);
+      if (!dateMap.has(key)) dateMap.set(key, d);
+    });
+    
+    const sorted = Array.from(dateMap.values()).sort((a, b) => a.getTime() - b.getTime());
+    
+    const ranges = [];
+    if (sorted.length === 0) return ranges;
+    
+    let currentStart = sorted[0];
+    let currentEnd = sorted[0];
+    
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const curr = sorted[i];
+      
+      // Check if curr is the day after prev
+      // (Using 1.1 to avoid floating point issues with daylight savings or similar)
+      const diffDays = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (diffDays <= 1.1) {
+        currentEnd = curr;
+      } else {
+        ranges.push({ start: currentStart, end: currentEnd });
+        currentStart = curr;
+        currentEnd = curr;
+      }
+    }
+    
+    ranges.push({ start: currentStart, end: currentEnd });
+    return ranges;
+  };
+
   const openMoreModal = (date, fcEventApiList) => {
     const items = (fcEventApiList || []).map(e => ({
       id: e.id,
@@ -145,102 +184,86 @@ function CalendarPage() {
   };
 
   const bookingBars = useMemo(() => {
-    const map = new Map(); // bookingId -> aggregate
+    const projectsMap = new Map(); // bookingId -> { itemsMap, allDates, info }
 
     bookings.forEach((b) => {
-      if (b.status === 'cancelled') return;
+      // Keep all statuses for visibility
       const bookingId = b.id ?? `${b.shootName || 'unknown'}|${b.startDate || ''}|${b.returnedAt || ''}`;
 
-      const shootName = b.shootName || 'Untitled Project';
-      const quotationNumber = b.quotationNumber || '';
-      const userName = b.user?.name || 'Operations';
-      const createdAt = b.created_at || b.createdAt;
-      const remarks = b.remarks || '';
-      const collaborators = Array.isArray(b.collaborators) ? b.collaborators : [];
-
-      // Collect all involved dates:
-      // - Prefer b.dates[] if present (these look like yyyy-MM-dd)
-      // - Else fallback to startDate
-      const dateList = [];
-
-      if (Array.isArray(b.dates) && b.dates.length > 0) {
-        b.dates.forEach((ds) => {
-          const d = safeParse(ds);
-          if (d) dateList.push(d);
-        });
-      } else {
-        const sd = safeParse(b.startDate);
-        if (sd) dateList.push(sd);
-      }
-
-      // Determine range start
-      let rangeStart = null;
-      if (dateList.length > 0) {
-        rangeStart = new Date(Math.min(...dateList.map(d => d.getTime())));
-      } else {
-        rangeStart = safeParse(b.startDate);
-      }
-
-      let rangeEndInclusive = null;
-      const returnedAt = safeParse(b.returnedAt);
-      if (returnedAt) {
-        rangeEndInclusive = returnedAt;
-      } else if (dateList.length > 0) {
-        rangeEndInclusive = new Date(Math.max(...dateList.map(d => d.getTime())));
-      } else if (rangeStart) {
-        rangeEndInclusive = rangeStart;
-      }
-
-      if (!rangeStart || !rangeEndInclusive) return;
-
-      const eq = equipment.find(item => item.id === b.equipmentId);
-      const eqName = b.equipmentName
-        ? b.equipmentName
-        : eq?.name || 'Unknown Equipment';
-      const eqCategory = eq?.category || 'Uncategorized';
-      const qty = b.quantity || 1;
-
-      if (!map.has(bookingId)) {
-        map.set(bookingId, {
-          bookingId,
-          shootName,
-          quotationNumber,
-          userName,
-          createdAt,
+      if (!projectsMap.has(bookingId)) {
+        projectsMap.set(bookingId, {
+          shootName: b.shootName || 'Untitled Project',
+          quotationNumber: b.quotationNumber || '',
+          userName: b.user?.name || 'Operations',
+          createdAt: b.created_at || b.createdAt,
           status: b.status,
-          remarks,
-          collaborators,
-          start: rangeStart,
-          endInclusive: rangeEndInclusive,
+          remarks: b.remarks || '',
+          collaborators: Array.isArray(b.collaborators) ? b.collaborators : [],
+          returnedAt: safeParse(b.returnedAt),
+          allDates: [],
           itemsMap: new Map(),
         });
       }
 
-      const agg = map.get(bookingId);
+      const proj = projectsMap.get(bookingId);
 
-      if (rangeStart < agg.start) agg.start = rangeStart;
-      if (rangeEndInclusive > agg.endInclusive) agg.endInclusive = rangeEndInclusive;
+      // Collect all involved dates:
+      if (Array.isArray(b.dates) && b.dates.length > 0) {
+        b.dates.forEach((ds) => {
+          const d = safeParse(ds);
+          if (d) proj.allDates.push(d);
+        });
+      } else {
+        const sd = safeParse(b.startDate);
+        if (sd) proj.allDates.push(sd);
+      }
+
+      const eq = equipment.find(item => item.id === b.equipmentId);
+      const eqName = b.equipmentName || eq?.name || 'Unknown Equipment';
+      const eqCategory = eq?.category || 'Uncategorized';
+      const qty = b.quantity || 1;
 
       const key = `${eqCategory}||${eqName}`;
-      if (!agg.itemsMap.has(key)) {
-        agg.itemsMap.set(key, { 
-          id: b.equipmentId, // Keep original ID for reliable duplication
+      if (!proj.itemsMap.has(key)) {
+        proj.itemsMap.set(key, { 
+          id: b.equipmentId, 
           name: eqName, 
           quantity: 0, 
           category: eqCategory 
         });
       }
-      const entry = agg.itemsMap.get(key);
-      entry.quantity += qty;
+      proj.itemsMap.get(key).quantity += qty;
     });
 
-    return Array.from(map.values()).map((agg) => ({
-      ...agg,
-      items: Array.from(agg.itemsMap.values()).sort((a, b) => {
-        if (a.category === b.category) return a.name.localeCompare(b.name);
-        return a.category.localeCompare(b.category);
-      }),
-    }));
+    const bars = [];
+    projectsMap.forEach((proj, bookingId) => {
+      const ranges = groupDatesIntoRanges(proj.allDates);
+      
+      ranges.forEach((range, idx) => {
+        // If project is returned, we still want to see the original dates on the calendar
+        // but maybe with a different color (handled in fcEvents)
+
+        bars.push({
+          bookingId: idx === 0 ? bookingId : `${bookingId}-range-${idx}`,
+          shootName: proj.shootName,
+          quotationNumber: proj.quotationNumber,
+          userName: proj.userName,
+          createdAt: proj.createdAt,
+          status: proj.status,
+          remarks: proj.remarks,
+          collaborators: proj.collaborators,
+          start: range.start,
+          endInclusive: range.end,
+          returnedAt: proj.returnedAt,
+          items: Array.from(proj.itemsMap.values()).sort((a, b) => {
+            if (a.category === b.category) return a.name.localeCompare(b.name);
+            return (a.category || '').localeCompare(b.category || '');
+          }),
+        });
+      });
+    });
+
+    return bars;
   }, [bookings, equipment]);
 
   // FullCalendar event objects
@@ -256,6 +279,7 @@ function CalendarPage() {
         start: startStr,
         end: endExclusiveStr,
         allDay: true,
+        className: b.status === 'returned' ? 'status-returned' : b.status === 'cancelled' ? 'status-cancelled' : '',
         extendedProps: {
           bookingId: b.bookingId,
           shootName: b.shootName,
@@ -265,6 +289,8 @@ function CalendarPage() {
           items: b.items,
           remarks: b.remarks,
           collaborators: b.collaborators,
+          status: b.status,
+          returnedAt: b.returnedAt ? dateOnlyStr(b.returnedAt) : null,
           start: startStr,
           endInclusive: dateOnlyStr(b.endInclusive),
         },
@@ -412,7 +438,13 @@ function CalendarPage() {
                     <button
                       key={String(b.bookingId)}
                       type="button"
-                      className="w-full text-left p-6 bg-[#4a5a67] dark:bg-slate-900 rounded-[2rem] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md"
+                      className={`w-full text-left p-6 rounded-[2rem] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md ${
+                        b.status === 'returned' 
+                          ? 'bg-green-600 dark:bg-green-900/80' 
+                          : b.status === 'cancelled' 
+                            ? 'bg-red-600 dark:bg-red-900/80' 
+                            : 'bg-[#4a5a67] dark:bg-slate-900'
+                      }`}
                       onClick={() => {
                         setSelectedEvent({
                           bookingId: b.bookingId,
@@ -423,6 +455,8 @@ function CalendarPage() {
                           items: b.items,
                           remarks: b.remarks,
                           collaborators: b.collaborators,
+                          status: b.status,
+                          returnedAt: b.returnedAt ? dateOnlyStr(b.returnedAt) : null,
                           start: dateOnlyStr(b.start),
                           endInclusive: dateOnlyStr(b.endInclusive),
                         });
@@ -430,16 +464,36 @@ function CalendarPage() {
                     >
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center space-x-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#ebc1b6]" />
-                          <span className="text-[9px] font-black text-[#ebc1b6] uppercase tracking-widest">Active Now</span>
+                          <div className={`w-1.5 h-1.5 rounded-full ${
+                            b.status === 'returned' || b.status === 'cancelled' 
+                              ? 'bg-white' 
+                              : 'bg-[#ebc1b6]'
+                          }`} />
+                          <span className={`text-[9px] font-black uppercase tracking-widest ${
+                            b.status === 'returned' || b.status === 'cancelled' 
+                              ? 'text-white' 
+                              : 'text-[#ebc1b6]'
+                          }`}>
+                            {b.status === 'returned' ? 'Returned' : b.status === 'cancelled' ? 'Cancelled' : 'Active Now'}
+                          </span>
                         </div>
                         <SafeIcon icon={FiExternalLink} className="text-white/40 text-xs" />
                       </div>
 
-                      <h5 className="text-white font-bold text-sm leading-tight mb-1 truncate">{b.shootName}</h5>
-                      <div className="flex items-center space-x-2 text-white/60 mb-6">
-                        <SafeIcon icon={FiUser} className="text-[10px]" />
-                        <span className="text-[10px] font-bold">{b.userName}</span>
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0 flex-1">
+                          <h5 className="text-white font-bold text-sm leading-tight mb-1 truncate">{b.shootName}</h5>
+                          <div className="flex items-center space-x-2 text-white/60 mb-6">
+                            <SafeIcon icon={FiUser} className="text-[10px]" />
+                            <span className="text-[10px] font-bold">{b.userName}</span>
+                          </div>
+                        </div>
+                        {b.returnedAt && (
+                          <div className="text-right shrink-0 ml-2">
+                             <p className="text-[8px] font-black text-white/40 uppercase tracking-widest leading-none mb-1">Returned On</p>
+                             <p className="text-[10px] font-bold text-white leading-none">{format(b.returnedAt, 'MMM d')}</p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="pt-6 border-t border-white/10">
@@ -617,9 +671,18 @@ function CalendarPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl transition-colors">
                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">User</div>
-                    <div className="text-xs font-black text-[#4a5a67] dark:text-[#ebc1b6] mt-1">{selectedEvent.userName}</div>
+                    <div className="text-xs font-black text-[#4a5a67] dark:text-[#ebc1b6] mt-1 truncate">{selectedEvent.userName}</div>
                   </div>
                   <div className="p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl transition-colors">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Status</div>
+                    <div className={`text-xs font-black mt-1 uppercase tracking-widest ${
+                      selectedEvent.status === 'returned' ? 'text-green-500' : selectedEvent.status === 'cancelled' ? 'text-red-500' : 'text-[#ebc1b6]'
+                    }`}>
+                      {selectedEvent.status || 'Active'}
+                      {selectedEvent.returnedAt && ` (On ${format(parseISO(selectedEvent.returnedAt), 'MMM d')})`}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl transition-colors col-span-2">
                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Collaborators</div>
                     <div className="text-xs font-black text-[#4a5a67] dark:text-[#ebc1b6] mt-1">
                       {Array.isArray(selectedEvent.collaborators) && selectedEvent.collaborators.length > 0
@@ -903,6 +966,28 @@ function CalendarPage() {
         .dark .fc-wrap .fc .fc-daygrid-event {
           background: #ebc1b6;
           color: #1e293b; /* Darker text on pink for better contrast in dark mode */
+        }
+
+        .fc-wrap .fc .fc-daygrid-event.status-returned {
+          background: #22c55e;
+          color: white;
+          box-shadow: 0 8px 18px rgba(34, 197, 94, 0.25);
+        }
+
+        .dark .fc-wrap .fc .fc-daygrid-event.status-returned {
+          background: #166534;
+          color: #f1f5f9;
+        }
+
+        .fc-wrap .fc .fc-daygrid-event.status-cancelled {
+          background: #ef4444;
+          color: white;
+          box-shadow: 0 8px 18px rgba(239, 68, 68, 0.25);
+        }
+
+        .dark .fc-wrap .fc .fc-daygrid-event.status-cancelled {
+          background: #991b1b;
+          color: #f1f5f9;
         }
 
         .fc-wrap .fc .fc-daygrid-event:hover {
