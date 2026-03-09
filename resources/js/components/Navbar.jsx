@@ -54,22 +54,22 @@ function Navbar({ onLogout, user }) {
             <span className="text-xl font-bold text-white tracking-tight">Vicinity IMS</span>
           </Link>
 
-          {/* Centered Navigation Links */}
-          <div className="hidden md:flex flex-1 justify-center items-center px-4">
-            <div className="flex items-center space-x-1">
+          {/* Centered Navigation Links - Hidden on Mobile/Tablet/Small Laptop */}
+          <div className="hidden xl:flex flex-1 justify-center items-center px-2">
+            <div className="flex items-center space-x-0.5">
               {navItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`relative px-3 py-2 rounded-lg transition-all duration-300 ${
+                    className={`relative px-2 py-2 rounded-lg transition-all duration-300 ${
                       isActive ? 'text-[#ebc1b6]' : 'text-gray-300 hover:text-white'
                     }`}
                   >
-                    <div className="flex items-center space-x-2 relative z-10">
-                      <SafeIcon icon={item.icon} className="text-lg" />
-                      <span className="font-semibold text-sm whitespace-nowrap">{item.label}</span>
+                    <div className="flex items-center space-x-1.5 relative z-10">
+                      <SafeIcon icon={item.icon} className="text-base" />
+                      <span className="font-bold text-[11px] uppercase tracking-wider whitespace-nowrap">{item.label}</span>
                     </div>
                     {isActive && (
                       <motion.div
@@ -83,32 +83,32 @@ function Navbar({ onLogout, user }) {
             </div>
           </div>
 
-          {/* Right Side Actions */}
-          <div className="hidden md:flex items-center space-x-3 flex-shrink-0">
+          {/* Right Side Actions - Hidden on Mobile/Tablet/Small Laptop */}
+          <div className="hidden xl:flex items-center space-x-2 flex-shrink-0">
             <button
               onClick={toggleDarkMode}
               className="p-2 rounded-full text-gray-300 hover:text-white hover:bg-white/10 transition-all"
               title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
-              <SafeIcon icon={darkMode ? FiSun : FiMoon} className="text-lg" />
+              <SafeIcon icon={darkMode ? FiSun : FiMoon} className="text-base" />
             </button>
             {user?.is_admin > 0 && (
               <>
                 <Link
                   to="/admin"
-                  className="flex items-center space-x-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all bg-white/5 text-gray-400 hover:text-white hover:bg-white/10"
+                  className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all bg-white/5 text-gray-400 hover:text-white hover:bg-white/10"
                 >
-                  <SafeIcon icon={FiSettings} />
+                  <SafeIcon icon={FiSettings} className="text-xs" />
                   <span>Panel</span>
                 </Link>
                 <button
                   onClick={handleAdminToggle}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                  className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${
                     isAdmin ? 'bg-red-500 text-white shadow-lg' : 'bg-white/5 text-gray-400 hover:text-white'
                   }`}
                 >
-                  <SafeIcon icon={FiShield} />
-                  <span>{isAdmin ? 'Admin Active' : 'Enable Admin'}</span>
+                  <SafeIcon icon={FiShield} className="text-xs" />
+                  <span>{isAdmin ? 'Admin' : 'Enable'}</span>
                 </button>
               </>
             )}
@@ -118,21 +118,22 @@ function Navbar({ onLogout, user }) {
               className="p-2 text-gray-400 hover:text-[#ebc1b6] transition-colors"
               title="My Profile"
             >
-              <SafeIcon icon={FiUser} className="text-lg" />
+              <SafeIcon icon={FiUser} className="text-base" />
             </Link>
 
             <button
               onClick={onLogout}
               className="p-2 text-gray-400 hover:text-[#ebc1b6] transition-colors"
+              title="Logout"
             >
-              <SafeIcon icon={FiLogOut} className="text-lg" />
+              <SafeIcon icon={FiLogOut} className="text-base" />
             </button>
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile/Tablet/Small Laptop Menu Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 rounded-lg text-[#ebc1b6]"
+            className="xl:hidden p-2 rounded-lg text-[#ebc1b6] hover:bg-white/5 transition-colors"
           >
             <SafeIcon icon={isOpen ? FiX : FiMenu} className="text-xl" />
           </button>
@@ -145,52 +146,88 @@ function Navbar({ onLogout, user }) {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-[#4a5a67] border-t border-white/10"
+            className="xl:hidden bg-[#4a5a67] dark:bg-slate-900 border-t border-white/10 transition-colors overflow-y-auto max-h-[calc(100vh-64px)] custom-scrollbar"
           >
-            <div className="px-4 py-4 space-y-2">
-              {navItems.map((item) => {
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => setIsOpen(false)}
-                    className={`block px-4 py-3 rounded-lg transition-colors ${
-                      isActive ? 'bg-white/10 text-[#ebc1b6]' : 'text-gray-300 hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
+            <div className="px-4 py-6 space-y-4">
+              {/* Navigation Grid for Tablet-sized devices */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {navItems.map((item) => {
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setIsOpen(false)}
+                      className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
+                        isActive 
+                          ? 'bg-[#ebc1b6] text-[#4a5a67] shadow-lg shadow-black/10' 
+                          : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
                       <SafeIcon icon={item.icon} className="text-xl" />
-                      <span className="font-medium">{item.label}</span>
-                    </div>
+                      <span className="font-bold tracking-tight">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Action Buttons in Mobile Menu */}
+              <div className="pt-6 mt-6 border-t border-white/10 space-y-4">
+                {user?.is_admin > 0 && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <Link
+                      to="/admin"
+                      onClick={() => setIsOpen(false)}
+                      className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/5 text-gray-300 hover:text-[#ebc1b6] transition-all"
+                    >
+                      <SafeIcon icon={FiSettings} className="text-xl mb-2" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Admin Panel</span>
+                    </Link>
+                    <button
+                      onClick={handleAdminToggle}
+                      className={`flex flex-col items-center justify-center p-4 rounded-2xl transition-all ${
+                        isAdmin 
+                          ? 'bg-red-500 text-white' 
+                          : 'bg-white/5 text-gray-300'
+                      }`}
+                    >
+                      <SafeIcon icon={FiShield} className="text-xl mb-2" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">
+                        {isAdmin ? 'Admin Active' : 'Enable Admin'}
+                      </span>
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    onClick={() => {
+                      toggleDarkMode();
+                      // Don't close menu to let user see theme change
+                    }}
+                    className="flex-1 flex items-center justify-center space-x-3 px-4 py-4 rounded-2xl bg-white/5 text-gray-300 hover:text-white transition-all"
+                  >
+                    <SafeIcon icon={darkMode ? FiSun : FiMoon} className="text-xl" />
+                    <span className="font-bold text-xs uppercase tracking-widest">
+                      {darkMode ? 'Light' : 'Dark'} Mode
+                    </span>
+                  </button>
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsOpen(false)}
+                    className="flex-1 flex items-center justify-center space-x-3 px-4 py-4 rounded-2xl bg-white/5 text-gray-300 hover:text-white transition-all"
+                  >
+                    <SafeIcon icon={FiUser} className="text-xl" />
+                    <span className="font-bold text-xs uppercase tracking-widest">Profile</span>
                   </Link>
-                );
-              })}
-              <div className="pt-4 mt-4 border-t border-white/10 space-y-2">
-                <Link
-                  to="/profile"
-                  onClick={() => setIsOpen(false)}
-                  className="w-full flex items-center space-x-3 px-4 py-3 text-gray-400 hover:text-[#ebc1b6] transition-colors"
-                >
-                  <SafeIcon icon={FiUser} className="text-xl" />
-                  <span className="font-medium">My Profile</span>
-                </Link>
-                <button
-                  onClick={() => {
-                    toggleDarkMode();
-                    setIsOpen(false);
-                  }}
-                  className="w-full flex items-center space-x-3 px-4 py-3 text-gray-400 hover:text-[#ebc1b6] transition-colors"
-                >
-                  <SafeIcon icon={darkMode ? FiSun : FiMoon} className="text-xl" />
-                  <span className="font-medium">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
-                </button>
+                </div>
+
                 <button
                   onClick={onLogout}
-                  className="w-full flex items-center space-x-3 px-4 py-3 text-gray-400 hover:text-[#ebc1b6] transition-colors"
+                  className="w-full flex items-center justify-center space-x-3 px-4 py-4 rounded-2xl bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all border border-red-500/20"
                 >
                   <SafeIcon icon={FiLogOut} className="text-xl" />
-                  <span className="font-medium">Logout</span>
+                  <span className="font-bold uppercase tracking-widest text-xs">Sign Out</span>
                 </button>
               </div>
             </div>
