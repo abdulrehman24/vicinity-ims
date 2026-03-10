@@ -98,7 +98,7 @@ function CalendarPage() {
   const activeBookingCount = useMemo(() => {
     const ids = new Set();
     bookings.forEach(b => {
-      if (b.status !== 'returned') ids.add(b.id);
+      if (b.status !== 'returned' && b.status !== 'cancelled') ids.add(b.id);
     });
     return ids.size;
   }, [bookings]);
@@ -107,7 +107,7 @@ function CalendarPage() {
     const ids = new Set();
     const monthPrefix = format(new Date(), 'yyyy-MM');
     bookings.forEach(b => {
-      if (b.startDate && b.startDate.includes(monthPrefix)) ids.add(b.id);
+      if (b.status !== 'cancelled' && b.startDate && b.startDate.includes(monthPrefix)) ids.add(b.id);
     });
     return ids.size;
   }, [bookings]);
@@ -187,7 +187,9 @@ function CalendarPage() {
     const projectsMap = new Map(); // bookingId -> { itemsMap, allDates, info }
 
     bookings.forEach((b) => {
-      // Keep all statuses for visibility
+      // Filter out cancelled bookings
+      if (b.status === 'cancelled') return;
+
       const bookingId = b.id ?? `${b.shootName || 'unknown'}|${b.startDate || ''}|${b.returnedAt || ''}`;
 
       if (!projectsMap.has(bookingId)) {
@@ -279,7 +281,7 @@ function CalendarPage() {
         start: startStr,
         end: endExclusiveStr,
         allDay: true,
-        className: b.status === 'returned' ? 'status-returned' : b.status === 'cancelled' ? 'status-cancelled' : '',
+        className: b.status === 'returned' ? 'status-returned' : '',
         extendedProps: {
           bookingId: b.bookingId,
           shootName: b.shootName,
@@ -441,9 +443,7 @@ function CalendarPage() {
                       className={`w-full text-left p-6 rounded-[2rem] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md ${
                         b.status === 'returned' 
                           ? 'bg-green-600 dark:bg-green-900/80' 
-                          : b.status === 'cancelled' 
-                            ? 'bg-red-600 dark:bg-red-900/80' 
-                            : 'bg-[#4a5a67] dark:bg-slate-900'
+                          : 'bg-[#4a5a67] dark:bg-slate-900'
                       }`}
                       onClick={() => {
                         setSelectedEvent({
@@ -465,16 +465,16 @@ function CalendarPage() {
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center space-x-2">
                           <div className={`w-1.5 h-1.5 rounded-full ${
-                            b.status === 'returned' || b.status === 'cancelled' 
+                            b.status === 'returned' 
                               ? 'bg-white' 
                               : 'bg-[#ebc1b6]'
                           }`} />
                           <span className={`text-[9px] font-black uppercase tracking-widest ${
-                            b.status === 'returned' || b.status === 'cancelled' 
+                            b.status === 'returned' 
                               ? 'text-white' 
                               : 'text-[#ebc1b6]'
                           }`}>
-                            {b.status === 'returned' ? 'Returned' : b.status === 'cancelled' ? 'Cancelled' : 'Active Now'}
+                            {b.status === 'returned' ? 'Returned' : 'Active Now'}
                           </span>
                         </div>
                         <SafeIcon icon={FiExternalLink} className="text-white/40 text-xs" />
@@ -676,7 +676,7 @@ function CalendarPage() {
                   <div className="p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl transition-colors">
                     <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Status</div>
                     <div className={`text-xs font-black mt-1 uppercase tracking-widest ${
-                      selectedEvent.status === 'returned' ? 'text-green-500' : selectedEvent.status === 'cancelled' ? 'text-red-500' : 'text-[#ebc1b6]'
+                      selectedEvent.status === 'returned' ? 'text-green-500' : 'text-[#ebc1b6]'
                     }`}>
                       {selectedEvent.status || 'Active'}
                       {selectedEvent.returnedAt && ` (On ${format(parseISO(selectedEvent.returnedAt), 'MMM d')})`}
@@ -976,17 +976,6 @@ function CalendarPage() {
 
         .dark .fc-wrap .fc .fc-daygrid-event.status-returned {
           background: #166534;
-          color: #f1f5f9;
-        }
-
-        .fc-wrap .fc .fc-daygrid-event.status-cancelled {
-          background: #ef4444;
-          color: white;
-          box-shadow: 0 8px 18px rgba(239, 68, 68, 0.25);
-        }
-
-        .dark .fc-wrap .fc .fc-daygrid-event.status-cancelled {
-          background: #991b1b;
           color: #f1f5f9;
         }
 

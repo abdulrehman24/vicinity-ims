@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('ims:send-stock-take-reminders')->daily();
+Schedule::command('bookings:auto-return')->daily();
