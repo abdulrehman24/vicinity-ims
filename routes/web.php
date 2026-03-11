@@ -10,6 +10,7 @@ use App\Http\Controllers\BundleController;
 use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\EquipmentLogController;
 use App\Http\Controllers\SecurityController;
+use App\Http\Controllers\StockTakeController;
 use App\Http\Controllers\SupportTicketController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -85,8 +86,11 @@ Route::middleware(['auth'])->group(function () {
     Route::apiResource('/api/personal-bundles', App\Http\Controllers\PersonalBundleController::class);
     Route::apiResource('/api/drafts', App\Http\Controllers\DraftController::class);
     Route::get('/equipment/{equipment}/logs', [EquipmentLogController::class, 'index']);
-    Route::get('/stock-takes', [App\Http\Controllers\StockTakeController::class, 'index']);
-    Route::post('/stock-takes', [App\Http\Controllers\StockTakeController::class, 'store']);
+    Route::get('/equipment/{equipment}/stock-take-logs', [StockTakeController::class, 'logs']);
+    Route::get('/stock-takes', [StockTakeController::class, 'index']);
+    Route::post('/stock-takes', [StockTakeController::class, 'store']);
+    Route::post('/bookings/batch-delete', [BookingController::class, 'batchDestroy']);
+    Route::delete('/bookings/{id}', [BookingController::class, 'destroy']);
 });
 
 Route::resource('equipment', EquipmentController::class);

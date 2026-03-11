@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Booking;
+use App\Models\Category;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -25,6 +26,7 @@ class CollaborationInviteMail extends Mailable
     public function __construct(Booking $booking, string $email, string $password)
     {
         $this->booking = $booking;
+        $this->booking->loadMissing(['user', 'equipments']);
         $this->email = $email;
         $this->password = $password;
     }
@@ -44,8 +46,34 @@ class CollaborationInviteMail extends Mailable
      */
     public function content(): Content
     {
+        // Get all categories sorted by sort_order
+        $categories = Category::orderBy('sort_order')->pluck('name')->toArray();
+        $categoryOrder = array_flip($categories);
+
+        // Group equipment by category and sort categories based on sort_order
+        $groupedEquipment = $this->booking->equipments
+            ->sortBy('name')
+            ->groupBy('category')
+            ->sortKeysUsing(function ($a, $b) use ($categoryOrder) {
+                $orderA = $categoryOrder[$a] ?? 999;
+                $orderB = $categoryOrder[$b] ?? 999;
+                
+                if ($orderA === $orderB) {
+                    return strcmp($a, $b);
+                }
+                
+                return $orderA <=> $orderB;
+            });
+
         return new Content(
             view: 'emails.collaboration_invite',
+            with: [
+                'booking' => $this->booking,
+                'email' => $this->email,
+                'password' => $this->password,
+                'owner' => $this->booking->user,
+                'groupedEquipment' => $groupedEquipment,
+            ],
         );
     }
 

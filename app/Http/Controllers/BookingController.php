@@ -329,6 +329,7 @@ class BookingController extends Controller
         $validated = $request->validate([
             'shootName' => 'required|string',
             'quotationNumber' => 'nullable|string',
+            'status' => 'nullable|string|in:active,returned,cancelled',
             'collaborators' => 'nullable|array',
         ]);
 
@@ -339,6 +340,13 @@ class BookingController extends Controller
             'quotation_number' => $validated['quotationNumber'],
         ];
 
+        if ($request->has('status') && auth()->user()->is_admin >= 1) {
+            $updateData['status'] = $validated['status'];
+            if ($validated['status'] === 'returned') {
+                $updateData['returned_at'] = now();
+            }
+        }
+
         if ($request->has('collaborators')) {
             $updateData['collaborators'] = $validated['collaborators'];
         }
@@ -346,6 +354,46 @@ class BookingController extends Controller
         $booking->update($updateData);
 
         return response()->json(['message' => 'Booking updated', 'data' => $booking]);
+    }
+
+    public function destroy($id)
+    {
+        if (auth()->user()->is_admin < 1) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $booking = Booking::findOrFail($id);
+        
+        DB::transaction(function () use ($booking) {
+            // Delete related records first
+            DB::table('booking_equipment')->where('booking_id', $booking->id)->delete();
+            DB::table('booking_dates')->where('booking_id', $booking->id)->delete();
+            $booking->delete();
+        });
+
+        return response()->json(['message' => 'Booking deleted successfully']);
+    }
+
+    public function batchDestroy(Request $request)
+    {
+        if (auth()->user()->is_admin < 1) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:bookings,id',
+        ]);
+
+        DB::transaction(function () use ($validated) {
+            $ids = $validated['ids'];
+            // Delete related records first
+            DB::table('booking_equipment')->whereIn('booking_id', $ids)->delete();
+            DB::table('booking_dates')->whereIn('booking_id', $ids)->delete();
+            Booking::whereIn('id', $ids)->delete();
+        });
+
+        return response()->json(['message' => count($validated['ids']).' bookings deleted successfully']);
     }
 
     public function replace(Request $request)

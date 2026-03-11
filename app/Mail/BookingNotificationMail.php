@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Booking;
+use App\Models\Category;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,6 +23,7 @@ class BookingNotificationMail extends Mailable implements ShouldQueue
     public function __construct(Booking $booking, ?array $dates = null)
     {
         $this->booking = $booking;
+        $this->booking->loadMissing(['user', 'equipments']);
 
         if ($dates !== null && count($dates) > 0) {
             $this->dates = array_values(array_unique(array_map(function ($date) {
@@ -64,11 +66,32 @@ class BookingNotificationMail extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
+        // Get all categories sorted by sort_order
+        $categories = Category::orderBy('sort_order')->pluck('name')->toArray();
+        $categoryOrder = array_flip($categories);
+
+        // Group equipment by category and sort categories based on sort_order
+        $groupedEquipment = $this->booking->equipments
+            ->sortBy('name')
+            ->groupBy('category')
+            ->sortKeysUsing(function ($a, $b) use ($categoryOrder) {
+            $orderA = $categoryOrder[$a] ?? 999;
+            $orderB = $categoryOrder[$b] ?? 999;
+            
+            if ($orderA === $orderB) {
+                return strcmp($a, $b);
+            }
+            
+            return $orderA <=> $orderB;
+        });
+
         return new Content(
             view: 'emails.booking.notification',
             with: [
                 'booking' => $this->booking,
                 'dates' => $this->dates,
+                'owner' => $this->booking->user,
+                'groupedEquipment' => $groupedEquipment,
             ],
         );
     }

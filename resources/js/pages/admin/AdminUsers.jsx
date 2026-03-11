@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import Pagination from '../../components/Pagination';
+import ConfirmationModal from '../../components/ConfirmationModal';
 
 function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -11,6 +13,7 @@ function AdminUsers() {
   const [search, setSearch] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, user: null });
 
   const currentUserId =
     typeof window !== 'undefined' && window.user && window.user.id ? window.user.id : null;
@@ -121,10 +124,6 @@ function AdminUsers() {
   };
 
   const handleDeleteUser = async (user) => {
-    if (!window.confirm(`Are you sure you want to delete user ${user.email}? This action cannot be undone.`)) {
-        return;
-    }
-    
     setUpdatingId(user.id);
     try {
         await axios.delete(`/api/admin/users/${user.id}`);
@@ -137,6 +136,7 @@ function AdminUsers() {
     } finally {
         setUpdatingId(null);
         setOpenMenuId(null);
+        setDeleteModal({ isOpen: false, user: null });
     }
   };
 
@@ -300,7 +300,10 @@ function AdminUsers() {
 
                           {!isProtected && (
                              <button
-                               onClick={() => handleDeleteUser(user)}
+                               onClick={() => {
+                                 setDeleteModal({ isOpen: true, user });
+                                 setOpenMenuId(null);
+                               }}
                                disabled={updatingId === user.id}
                                className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 uppercase tracking-wider border-t border-gray-100"
                              >
@@ -323,43 +326,27 @@ function AdminUsers() {
             </tbody>
           </table>
         </div>
-        <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-          <div>
-            {total > 0 ? (
-              <span>
-                Showing {(page - 1) * pageSize + 1}–
-                {Math.min(page * pageSize, total)} of {total} users
-              </span>
-            ) : (
-              <span>Showing 0 of 0 users</span>
-            )}
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={page === 1}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <span>
-              Page {page} of {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPage((prev) => (prev < totalPages ? prev + 1 : prev))}
-              disabled={page >= totalPages}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalEntries={total}
+          itemsPerPage={pageSize}
+          onPageChange={setPage}
+         />
+       </div>
+
+       <ConfirmationModal 
+         isOpen={deleteModal.isOpen}
+         onClose={() => setDeleteModal({ isOpen: false, user: null })}
+         onConfirm={() => handleDeleteUser(deleteModal.user)}
+         title="Delete User"
+         message={`Are you sure you want to delete "${deleteModal.user?.name || deleteModal.user?.email}"? This action will permanently remove their access and cannot be undone.`}
+         confirmText="Delete User"
+         isDangerous={true}
+       />
+     </div>
+   );
+ }
 
 export default AdminUsers;
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import Pagination from '../../components/Pagination';
 
 function AdminTickets() {
   const [tickets, setTickets] = useState([]);
@@ -283,39 +284,14 @@ function AdminTickets() {
             </tbody>
           </table>
         </div>
-        <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-          <div>
-            {total > 0 ? (
-              <span>
-                Showing {(page - 1) * pageSize + 1}–
-                {Math.min(page * pageSize, total)} of {total} tickets
-              </span>
-            ) : (
-              <span>Showing 0 of 0 tickets</span>
-            )}
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              type="button"
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-              disabled={page === 1}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <span>
-              Page {page} of {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPage((prev) => (prev < totalPages ? prev + 1 : prev))}
-              disabled={page >= totalPages}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+        
+        <Pagination 
+          currentPage={page}
+          totalPages={totalPages}
+          totalEntries={total}
+          itemsPerPage={pageSize}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   );

@@ -62,20 +62,6 @@ class StockTakeController extends Controller
             $updates['location'] = $data['location'];
         }
 
-        // If a new verification photo is uploaded, we update the main image as well
-        // "Saving will replace the asset's main display image with the latest upload." - from StockTake.jsx
-        if ($imagePath) {
-            $updates['image_path'] = $imagePath;
-
-            // Delete old image if exists and different
-            if ($equipment->image_path && $equipment->image_path !== $imagePath) {
-                $oldPath = str_replace('/storage/', '', $equipment->image_path);
-                if (Storage::disk('public')->exists($oldPath)) {
-                    Storage::disk('public')->delete($oldPath);
-                }
-            }
-        }
-
         // Calculate next audit date
         $auditInterval = Setting::where('key', 'audit_interval_months')->value('value') ?? 6;
         $updates['next_audit_date'] = now()->addMonths((int) $auditInterval);
@@ -87,6 +73,18 @@ class StockTakeController extends Controller
             'data' => $stockTake,
             'equipment' => new EquipmentResource($equipment),
         ], 201);
+    }
+
+    public function logs($id)
+    {
+        $logs = StockTake::with('user')
+            ->where('equipment_id', $id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'data' => $logs,
+        ]);
     }
 
     private function processAndSaveImage($file)

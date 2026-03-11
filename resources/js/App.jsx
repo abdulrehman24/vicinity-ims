@@ -25,6 +25,7 @@ import AdminSettings from './pages/admin/AdminSettings';
 import AdminTickets from './pages/admin/AdminTickets';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminBundles from './pages/admin/AdminBundles';
+import AdminBookings from './pages/admin/AdminBookings';
 import { InventoryProvider } from './context/InventoryContext';
 import SafeIcon from './common/SafeIcon';
 import './App.css';
@@ -153,6 +154,7 @@ function App() {
                 <Route path="tickets" element={<AdminTickets />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="settings" element={<AdminSettings />} />
+                <Route path="bookings" element={<AdminBookings />} />
                 <Route path="bundles" element={<AdminBundles />} />
               </Route>
               

@@ -446,7 +446,10 @@ export function InventoryProvider({ children, user }) {
         savePersonalBundle,
         saveDraft,
         deleteDraft,
-        fetchEquipmentLogs
+        fetchEquipmentLogs,
+        fetchBookings,
+        fetchEquipment,
+        fetchCategories
     }}>
       {children}
     </InventoryContext.Provider>

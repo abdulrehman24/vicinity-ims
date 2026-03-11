@@ -8,6 +8,7 @@ import { format, addMonths, isPast, parseISO, differenceInDays } from 'date-fns'
 import * as FiIcons from 'react-icons/fi';
 import axios from 'axios';
 import imageCompression from 'browser-image-compression';
+import { toast } from 'react-hot-toast';
 
 const { FiUpload, FiCamera, FiCheck, FiX, FiSave, FiImage, FiMapPin, FiInfo, FiLayers, FiShield, FiLock, FiClock, FiAlertCircle, FiSearch, FiFilter } = FiIcons;
 
@@ -25,6 +26,7 @@ function StockTake() {
   const [verifiedAssets, setVerifiedAssets] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [historyModal, setHistoryModal] = useState({ isOpen: false, equipment: null, logs: [], loading: false });
 
   useEffect(() => {
       if (isAdmin) {
@@ -71,8 +73,21 @@ function StockTake() {
 
   // Combine pending and verified items for the sidebar list
   const sidebarItems = useMemo(() => {
-    // Map verified assets to a structure compatible with the list
-    const verifiedItems = verifiedAssets.map(record => ({
+    // Unique verified assets by equipment ID (taking the most recent record)
+    const uniqueVerifiedRecords = [];
+    const processedIds = new Set();
+    
+    // verifiedAssets is already sorted by created_at desc from the backend
+    verifiedAssets.forEach(record => {
+      const eqId = record.equipment_id || record.equipment?.id;
+      if (eqId && !processedIds.has(eqId)) {
+        uniqueVerifiedRecords.push(record);
+        processedIds.add(eqId);
+      }
+    });
+
+    // Map unique verified assets to a structure compatible with the list
+    const verifiedItems = uniqueVerifiedRecords.map(record => ({
       ...record.equipment,
       id: record.equipment_id || record.equipment?.id,
       isVerified: true,
@@ -302,92 +317,120 @@ function StockTake() {
     }));
   };
 
-  const saveStockTake = () => {
-    const stockTakeRecord = {
-      id: Date.now(),
-      date: new Date().toISOString(),
-      equipment: selectedEquipment.map(equipmentId => {
-        const item = equipment.find(e => e.id === equipmentId);
-        return {
-          equipmentId,
-          equipmentName: item.name,
-          oldCondition: item.condition,
-          newCondition: stockTakeData[equipmentId].condition,
-          oldLocation: item.location,
-          newLocation: stockTakeData[equipmentId].location,
-          notes: stockTakeData[equipmentId].notes,
-          images: uploadedImages[equipmentId] || []
-        };
-      })
-    };
+  const fetchHistory = async (equipment) => {
+    setHistoryModal({ isOpen: true, equipment, logs: [], loading: true });
+    try {
+        const res = await axios.get(`/equipment/${equipment.id}/stock-take-logs`);
+        setHistoryModal(prev => ({ ...prev, logs: res.data.data, loading: false }));
+    } catch (err) {
+        console.error("Failed to fetch history logs", err);
+        setHistoryModal(prev => ({ ...prev, loading: false }));
+        toast.error("Failed to load audit history");
+    }
+  };
 
-    selectedEquipment.forEach(equipmentId => {
-      const updates = { ...stockTakeData[equipmentId] };
-      const newPhotos = uploadedImages[equipmentId];
-      if (newPhotos && newPhotos.length > 0) {
-        updates.image = newPhotos[newPhotos.length - 1].preview;
+  const saveStockTake = async () => {
+    setIsSaving(true);
+    let successCount = 0;
+
+    for (const equipmentId of selectedEquipment) {
+      const item = equipment.find(e => e.id === equipmentId);
+      const data = stockTakeData[equipmentId] || {};
+      const images = uploadedImages[equipmentId] || [];
+
+      const formData = new FormData();
+      formData.append('equipment_id', equipmentId);
+      formData.append('condition', data.condition || item.condition);
+      formData.append('location', data.location || item.location || '');
+      formData.append('notes', data.notes || '');
+      
+      if (images.length > 0 && images[images.length - 1].file) {
+        formData.append('image', images[images.length - 1].file);
       }
-      updateEquipment({ id: equipmentId, ...updates });
-    });
 
-    addStockTake(stockTakeRecord);
+      try {
+        const response = await axios.post('/stock-takes', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        if (response.data.equipment) {
+          updateLocalEquipment(response.data.equipment);
+        }
+        
+        if (response.data.data) {
+          const record = response.data.data;
+          const recordWithRel = { ...record, equipment: item };
+          addStockTake({ ...recordWithRel, date: record.created_at });
+          setVerifiedAssets(prev => [recordWithRel, ...prev]);
+        }
+        successCount++;
+      } catch (error) {
+        console.error(`Audit failed for ${item.name}`, error);
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`Successfully saved ${successCount} audit records`);
+    }
+
     setSelectedEquipment([]);
     setStockTakeData({});
     setUploadedImages({});
+    setIsSaving(false);
   };
 
-  const saveSingleStockTake = (equipmentId) => {
+  const saveSingleStockTake = async (equipmentId) => {
     const item = equipment.find(e => e.id === equipmentId);
     const data = stockTakeData[equipmentId] || {};
     const images = uploadedImages[equipmentId] || [];
-
-    const stockTakeRecord = {
-      id: Date.now(),
-      date: new Date().toISOString(),
-      equipment: [{
-        equipmentId,
-        equipmentName: item.name,
-        oldCondition: item.condition,
-        newCondition: data.condition || item.condition,
-        oldLocation: item.location,
-        newLocation: data.location || item.location,
-        notes: data.notes || '',
-        images: images
-      }]
-    };
-
-    const nextAuditDate = addMonths(new Date(), auditSettings.interval);
     
-    // Merge existing item properties with updates to ensure all required fields are present
-    const updates = { 
-        ...item, // Include all existing fields first
-        ...data, // Overwrite with stock take changes
-        nextAuditDate: format(nextAuditDate, 'yyyy-MM-dd')
-    };
-
-    // Remove backend-only or problematic fields that shouldn't be sent back as-is if they cause issues,
-    // but InventoryContext.updateEquipment handles most mapping.
-    // However, we must ensure fields match what mapFrontendToBackend expects.
-    // The context sends the spread object.
-
-    if (images.length > 0) {
-      updates.image = images[images.length - 1].preview;
+    setIsSaving(true);
+    const formData = new FormData();
+    formData.append('equipment_id', equipmentId);
+    formData.append('condition', data.condition || item.condition);
+    formData.append('location', data.location || item.location || '');
+    formData.append('notes', data.notes || '');
+    
+    if (images.length > 0 && images[images.length - 1].file) {
+      formData.append('image', images[images.length - 1].file);
     }
-    updateEquipment({ id: equipmentId, ...updates });
-    addStockTake(stockTakeRecord);
-    
-    setSelectedEquipment(prev => prev.filter(id => id !== equipmentId));
-    
-    setStockTakeData(prev => {
+
+    try {
+      const response = await axios.post('/stock-takes', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.equipment) {
+        updateLocalEquipment(response.data.equipment);
+      }
+      
+      if (response.data.data) {
+        const record = response.data.data;
+        const recordWithRel = { ...record, equipment: item };
+        addStockTake({ ...recordWithRel, date: record.created_at });
+        setVerifiedAssets(prev => [recordWithRel, ...prev]);
+      }
+      
+      toast.success("Audit completed successfully");
+      
+      setSelectedEquipment(prev => prev.filter(id => id !== equipmentId));
+      
+      setStockTakeData(prev => {
         const next = { ...prev };
         delete next[equipmentId];
         return next;
-    });
-    setUploadedImages(prev => {
+      });
+      setUploadedImages(prev => {
         const next = { ...prev };
         delete next[equipmentId];
         return next;
-    });
+      });
+    } catch (error) {
+      console.error("Audit failed", error);
+      toast.error("Failed to save audit record");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!isAdmin) {
@@ -482,7 +525,7 @@ function StockTake() {
                             <div key={item.id} className="w-full text-left p-3 rounded-2xl border border-green-100 dark:border-green-500/20 bg-green-50/30 dark:bg-green-500/5 flex items-center space-x-3 opacity-80 hover:opacity-100 transition-all">
                                 <div className="relative shrink-0">
                                     <img 
-                                      src={item.auditRecord?.image_path || item.image} 
+                                      src={item.image} 
                                       alt={item.name} 
                                       className="w-10 h-10 rounded-xl object-cover border border-white/50 dark:border-slate-700 shadow-sm" 
                                     />
@@ -491,7 +534,19 @@ function StockTake() {
                                     </div>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="font-bold text-xs truncate text-[#4a5a67] dark:text-slate-200">{item.name}</h3>
+                                    <div className="flex items-center justify-between">
+                                      <h3 className="font-bold text-xs truncate text-[#4a5a67] dark:text-slate-200">{item.name}</h3>
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          fetchHistory(item);
+                                        }}
+                                        className="p-1.5 rounded-lg bg-white/50 dark:bg-slate-800/50 text-gray-400 hover:text-[#ebc1b6] transition-colors"
+                                        title="View History"
+                                      >
+                                        <SafeIcon icon={FiClock} className="text-[10px]" />
+                                      </button>
+                                    </div>
                                     <div className="flex items-center justify-between mt-0.5">
                                       <p className="text-[9px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">
                                         {item.serialNumber}
@@ -507,18 +562,34 @@ function StockTake() {
                       }
 
                       return (
-                        <button key={item.id} onClick={() => handleEquipmentSelect(item.id)} className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedEquipment.includes(item.id) ? 'bg-[#ebc1b6] border-[#ebc1b6] text-[#4a5a67] shadow-md' : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 hover:border-[#ebc1b6] text-[#4a5a67] dark:text-slate-200'}`} >
-                          <div className="flex items-center space-x-3">
-                            <img src={item.image} alt={item.name} className="w-10 h-10 rounded-xl object-cover border border-white/20 dark:border-slate-700" />
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-bold text-xs truncate">{item.name}</h3>
-                              <p className={`text-[9px] font-black uppercase tracking-widest mt-0.5 ${selectedEquipment.includes(item.id) ? 'text-[#4a5a67]/60' : 'text-gray-400 dark:text-slate-500'}`}>
-                                {item.serialNumber} • {item.location}
-                              </p>
+                        <div key={item.id} className="relative group">
+                          <button onClick={() => handleEquipmentSelect(item.id)} className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedEquipment.includes(item.id) ? 'bg-[#ebc1b6] border-[#ebc1b6] text-[#4a5a67] shadow-md' : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 hover:border-[#ebc1b6] text-[#4a5a67] dark:text-slate-200'}`} >
+                            <div className="flex items-center space-x-3">
+                              <img src={item.image} alt={item.name} className="w-10 h-10 rounded-xl object-cover border border-white/20 dark:border-slate-700" />
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-bold text-xs truncate">{item.name}</h3>
+                                <p className={`text-[9px] font-black uppercase tracking-widest mt-0.5 ${selectedEquipment.includes(item.id) ? 'text-[#4a5a67]/60' : 'text-gray-400 dark:text-slate-500'}`}>
+                                  {item.serialNumber} • {item.location}
+                                </p>
+                              </div>
+                              {selectedEquipment.includes(item.id) && <SafeIcon icon={FiCheck} className="text-sm" />}
                             </div>
-                            {selectedEquipment.includes(item.id) && <SafeIcon icon={FiCheck} className="text-sm" />}
-                          </div>
-                        </button>
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              fetchHistory(item);
+                            }}
+                            className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all ${
+                              selectedEquipment.includes(item.id) 
+                                ? 'bg-white/20 text-[#4a5a67] hover:bg-white/40' 
+                                : 'bg-gray-50 dark:bg-slate-700/50 text-gray-400 hover:text-[#ebc1b6] opacity-0 group-hover:opacity-100'
+                            }`}
+                            title="View Audit History"
+                          >
+                            <SafeIcon icon={FiClock} className="text-xs" />
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -639,7 +710,6 @@ function StockTake() {
                         <div className="space-y-3">
                           <label className="text-[9px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest ml-1">Asset Verification Photo</label>
                           <ImageDropzone equipmentId={equipmentId} onDrop={onDrop} uploadedImages={uploadedImages[equipmentId] || []} onRemoveImage={removeImage} />
-                          <p className="text-[8px] text-gray-400 dark:text-slate-500 italic">Note: Saving will replace the asset's main display image with the latest upload.</p>
                         </div>
                       </div>
 
@@ -684,7 +754,142 @@ function StockTake() {
           )}
         </div>
       </div>
+      <HistoryModal 
+        isOpen={historyModal.isOpen} 
+        onClose={() => setHistoryModal(prev => ({ ...prev, isOpen: false }))}
+        equipment={historyModal.equipment}
+        logs={historyModal.logs}
+        loading={historyModal.loading}
+      />
     </motion.div>
+  );
+}
+
+function HistoryModal({ isOpen, onClose, equipment, logs, loading }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-white/20 dark:border-slate-700"
+      >
+        <div className="p-8 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-gray-50/50 dark:bg-slate-900/30">
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-[#ebc1b6] rounded-2xl text-[#4a5a67] shadow-sm">
+              <SafeIcon icon={FiClock} className="text-xl" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-[#4a5a67] dark:text-slate-200 uppercase tracking-tight">Audit History</h2>
+              <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">
+                {equipment?.name} • {equipment?.serialNumber || equipment?.serial_number}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-3 bg-white dark:bg-slate-800 rounded-2xl text-gray-400 hover:text-red-500 shadow-sm border border-gray-100 dark:border-slate-700 transition-all hover:scale-110">
+            <SafeIcon icon={FiX} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+          {loading ? (
+            <div className="h-64 flex flex-col items-center justify-center space-y-4">
+              <div className="w-12 h-12 border-4 border-[#ebc1b6] border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Retrieving Logs...</p>
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="h-64 flex flex-col items-center justify-center text-center space-y-4 opacity-40">
+              <SafeIcon icon={FiInfo} className="text-5xl text-gray-300" />
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No audit records found for this asset</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-3xl border border-gray-100 dark:border-slate-700 shadow-sm">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-slate-900/50">
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest">Verification Photo</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest">Date & User</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest">Status/Location</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                  {logs.map((log) => (
+                    <tr key={log.id} className="hover:bg-gray-50/50 dark:hover:bg-slate-900/20 transition-colors">
+                      <td className="px-6 py-4">
+                        {log.image_path ? (
+                          <div className="relative group w-24 aspect-square">
+                            <img 
+                              src={log.image_path} 
+                              alt="Verification" 
+                              className="w-full h-full object-cover rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm transition-transform group-hover:scale-105" 
+                            />
+                            <a 
+                              href={log.image_path} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl text-white text-[10px] font-black uppercase tracking-widest"
+                            >
+                              View Full
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="w-24 aspect-square bg-gray-100 dark:bg-slate-900/50 rounded-xl flex items-center justify-center border border-dashed border-gray-200 dark:border-slate-700">
+                            <SafeIcon icon={FiImage} className="text-gray-300 dark:text-slate-700 text-xl" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col space-y-1">
+                          <span className="text-xs font-black text-[#4a5a67] dark:text-slate-200 uppercase tracking-tight">
+                            {format(parseISO(log.created_at), 'MMM d, yyyy')}
+                          </span>
+                          <span className="text-[10px] font-bold text-gray-400 dark:text-slate-500">
+                            {format(parseISO(log.created_at), 'h:mm a')}
+                          </span>
+                          <div className="flex items-center gap-1.5 mt-1">
+                             <div className="w-5 h-5 bg-gray-200 dark:bg-slate-700 rounded-full flex items-center justify-center text-[8px] font-black">
+                                {log.user?.name?.[0]?.toUpperCase() || '?'}
+                             </div>
+                             <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400">{log.user?.name || 'Unknown User'}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${
+                              log.condition === 'good' ? 'bg-green-100 dark:bg-green-500/10 text-green-600' :
+                              log.condition === 'fair' ? 'bg-orange-100 dark:bg-orange-500/10 text-orange-600' :
+                              'bg-red-100 dark:bg-red-500/10 text-red-600'
+                            }`}>
+                              {log.condition}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 dark:text-slate-500">
+                            <SafeIcon icon={FiMapPin} className="text-[#ebc1b6]" />
+                            {log.location || 'No location recorded'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-xs font-medium text-gray-500 dark:text-slate-400 leading-relaxed max-w-xs italic">
+                          {log.notes || 'No internal notes provided for this audit.'}
+                        </p>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <div className="p-6 bg-gray-50 dark:bg-slate-900/30 border-t border-gray-100 dark:border-slate-700 text-center">
+           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Audit Log Integrity Verified • {logs.length} Total Records</p>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 

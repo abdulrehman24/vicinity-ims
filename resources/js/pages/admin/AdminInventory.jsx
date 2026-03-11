@@ -8,6 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
 import { equipmentTypes, businessUnits } from '../../data/inventoryData';
 import { useInventory } from '../../context/InventoryContext';
+import Pagination from '../../components/Pagination';
+import ConfirmationModal from '../../components/ConfirmationModal';
 
 const { FiPlus, FiTrash2, FiEdit2, FiSearch, FiImage, FiX, FiUpload, FiCamera, FiHash, FiMapPin, FiCheck, FiAlertTriangle, FiTool } = FiIcons;
 
@@ -256,6 +258,7 @@ function AdminInventory() {
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null });
   
   // Pagination & Filter state
   const [page, setPage] = useState(1);
@@ -360,7 +363,6 @@ function AdminInventory() {
   };
 
   const handleDelete = async (item) => {
-    if (!window.confirm(`Delete "${item.name}"?`)) return;
     try {
       await axios.delete(`/equipment/${item.id}`);
       toast.success('Item deleted');
@@ -368,6 +370,8 @@ function AdminInventory() {
     } catch (e) {
       console.error(e);
       toast.error('Failed to delete item');
+    } finally {
+      setDeleteModal({ isOpen: false, item: null });
     }
   };
 
@@ -497,7 +501,7 @@ function AdminInventory() {
                           <SafeIcon icon={FiEdit2} />
                         </button>
                         <button
-                          onClick={() => handleDelete(item)}
+                          onClick={() => setDeleteModal({ isOpen: true, item })}
                           className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                         >
                           <SafeIcon icon={FiTrash2} />
@@ -511,29 +515,24 @@ function AdminInventory() {
           </table>
         </div>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between mt-6">
-          <p className="text-xs text-gray-400">
-            Page {page} of {totalPages}
-          </p>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-3 py-1 rounded-lg border border-gray-200 text-xs text-gray-500 disabled:opacity-50 hover:bg-gray-50"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="px-3 py-1 rounded-lg border border-gray-200 text-xs text-gray-500 disabled:opacity-50 hover:bg-gray-50"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+        <Pagination 
+          currentPage={page}
+          totalPages={totalPages}
+          totalEntries={filteredData.length}
+          itemsPerPage={pageSize}
+          onPageChange={setPage}
+        />
       </div>
+
+      <ConfirmationModal 
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, item: null })}
+        onConfirm={() => handleDelete(deleteModal.item)}
+        title="Delete Item"
+        message={`Are you sure you want to delete "${deleteModal.item?.name}"? This will permanently remove it from the inventory database.`}
+        confirmText="Delete Item"
+        isDangerous={true}
+      />
 
       <AnimatePresence>
         {isModalOpen && (

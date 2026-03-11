@@ -4,7 +4,7 @@ import axios from 'axios';
 import SafeIcon from '../../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 
-const { FiSettings, FiTag, FiMenu, FiChevronLeft, FiHome, FiLogOut, FiAlertCircle, FiUsers, FiPackage, FiRefreshCw } =
+const { FiSettings, FiTag, FiMenu, FiChevronLeft, FiHome, FiLogOut, FiAlertCircle, FiUsers, FiPackage, FiRefreshCw, FiCalendar } =
   FiIcons;
 
 function AdminLayout({ onLogout }) {
@@ -159,6 +159,27 @@ function AdminLayout({ onLogout }) {
                 className={`text-lg ${collapsed ? 'mx-auto' : 'mr-3'}`}
               />
               {!collapsed && <span>Bundles</span>}
+            </NavLink>
+            <NavLink
+              to="/admin/bookings"
+              className={({ isActive }) =>
+                `group relative flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-white text-[#4a5a67] shadow-sm'
+                    : 'text-gray-200 hover:bg-white/10 hover:text-white'
+                }`
+              }
+            >
+              <div
+                className={`absolute left-0 inset-y-1 w-1 rounded-full transition-opacity ${
+                  collapsed ? 'opacity-0' : 'opacity-100'
+                } ${location.pathname.startsWith('/admin/bookings') ? 'bg-[#ebc1b6]' : 'bg-transparent'}`}
+              />
+              <SafeIcon
+                icon={FiCalendar}
+                className={`text-lg ${collapsed ? 'mx-auto' : 'mr-3'}`}
+              />
+              {!collapsed && <span>All Bookings</span>}
             </NavLink>
             <NavLink
               to="/admin/users"

@@ -45,8 +45,8 @@
                     <div>{{ $booking->quotation_number ?: 'N/A' }}</div>
                 </td>
                 <td style="width:50%;font-size:12px;color:#6b7280;">
-                    <div style="font-weight:700;color:#4a5a67;">Shoot Type</div>
-                    <div>{{ $booking->shoot_type }}</div>
+                    <div style="font-weight:700;color:#4a5a67;">Booking Owner</div>
+                    <div>{{ $owner ? $owner->name : 'System' }}</div>
                 </td>
             </tr>
         </table>
@@ -65,15 +65,22 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($booking->equipments as $equipment)
+                @foreach($groupedEquipment as $category => $equipments)
                 <tr>
-                    <td style="padding-top:8px;border-top:1px solid #f3f4f6;font-size:12px;color:#4a5a67;">
+                    <td colspan="2" style="padding:12px 0 4px 0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#4a5a67;border-bottom:1px solid #f3f4f6;">
+                        {{ $category }}
+                    </td>
+                </tr>
+                @foreach($equipments as $equipment)
+                <tr>
+                    <td style="padding:8px 12px;font-size:12px;color:#4a5a67;border-bottom:1px solid #f9fafb;">
                         {{ $equipment->name }}
                     </td>
-                    <td align="right" style="padding-top:8px;border-top:1px solid #f3f4f6;font-size:12px;color:#4a5a67;font-weight:700;">
+                    <td align="right" style="padding:8px 0;font-size:12px;color:#4a5a67;font-weight:700;border-bottom:1px solid #f9fafb;">
                         {{ $equipment->pivot->quantity }}
                     </td>
                 </tr>
+                @endforeach
                 @endforeach
             </tbody>
         </table>
