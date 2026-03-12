@@ -94,6 +94,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::resource('equipment', EquipmentController::class);
+Route::post('/equipment/{id}/recommission', [EquipmentController::class, 'recommission']);
 
 Route::get('/api/login-settings', [SettingController::class, 'publicLoginSettings']);
 

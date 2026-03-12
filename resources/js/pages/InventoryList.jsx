@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import AdminAuthModal from '../components/AdminAuthModal'; // Deprecated but keeping for reference if needed
 import SecurityModal from '../components/SecurityModal';
 import imageCompression from 'browser-image-compression';
+import RecommissionModal from '../components/RecommissionModal';
 
 const { 
   FiSearch, FiPlus, FiEdit2, FiX, FiCamera, FiHash, FiMapPin, 
@@ -19,7 +20,7 @@ const {
 } = FiIcons;
 
 function InventoryList() {
-  const { equipment, categories, addEquipment, updateEquipment, isAdmin, toggleAdmin } = useInventory();
+  const { equipment, categories, addEquipment, updateEquipment, recommissionEquipment, isAdmin, toggleAdmin } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,7 +33,7 @@ function InventoryList() {
 
   const [decommissioningItem, setDecommissioningItem] = useState(null);
   const [repairingItem, setRepairingItem] = useState(null);
-  const [restoringItem, setRestoringItem] = useState(null);
+  const [recommissioningItem, setRecommissioningItem] = useState(null);
 
   const uniqueCategories = useMemo(() => {
     return Array.isArray(categories) ? categories : [];
@@ -143,38 +144,17 @@ function InventoryList() {
     toast.success(`Sent ${qty} unit(s) to service bay`);
   };
 
-  const handleRestoreConfirm = (id, data) => {
-    const item = equipment.find(e => e.id === id);
-    if (!item) return;
-
-    const total = item.totalQuantity ?? 1;
-    const maintenance = item.maintenanceQuantity ?? 0;
-    const decommissioned = item.decommissionedQuantity ?? 0;
-
-    if (maintenance > 0) {
-      const rawQty = parseInt(data.quantity, 10) || 1;
-      const qty = Math.min(rawQty, maintenance);
-      const newMaintenance = Math.max(0, maintenance - qty);
-      const remaining = total - decommissioned;
-      const newStatus = newMaintenance > 0 && newMaintenance >= remaining ? 'maintenance' : 'available';
-
-      updateEquipment({
-        ...item,
-        id,
-        status: newStatus,
-        maintenanceQuantity: newMaintenance
-      });
-      toast.success(`Restored ${qty} unit(s) to active inventory`);
-    } else {
-      updateEquipment({
-        ...item,
-        id,
-        status: 'available'
-      });
-      toast.success('Asset restored');
+  const handleRecommissionConfirm = async (quantity) => {
+    if (!recommissioningItem) return;
+    
+    const ok = await recommissionEquipment(recommissioningItem.id, {
+      quantity,
+      source_status: recommissioningItem.status
+    });
+    
+    if (ok) {
+      setRecommissioningItem(null);
     }
-
-    setRestoringItem(null);
   };
 
   const executeProtectedAction = (action) => {
@@ -253,10 +233,10 @@ function InventoryList() {
             onDecommission={() => setDecommissioningItem(item)}
             onRepair={() => setRepairingItem(item)}
             onEdit={() => executeProtectedAction(() => setEditingItem(item))}
-            onActivate={(id) => {
+            onActivate={(id, status) => {
               const original = equipment.find(e => e.id === id);
               if (!original) return;
-              setRestoringItem(original);
+              setRecommissioningItem({...original, status: status || original.status});
             }}
           />
         ))}
@@ -360,12 +340,12 @@ function InventoryList() {
           />
         )}
 
-        {restoringItem && (
-          <ActionModal 
-            item={restoringItem} 
-            type="restore"
-            onClose={() => setRestoringItem(null)} 
-            onConfirm={(data) => handleRestoreConfirm(restoringItem.id, data)} 
+        {recommissioningItem && (
+          <RecommissionModal
+            isOpen={!!recommissioningItem}
+            equipment={recommissioningItem}
+            onClose={() => setRecommissioningItem(null)}
+            onSubmit={handleRecommissionConfirm}
           />
         )}
       </AnimatePresence>
@@ -498,94 +478,155 @@ function ActionModal({ item, type, onClose, onConfirm }) {
 }
 
 function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate }) {
+  const availableCount = (item.totalQuantity || 0) - (item.maintenanceQuantity || 0) - (item.decommissionedQuantity || 0);
+  const totalCount = item.totalQuantity || 1;
+  const availabilityRate = (availableCount / totalCount) * 100;
+
   return (
-    <motion.div layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden group hover:shadow-md transition-all ${item.status === 'decommissioned' ? 'opacity-60 grayscale' : ''}`}>
-      <div className="h-48 relative overflow-hidden">
-        <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
-        <div className="absolute top-4 right-4">
-          <span className={`px-3 py-1 rounded-full text-[10px] font-bold shadow-lg uppercase tracking-widest ${item.status === 'available' ? 'bg-green-500 text-white' : item.status === 'decommissioned' ? 'bg-black text-white' : item.status === 'maintenance' ? 'bg-blue-500 text-white' : 'bg-[#ebc1b6] text-[#4a5a67]'}`}>
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -4 }}
+      className={`bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden group hover:shadow-xl transition-all duration-300 flex flex-col h-full ${item.status === 'decommissioned' ? 'opacity-75' : ''}`}
+    >
+      {/* Image Section */}
+      <div className="h-52 relative overflow-hidden shrink-0">
+        <img
+          src={item.image}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          alt={item.name}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+          <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black shadow-xl uppercase tracking-[0.15em] backdrop-blur-md border border-white/20 ${
+            item.status === 'available' ? 'bg-emerald-500/90 text-white' : 
+            item.status === 'decommissioned' ? 'bg-rose-500/90 text-white' : 
+            item.status === 'maintenance' ? 'bg-amber-500/90 text-white' : 
+            'bg-[#ebc1b6]/90 text-[#4a5a67]'
+          }`}>
             {item.status.replace('_', ' ')}
           </span>
+          {availableCount === 0 && item.status !== 'decommissioned' && (
+            <span className="px-3 py-1.5 rounded-xl text-[10px] font-black bg-rose-500 text-white shadow-xl uppercase tracking-[0.15em] border border-white/20">
+              Out of Stock
+            </span>
+          )}
         </div>
       </div>
-      <div className="p-6">
-        <h3 className="text-lg font-bold text-[#4a5a67] dark:text-[#ebc1b6] mb-1">{item.name}</h3>
-        <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 mb-2 uppercase tracking-wider">{item.category}</p>
-        
+
+      {/* Content Section */}
+      <div className="p-6 flex flex-col flex-1">
+        <div className="mb-4">
+          <div className="flex justify-between items-start mb-1">
+            <h3 className="text-lg font-extrabold text-[#4a5a67] dark:text-white leading-tight group-hover:text-blue-600 dark:group-hover:text-[#ebc1b6] transition-colors line-clamp-1">
+              {item.name}
+            </h3>
+            {item.serialNumber && (
+              <span className="text-[9px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-widest bg-gray-50 dark:bg-slate-900 px-2 py-1 rounded-md ml-2 shrink-0">
+                {item.serialNumber}
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">
+            {item.category}
+          </p>
+        </div>
+
         {item.description && (
-          <p className="text-[11px] text-gray-600 dark:text-gray-400 mb-3 leading-snug line-clamp-3">
+          <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-6 leading-relaxed line-clamp-2 italic">
             {item.description}
           </p>
         )}
 
-        {item.totalQuantity > 1 && (
-          <div className="mb-3 flex flex-col space-y-1 text-[11px]">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-[#4a5a67] dark:text-[#ebc1b6]">
-                {(item.totalQuantity || 0) - (item.maintenanceQuantity || 0) - (item.decommissionedQuantity || 0)}/{item.totalQuantity || 0} units available
+        <div className="mt-auto space-y-5">
+          {/* Availability Info */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-end">
+              <span className="text-[10px] font-black text-[#4a5a67] dark:text-gray-400 uppercase tracking-widest">
+                Availability
               </span>
-              {item.maintenanceQuantity > 0 && (
-                <span className="text-[10px] font-bold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-full">
-                  {item.maintenanceQuantity} in repair
-                </span>
-              )}
+              <span className="text-xs font-black text-[#4a5a67] dark:text-white">
+                {availableCount}<span className="text-gray-400 dark:text-gray-600 font-bold mx-0.5">/</span>{totalCount} <span className="text-[9px] text-gray-400 dark:text-gray-500 uppercase tracking-widest">Units</span>
+              </span>
             </div>
+            <div className="h-1.5 w-full bg-gray-100 dark:bg-slate-900 rounded-full overflow-hidden flex">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${availabilityRate}%` }}
+                className={`h-full rounded-full ${
+                  availabilityRate > 50 ? 'bg-emerald-500' : 
+                  availabilityRate > 0 ? 'bg-amber-500' : 'bg-rose-500'
+                }`}
+              />
+            </div>
+          </div>
+
+          {/* Sub-status Badges */}
+          <div className="flex flex-wrap gap-2 min-h-[24px]">
+            {item.maintenanceQuantity > 0 && (
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg border border-blue-100 dark:border-blue-800/50">
+                <SafeIcon icon={FiIcons.FiTool} size={10} />
+                <span className="text-[9px] font-black uppercase tracking-widest">{item.maintenanceQuantity} Repairing</span>
+              </div>
+            )}
             {item.decommissionedQuantity > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">
-                  {item.decommissionedQuantity} decommissioned
-                </span>
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-gray-50 dark:bg-slate-900 text-gray-500 dark:text-gray-400 rounded-lg border border-gray-100 dark:border-slate-700">
+                <SafeIcon icon={FiIcons.FiAlertTriangle} size={10} />
+                <span className="text-[9px] font-black uppercase tracking-widest">{item.decommissionedQuantity} Graveyard</span>
               </div>
             )}
           </div>
-        )}
-        
-        {item.status === 'decommissioned' && item.decommissionReason && (
-          <div className="mt-2 p-3 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 transition-colors">
-            <p className="text-[8px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Graveyard Record</p>
-            <p className="text-[10px] italic text-gray-500 dark:text-gray-400 line-clamp-2">"{item.decommissionReason}"</p>
-            <p className="text-[9px] font-bold text-[#4a5a67] dark:text-[#ebc1b6] mt-1">{item.decommissionDate}</p>
-          </div>
-        )}
 
-        {item.status === 'maintenance' && item.remarks && (
-          <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-900/30 transition-colors">
-            <p className="text-[8px] font-black text-blue-400 dark:text-blue-500 uppercase tracking-widest mb-1">Service Notes</p>
-            <p className="text-[10px] italic text-[#4a5a67] dark:text-gray-300 line-clamp-2">"{item.remarks}"</p>
-            <p className="text-[9px] font-bold text-blue-600 dark:text-blue-400 mt-1">In since: {item.repairStartDate || 'Recently'}</p>
-          </div>
-        )}
-        
-        <div className="flex justify-between items-center border-t border-gray-50 dark:border-slate-700 pt-4 mt-4">
-          <button onClick={onEdit} className={`text-gray-400 dark:text-gray-500 hover:text-[#4a5a67] dark:hover:text-[#ebc1b6] transition-colors p-2`}><SafeIcon icon={FiEdit2} /></button>
-          
-          <div className={`flex space-x-2 transition-all duration-300 ${isAdmin ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            {item.status === 'decommissioned' || item.status === 'maintenance' ? (
-              <button 
-                onClick={() => onActivate(item.id)}
-                className="flex items-center space-x-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-green-600 dark:hover:bg-green-600 hover:text-white transition-all"
-              >
-                <SafeIcon icon={FiCheck} />
-                <span>Restore</span>
-              </button>
-            ) : (
-              <>
+          {/* Action Bar */}
+          <div className="flex items-center justify-between pt-5 border-t border-gray-50 dark:border-slate-700/50 mt-4">
+            <button 
+              onClick={onEdit} 
+              className="p-2.5 bg-gray-50 dark:bg-slate-900 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-[#ebc1b6] hover:bg-blue-50 dark:hover:bg-slate-700 rounded-xl transition-all active:scale-90"
+              title="Edit Asset"
+            >
+              <SafeIcon icon={FiIcons.FiEdit2} size={16} />
+            </button>
+            
+            <div className={`flex items-center gap-2 transition-all duration-300 ${isAdmin ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              {item.maintenanceQuantity > 0 && (
                 <button 
-                  onClick={onRepair}
-                  className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 dark:hover:bg-blue-600 hover:text-white transition-all"
+                  onClick={() => onActivate(item.id, 'maintenance')}
+                  className="px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-[9px] font-black uppercase tracking-[0.1em] hover:bg-emerald-600 hover:text-white transition-all active:scale-95 border border-emerald-100 dark:border-emerald-800/50 shadow-sm"
                 >
-                  <SafeIcon icon={FiTool} />
-                  <span>Repair</span>
+                  Unrepair
                 </button>
+              )}
+
+              {item.decommissionedQuantity > 0 && (
                 <button 
-                  onClick={onDecommission}
-                  className="flex items-center space-x-2 px-3 py-1.5 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 dark:hover:bg-orange-600 hover:text-white transition-all"
+                  onClick={() => onActivate(item.id, 'decommissioned')}
+                  className="px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-xl text-[9px] font-black uppercase tracking-[0.1em] hover:bg-indigo-600 hover:text-white transition-all active:scale-95 border border-indigo-100 dark:border-indigo-800/50 shadow-sm"
                 >
-                  <SafeIcon icon={FiAlertTriangle} />
-                  <span>Decommission</span>
+                  Recommission
                 </button>
-              </>
-            )}
+              )}
+
+              {availableCount > 0 && (
+                <div className="flex gap-1.5 ml-1 pl-3 border-l border-gray-100 dark:border-slate-700/50">
+                  <button 
+                    onClick={onRepair}
+                    className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-600 hover:text-white transition-all active:scale-95 border border-blue-100 dark:border-blue-800/50 shadow-sm"
+                    title="Send to Repair"
+                  >
+                    <SafeIcon icon={FiIcons.FiTool} size={14} />
+                  </button>
+                  <button 
+                    onClick={onDecommission}
+                    className="p-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl hover:bg-orange-600 hover:text-white transition-all active:scale-95 border border-orange-100 dark:border-orange-800/50 shadow-sm"
+                    title="Decommission"
+                  >
+                    <SafeIcon icon={FiIcons.FiAlertTriangle} size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

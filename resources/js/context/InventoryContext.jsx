@@ -299,6 +299,19 @@ export function InventoryProvider({ children, user }) {
       }
   }, []);
 
+  const recommissionEquipment = useCallback(async (id, data) => {
+    try {
+      const response = await axios.post(`/equipment/${id}/recommission`, data);
+      dispatch({ type: 'UPDATE_EQUIPMENT', payload: response.data.data });
+      toast.success("Equipment restore successfully");
+      return true;
+    } catch (error) {
+      console.error("Failed to recommission equipment", error);
+      toast.error(error.response?.data?.message || "Failed to recommission equipment");
+      return false;
+    }
+  }, []);
+
   const checkOutEquipment = useCallback(async (bookingData, options = {}) => {
       const { showToast = true } = options;
       try {
@@ -431,6 +444,7 @@ export function InventoryProvider({ children, user }) {
         updateEquipment, 
         updateLocalEquipment,
         deleteEquipment,
+        recommissionEquipment,
         checkOutEquipment, 
         batchCheckIn, 
         cancelBooking,

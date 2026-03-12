@@ -265,4 +265,39 @@ class EquipmentController extends Controller
 
         return '/storage/'.$filename;
     }
+
+    public function recommission(Request $request, $id)
+    {
+        $request->validate([
+            'quantity' => 'required|integer|min:1',
+            'source_status' => 'required|string|in:maintenance,decommissioned',
+        ]);
+
+        $equipment = Equipment::findOrFail($id);
+        $quantity = $request->input('quantity');
+        $sourceStatus = $request->input('source_status');
+
+        if ($sourceStatus === 'maintenance') {
+            if ($quantity > $equipment->maintenance_quantity) {
+                return response()->json(['message' => 'Quantity exceeds quantity in maintenance.'], 422);
+            }
+            $equipment->maintenance_quantity -= $quantity;
+        } else { // decommissioned
+            if ($quantity > $equipment->decommissioned_quantity) {
+                return response()->json(['message' => 'Quantity exceeds decommissioned quantity.'], 422);
+            }
+            $equipment->decommissioned_quantity -= $quantity;
+        }
+
+        $equipment->total_quantity += $quantity;
+
+        // If all items are back in stock, change status to available
+        if ($equipment->maintenance_quantity === 0 && $equipment->decommissioned_quantity === 0) {
+            $equipment->status = 'available';
+        }
+
+        $equipment->save();
+
+        return new EquipmentResource($equipment);
+    }
 }
