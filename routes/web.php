@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\BundleController;
+use App\Http\Controllers\CollaborationController;
 use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\EquipmentLogController;
 use App\Http\Controllers\SecurityController;
@@ -56,12 +57,18 @@ Route::view('/login', 'welcome');
 Route::view('/register', 'welcome');
 Route::view('/forgot-password', 'welcome');
 Route::view('/check-in-out', 'welcome');
+Route::view('/collaborate/{token}', 'welcome'); // Public route for collaborators
 
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/register', [AuthController::class, 'register'])->name('register');
 Route::post('/forgot-password/otp', [AuthController::class, 'sendResetOtp']);
 Route::post('/forgot-password/verify', [AuthController::class, 'verifyResetOtp']);
 Route::post('/forgot-password/reset', [AuthController::class, 'resetPasswordWithOtp']);
+
+// Public Collaboration Endpoints
+Route::get('/api/collaborate/equipment', [CollaborationController::class, 'equipment']);
+Route::get('/api/collaborate/{token}', [CollaborationController::class, 'validateToken']);
+Route::post('/api/collaborate/{token}', [CollaborationController::class, 'update']);
 
 Route::post('/logout', function () {
     Auth::logout();
@@ -91,6 +98,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/stock-takes', [StockTakeController::class, 'store']);
     Route::post('/bookings/batch-delete', [BookingController::class, 'batchDestroy']);
     Route::delete('/bookings/{id}', [BookingController::class, 'destroy']);
+    
+    // Collaboration Invite
+    Route::post('/bookings/{booking}/invite', [CollaborationController::class, 'invite']);
 });
 
 Route::resource('equipment', EquipmentController::class);

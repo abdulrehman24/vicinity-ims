@@ -2,8 +2,7 @@
 
 namespace App\Mail;
 
-use App\Models\Booking;
-use App\Models\Category;
+use App\Models\CollaborationInvite;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -14,74 +13,36 @@ class CollaborationInviteMail extends Mailable
 {
     use Queueable, SerializesModels;
 
+    public $invite;
     public $booking;
 
-    public $password;
-
-    public $email;
-
-    /**
-     * Create a new message instance.
-     */
-    public function __construct(Booking $booking, string $email, string $password)
+    public function __construct(CollaborationInvite $invite)
     {
-        $this->booking = $booking;
+        $this->invite = $invite;
+        $this->booking = $invite->booking;
         $this->booking->loadMissing(['user', 'equipments']);
-        $this->email = $email;
-        $this->password = $password;
     }
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'You have been invited to collaborate on '.$this->booking->project_title,
+            subject: 'Invitation to collaborate on project: ' . $this->booking->project_title,
         );
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
-        // Get all categories sorted by sort_order
-        $categories = Category::orderBy('sort_order')->pluck('name')->toArray();
-        $categoryOrder = array_flip($categories);
-
-        // Group equipment by category and sort categories based on sort_order
-        $groupedEquipment = $this->booking->equipments
-            ->sortBy('name')
-            ->groupBy('category')
-            ->sortKeysUsing(function ($a, $b) use ($categoryOrder) {
-                $orderA = $categoryOrder[$a] ?? 999;
-                $orderB = $categoryOrder[$b] ?? 999;
-                
-                if ($orderA === $orderB) {
-                    return strcmp($a, $b);
-                }
-                
-                return $orderA <=> $orderB;
-            });
-
         return new Content(
             view: 'emails.collaboration_invite',
             with: [
+                'invite' => $this->invite,
                 'booking' => $this->booking,
-                'email' => $this->email,
-                'password' => $this->password,
-                'owner' => $this->booking->user,
-                'groupedEquipment' => $groupedEquipment,
+                'link' => url("/collaborate/{$this->invite->token}"),
+                'expires_at' => $this->invite->expires_at->format('M d, Y H:i'),
             ],
         );
     }
 
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
     public function attachments(): array
     {
         return [];

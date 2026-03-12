@@ -6,19 +6,19 @@
     </div>
 
     <div style="font-size:20px;font-weight:800;color:#4a5a67;margin-bottom:8px;">
-        You've been invited!
+        Collaborate on Project
     </div>
     
     <div style="font-size:12px;color:#6b7280;margin-bottom:24px;">
-        You have been added as a collaborator for the project <strong>{{ $booking->project_title }}</strong>.
+        You have been invited to collaborate on the booking for <strong>{{ $booking->project_title }}</strong>.
     </div>
     
     <div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:24px;">
         <div style="font-size:11px;font-weight:900;letter-spacing:0.15em;text-transform:uppercase;color:#9ca3af;margin-bottom:12px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">
-            Booking Details
+            Project Details
         </div>
         
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
             <tr>
                 <td style="width:50%;padding-bottom:12px;font-size:12px;color:#6b7280;">
                     <div style="font-weight:700;color:#4a5a67;">Project</div>
@@ -30,87 +30,26 @@
                 </td>
             </tr>
             <tr>
-                <td style="width:50%;padding-bottom:12px;font-size:12px;color:#6b7280;">
-                    <div style="font-weight:700;color:#4a5a67;">Shift</div>
-                    <div>{{ $booking->shift }}</div>
-                </td>
-                <td style="width:50%;padding-bottom:12px;font-size:12px;color:#6b7280;">
-                    <div style="font-weight:700;color:#4a5a67;">Equipment Items</div>
-                    <div>{{ $booking->equipments->sum('pivot.quantity') }} items allocated</div>
-                </td>
-            </tr>
-            <tr>
-                <td style="width:50%;font-size:12px;color:#6b7280;">
-                    <div style="font-weight:700;color:#4a5a67;">Quotation</div>
-                    <div>{{ $booking->quotation_number ?: 'N/A' }}</div>
-                </td>
                 <td style="width:50%;font-size:12px;color:#6b7280;">
                     <div style="font-weight:700;color:#4a5a67;">Booking Owner</div>
-                    <div>{{ $owner ? $owner->name : 'System' }}</div>
+                    <div>{{ $booking->user ? $booking->user->name : 'System' }}</div>
+                </td>
+                <td style="width:50%;font-size:12px;color:#6b7280;">
+                    <div style="font-weight:700;color:#4a5a67;">Link Expires</div>
+                    <div style="color:#be123c;font-weight:700;">{{ $expires_at }}</div>
                 </td>
             </tr>
         </table>
     </div>
 
-    <div style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:24px;">
-        <div style="font-size:11px;font-weight:900;letter-spacing:0.15em;text-transform:uppercase;color:#9ca3af;margin-bottom:12px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">
-            Equipment List
-        </div>
-        
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            <thead>
-                <tr>
-                    <th align="left" style="padding-bottom:8px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;">Item</th>
-                    <th align="right" style="padding-bottom:8px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;">Qty</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($groupedEquipment as $category => $equipments)
-                <tr>
-                    <td colspan="2" style="padding:12px 0 4px 0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#4a5a67;border-bottom:1px solid #f3f4f6;">
-                        {{ $category }}
-                    </td>
-                </tr>
-                @foreach($equipments as $equipment)
-                <tr>
-                    <td style="padding:8px 12px;font-size:12px;color:#4a5a67;border-bottom:1px solid #f9fafb;">
-                        {{ $equipment->name }}
-                    </td>
-                    <td align="right" style="padding:8px 0;font-size:12px;color:#4a5a67;font-weight:700;border-bottom:1px solid #f9fafb;">
-                        {{ $equipment->pivot->quantity }}
-                    </td>
-                </tr>
-                @endforeach
-                @endforeach
-            </tbody>
-        </table>
-    </div>
-
-    <div style="background-color:#fff1f2;border:1px solid #ebc1b6;border-radius:12px;padding:20px;margin-bottom:24px;">
-        <div style="font-size:11px;font-weight:900;letter-spacing:0.15em;text-transform:uppercase;color:#be123c;margin-bottom:12px;border-bottom:1px solid #fecdd3;padding-bottom:8px;">
-            Action Required
-        </div>
-        <div style="font-size:12px;color:#881337;margin-bottom:16px;">
-            An account has been created for you. Please log in using the temporary credentials below and update your password immediately.
-        </div>
-        
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-                <td style="padding-bottom:8px;font-size:12px;color:#881337;">
-                    <strong>Email:</strong> {{ $email }}
-                </td>
-            </tr>
-            <tr>
-                <td style="font-size:12px;color:#881337;">
-                    <strong>Temporary Password:</strong> <span style="font-family:monospace;background:white;padding:4px 8px;border-radius:4px;border:1px solid #fecdd3;font-weight:700;">{{ $password }}</span>
-                </td>
-            </tr>
-        </table>
-    </div>
-
-    <div style="text-align:center;">
-        <a href="{{ url('/login') }}" style="display:inline-block;background-color:#4a5a67;color:#ffffff;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;padding:14px 28px;text-decoration:none;border-radius:8px;">
-            Access Dashboard
+    <div style="margin-bottom:32px;text-align:center;">
+        <a href="{{ $link }}" style="background-color:#4a5a67;color:#ffffff;padding:14px 28px;border-radius:12px;text-decoration:none;font-weight:800;font-size:14px;display:inline-block;letter-spacing:0.05em;text-transform:uppercase;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+            Open Collaborative Link
         </a>
+    </div>
+
+    <div style="font-size:11px;color:#9ca3af;line-height:1.6;">
+        <p><strong>Note:</strong> This link is secure and unique to you. It will grant access to view and edit this specific booking only. Access will automatically expire 24 hours after the project ends.</p>
+        <p>If you did not expect this invitation, please ignore this email.</p>
     </div>
 @endsection

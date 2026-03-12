@@ -9,12 +9,13 @@ import { format, parseISO, eachDayOfInterval, isSameDay, isBefore, startOfDay, d
 import toast from 'react-hot-toast';
 import CollaboratorList from '../components/CollaboratorList';
 import ConfirmationModal from '../components/ConfirmationModal';
+import InviteCollabModal from '../components/InviteCollabModal';
 
 const { 
   FiZap, FiLogIn, FiLogOut, FiPackage, FiBox, FiCalendar, FiClock,
   FiCheck, FiX, FiAlertTriangle, FiInfo, FiLayers, FiSearch, FiChevronRight, FiChevronLeft,
   FiChevronsRight, FiChevronsLeft,
-  FiPlus, FiMinus, FiFileText, FiCheckSquare, FiSquare, FiTrash2, FiEdit2, FiUser
+  FiPlus, FiMinus, FiFileText, FiCheckSquare, FiSquare, FiTrash2, FiEdit2, FiUser, FiShare2
 } = FiIcons;
 
 function CheckInOut() {
@@ -25,6 +26,7 @@ function CheckInOut() {
   const [processingMessage, setProcessingMessage] = useState("Processing booking...");
   const [initialSelectedKeys, setInitialSelectedKeys] = useState([]);
   const [duplicateProjectData, setDuplicateProjectData] = useState(null);
+  const [inviteModal, setInviteModal] = useState({ isOpen: false, bookingId: null, projectName: '' });
   const location = useLocation();
 
   const overdueBookings = useMemo(() => {
@@ -309,10 +311,18 @@ function CheckInOut() {
               setInitialSelectedKeys([]); // Clear pre-selection after success
             }}
             onEditRequest={handleEditRequest} 
+            onInviteRequest={(id, name) => setInviteModal({ isOpen: true, bookingId: id, projectName: name })}
             initialSelectedKeys={initialSelectedKeys}
           />
         )}
       </AnimatePresence>
+
+      <InviteCollabModal 
+        isOpen={inviteModal.isOpen}
+        onClose={() => setInviteModal({ isOpen: false, bookingId: null, projectName: '' })}
+        bookingId={inviteModal.bookingId}
+        projectName={inviteModal.projectName}
+      />
 
     </motion.div>
   );
@@ -1143,7 +1153,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, se
   );
 }
 
-function GroupReturnView({ equipment, bookings, categories, onConfirm, onEditRequest, initialSelectedKeys = [] }) {
+function GroupReturnView({ equipment, bookings, categories, onConfirm, onEditRequest, onInviteRequest, initialSelectedKeys = [] }) {
   const { cancelBooking, user } = useInventory();
   const [returnStates, setReturnStates] = useState({}); // { itemId: { isDamaged: bool, note: str } }
   const [selectedProjectKeys, setSelectedProjectKeys] = useState(initialSelectedKeys);
@@ -1431,6 +1441,18 @@ function GroupReturnView({ equipment, bookings, categories, onConfirm, onEditReq
                   >
                       <SafeIcon icon={FiEdit2} />
                   </button>
+                  {activeTab === 'my_bookings' && (
+                    <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onInviteRequest(p.bookingIds[0], p.shootName);
+                        }}
+                        className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-white/20 dark:hover:bg-black/20 text-current' : 'hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-400'}`}
+                        title="Invite External Collaborator"
+                    >
+                        <SafeIcon icon={FiShare2} />
+                    </button>
+                  )}
                   <button 
                       onClick={(e) => handleCancelProject(p, e)}
                       className={`p-2 rounded-lg ${selectedProjectKeys.includes(projectKey(p)) ? 'hover:bg-red-500/20 text-red-300' : 'hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400'}`}

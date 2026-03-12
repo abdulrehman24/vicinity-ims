@@ -26,6 +26,7 @@ import AdminTickets from './pages/admin/AdminTickets';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminBundles from './pages/admin/AdminBundles';
 import AdminBookings from './pages/admin/AdminBookings';
+import CollaborationEditor from './pages/CollaborationEditor';
 import { InventoryProvider } from './context/InventoryContext';
 import SafeIcon from './common/SafeIcon';
 import './App.css';
@@ -112,6 +113,7 @@ function App() {
       <Routes>
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/collaborate/:token" element={<CollaborationEditor />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
@@ -146,6 +148,7 @@ function App() {
               <Route path="/records" element={<Records />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/profile" element={<UserProfile user={user} />} />
+              <Route path="/collaborate/:token" element={<CollaborationEditor />} />
               <Route path="/admin/*" element={adminElement}>
                 <Route index element={<Navigate to="/admin/dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
