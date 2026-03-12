@@ -519,14 +519,16 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate
       {/* Content Section */}
       <div className="p-6 flex flex-col flex-1">
         <div className="mb-4">
-          <div className="flex justify-between items-start mb-1">
-            <h3 className="text-lg font-extrabold text-[#4a5a67] dark:text-white leading-tight group-hover:text-blue-600 dark:group-hover:text-[#ebc1b6] transition-colors line-clamp-1">
+          <div className="mb-1">
+            <h3 className="text-lg font-extrabold text-[#4a5a67] dark:text-white leading-tight group-hover:text-blue-600 dark:group-hover:text-[#ebc1b6] transition-colors line-clamp-2">
               {item.name}
             </h3>
             {item.serialNumber && (
-              <span className="text-[9px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-widest bg-gray-50 dark:bg-slate-900 px-2 py-1 rounded-md ml-2 shrink-0">
-                {item.serialNumber}
-              </span>
+              <div className="mt-1.5 flex">
+                <span className="text-[9px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-widest bg-gray-50 dark:bg-slate-900 px-2 py-1 rounded-md max-w-full truncate" title={item.serialNumber}>
+                  {item.serialNumber}
+                </span>
+              </div>
             )}
           </div>
           <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">
