@@ -18,25 +18,85 @@ function CollaborationEditor() {
   
   // Local state for when context is not available (guest users)
   const [localEquipment, setLocalEquipment] = useState([]);
+  const [systemCategories, setSystemCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [booking, setBooking] = useState(null);
   const [invite, setInvite] = useState(null);
 
-  // Use context if available, otherwise use local state
-  const equipmentList = context?.equipment || localEquipment;
-  
   // Local Form State
   const [projTitle, setProjTitle] = useState('');
   const [remarks, setRemarks] = useState('');
   const [selectedItems, setSelectedItems] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Filter and Search State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+
+  // Use context if available, otherwise use local state
+  const equipmentList = context?.equipment || localEquipment;
+
+  // Category Sort Map
+  const categorySortMap = useMemo(() => {
+    return systemCategories.reduce((acc, cat) => {
+      acc[cat.name] = cat.sort_order;
+      return acc;
+    }, {});
+  }, [systemCategories]);
+
+  // Derive categories for the filter
+  const allCategories = useMemo(() => {
+    const catsInList = Array.from(new Set(equipmentList.map(item => item.category)));
+    
+    // Sort based on system sort_order, fallback to alphabetical
+    const sorted = catsInList.sort((a, b) => {
+      const orderA = categorySortMap[a] ?? 999;
+      const orderB = categorySortMap[b] ?? 999;
+      if (orderA === orderB) return a.localeCompare(b);
+      return orderA - orderB;
+    });
+
+    return ['All', ...sorted];
+  }, [equipmentList, categorySortMap]);
+
+  const filteredCatalog = useMemo(() => {
+    return equipmentList.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (item.serialNumber && item.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
+      const isAvailable = item.status === 'available';
+      const isNotInCart = !selectedItems.find(i => i.id === item.id);
+      
+      return matchesSearch && matchesCategory && isAvailable && isNotInCart;
+    });
+  }, [equipmentList, searchTerm, selectedCategory, selectedItems]);
+
+  // Grouped cart items
+  const groupedItems = useMemo(() => {
+    const grouped = selectedItems.reduce((acc, item) => {
+      if (!acc[item.category]) acc[item.category] = [];
+      acc[item.category].push(item);
+      return acc;
+    }, {});
+
+    // Return as sorted entries
+    return Object.entries(grouped).sort(([catA], [catB]) => {
+      const orderA = categorySortMap[catA] ?? 999;
+      const orderB = categorySortMap[catB] ?? 999;
+      if (orderA === orderB) return catA.localeCompare(catB);
+      return orderA - orderB;
+    });
+  }, [selectedItems, categorySortMap]);
+  
   const fetchPublicEquipment = useCallback(async () => {
     if (context) return; // Don't fetch if we already have context
     try {
       const response = await axios.get('/api/collaborate/equipment');
       setLocalEquipment(response.data.data);
+      if (response.data.categories) {
+        setSystemCategories(response.data.categories);
+      }
     } catch (err) {
       console.error("Failed to fetch public equipment", err);
     }
@@ -48,6 +108,9 @@ function CollaborationEditor() {
       const data = response.data;
       setBooking(data.booking);
       setInvite(data.invite);
+      if (data.categories) {
+        setSystemCategories(data.categories);
+      }
       
       setProjTitle(data.booking.project_title || '');
       setRemarks(data.booking.remarks || '');
@@ -234,35 +297,48 @@ function CollaborationEditor() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                {selectedItems.map(item => (
-                  <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-700 gap-4 transition-colors">
-                    <div className="flex items-center space-x-4">
-                      <img src={item.image} className="w-12 h-12 rounded-xl object-cover" alt="" />
-                      <div>
-                        <p className="text-xs font-black text-[#4a5a67] dark:text-[#ebc1b6] uppercase tracking-wide">{item.name}</p>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{item.category}</p>
-                      </div>
+              <div className="space-y-8">
+                {groupedItems.map(([category, items]) => (
+                  <div key={category} className="space-y-4">
+                    <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-700">
+                      <div className="w-2 h-2 rounded-full bg-[#ebc1b6]" />
+                      <h3 className="text-[10px] font-black text-[#4a5a67] dark:text-[#ebc1b6] uppercase tracking-[0.2em]">{category}</h3>
+                      <span className="ml-auto text-[10px] font-black text-gray-400 dark:text-slate-500">{items.length} Units</span>
                     </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-6">
-                      <div className="flex items-center gap-4 bg-white dark:bg-slate-800 px-4 py-2 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm transition-colors">
-                        <button onClick={() => updateQty(item.id, -1)} className="text-[#ebc1b6] hover:text-[#4a5a67] dark:hover:text-white p-1 transition-colors"><SafeIcon icon={FiMinus} /></button>
-                        <span className="text-sm font-black text-[#4a5a67] dark:text-[#ebc1b6] w-6 text-center">{item.qty}</span>
-                        <button onClick={() => updateQty(item.id, 1)} className="text-[#ebc1b6] hover:text-[#4a5a67] dark:hover:text-white p-1 transition-colors"><SafeIcon icon={FiPlus} /></button>
-                      </div>
-                      <button 
-                        onClick={() => removeItem(item.id)}
-                        className="p-2.5 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl transition-all"
-                      >
-                        <SafeIcon icon={FiTrash2} />
-                      </button>
+                    
+                    <div className="space-y-4">
+                      {items.map(item => (
+                        <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 gap-4 transition-colors hover:border-[#ebc1b6]/30 group">
+                          <div className="flex items-center space-x-4">
+                            <img src={item.image} className="w-12 h-12 rounded-xl object-cover" alt="" />
+                            <div>
+                              <p className="text-xs font-black text-[#4a5a67] dark:text-[#ebc1b6] uppercase tracking-wide group-hover:text-[#4a5a67] transition-colors">{item.name}</p>
+                              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{item.category}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between sm:justify-end gap-6">
+                            <div className="flex items-center gap-4 bg-gray-50 dark:bg-slate-900 px-4 py-2 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm transition-colors">
+                              <button onClick={() => updateQty(item.id, -1)} className="text-[#ebc1b6] hover:text-[#4a5a67] dark:hover:text-white p-1 transition-colors"><SafeIcon icon={FiMinus} /></button>
+                              <span className="text-sm font-black text-[#4a5a67] dark:text-[#ebc1b6] w-6 text-center">{item.qty}</span>
+                              <button onClick={() => updateQty(item.id, 1)} className="text-[#ebc1b6] hover:text-[#4a5a67] dark:hover:text-white p-1 transition-colors"><SafeIcon icon={FiPlus} /></button>
+                            </div>
+                            <button 
+                              onClick={() => removeItem(item.id)}
+                              className="p-2.5 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl transition-all"
+                            >
+                              <SafeIcon icon={FiTrash2} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
+                
                 {selectedItems.length === 0 && (
                   <div className="py-20 text-center opacity-30">
-                    <SafeIcon icon={FiPackage} className="text-5xl mx-auto mb-4" />
-                    <p className="text-sm font-black uppercase tracking-widest">No equipment selected</p>
+                    <SafeIcon icon={FiPackage} className="text-5xl mx-auto mb-4 text-[#4a5a67] dark:text-slate-400" />
+                    <p className="text-sm font-black uppercase tracking-widest text-[#4a5a67] dark:text-slate-400">No equipment selected</p>
                   </div>
                 )}
               </div>
@@ -272,28 +348,62 @@ function CollaborationEditor() {
           {/* Right Column: Catalog */}
           <div className="lg:col-span-4 space-y-8">
             <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-slate-700 sticky top-24 transition-colors">
-              <h2 className="text-lg font-black text-[#4a5a67] dark:text-[#ebc1b6] uppercase tracking-tight mb-6">Add More Gear</h2>
-              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                {equipmentList.map(item => {
-                  const isInCart = selectedItems.find(i => i.id === item.id);
-                  if (item.status !== 'available' || isInCart) return null;
+              <div className="mb-6">
+                <h2 className="text-lg font-black text-[#4a5a67] dark:text-[#ebc1b6] uppercase tracking-tight mb-4">Add More Gear</h2>
+                
+                {/* Search & Filter */}
+                <div className="space-y-3">
+                  <div className="relative">
+                    <FiIcons.FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input 
+                      type="text"
+                      placeholder="Search equipment..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-slate-900 border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] rounded-xl outline-none font-bold text-xs text-[#4a5a67] dark:text-[#ebc1b6] transition-all"
+                    />
+                  </div>
                   
-                  return (
-                    <button 
-                      key={item.id}
-                      onClick={() => addItem(item)}
-                      className="w-full group text-left p-3 bg-gray-50 dark:bg-slate-900 border border-transparent hover:border-[#ebc1b6] dark:hover:border-[#ebc1b6] rounded-2xl transition-all"
+                  <div className="relative">
+                    <FiIcons.FiFilter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <select 
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3 bg-gray-50 dark:bg-slate-900 border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] rounded-xl outline-none font-bold text-xs text-[#4a5a67] dark:text-[#ebc1b6] appearance-none transition-all cursor-pointer"
                     >
-                      <div className="flex items-center gap-3">
-                        <img src={item.image} className="w-10 h-10 rounded-lg object-cover grayscale group-hover:grayscale-0 transition-all" alt="" />
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-black text-[#4a5a67] dark:text-[#ebc1b6] uppercase truncate">{item.name}</p>
-                          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{item.category}</p>
-                        </div>
+                      {allCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                {filteredCatalog.map(item => (
+                  <button 
+                    key={item.id}
+                    onClick={() => addItem(item)}
+                    className="w-full group text-left p-3 bg-gray-50 dark:bg-slate-900 border border-transparent hover:border-[#ebc1b6] dark:hover:border-[#ebc1b6] rounded-2xl transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img src={item.image} className="w-10 h-10 rounded-lg object-cover grayscale group-hover:grayscale-0 transition-all" alt="" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-black text-[#4a5a67] dark:text-[#ebc1b6] uppercase truncate group-hover:text-[#ebc1b6] transition-colors">{item.name}</p>
+                        <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{item.category}</p>
                       </div>
-                    </button>
-                  );
-                })}
+                      <div className="p-1.5 bg-white dark:bg-slate-800 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                        <SafeIcon icon={FiPlus} className="text-[#ebc1b6]" />
+                      </div>
+                    </div>
+                  </button>
+                ))}
+                
+                {filteredCatalog.length === 0 && (
+                  <div className="py-10 text-center opacity-30">
+                    <p className="text-[10px] font-black uppercase tracking-widest">No matching gear found</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

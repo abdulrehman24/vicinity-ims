@@ -18,7 +18,12 @@ class CollaborationController extends Controller
     public function equipment()
     {
         $equipment = Equipment::where('status', '!=', 'decommissioned')->get();
-        return EquipmentResource::collection($equipment);
+        $categories = DB::table('categories')->where('is_active', true)->orderBy('sort_order')->get(['name', 'sort_order']);
+        
+        return response()->json([
+            'data' => EquipmentResource::collection($equipment),
+            'categories' => $categories
+        ]);
     }
 
     public function invite(Request $request, Booking $booking)
@@ -64,9 +69,12 @@ class CollaborationController extends Controller
             return response()->json(['message' => 'Invalid or expired link'], 403);
         }
 
+        $categories = DB::table('categories')->where('is_active', true)->orderBy('sort_order')->get(['name', 'sort_order']);
+
         return response()->json([
             'booking' => $invite->booking,
             'invite' => $invite,
+            'categories' => $categories
         ]);
     }
 
