@@ -55,11 +55,11 @@ class AuthController extends Controller
             ], 422);
         }
 
-        if ($user->expires_at && Carbon::parse($user->expires_at)->isPast()) {
-            return response()->json([
-                'message' => 'Your collaboration invite has expired (7 days). Please contact the booking owner to re-invite you.',
-            ], 403);
-        }
+        // if ($user->expires_at && Carbon::parse($user->expires_at)->isPast()) {
+        //     return response()->json([
+        //         'message' => 'Your collaboration invite has expired (7 days). Please contact the booking owner to re-invite you.',
+        //     ], 403);
+        // }
 
         if (! $user->is_approved) {
             return response()->json([
