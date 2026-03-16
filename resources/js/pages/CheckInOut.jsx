@@ -331,7 +331,8 @@ function CheckInOut() {
 const groupDates = (dates) => {
   if (!dates || dates.length === 0) return [];
   
-  const sorted = [...dates].sort();
+  // Ensure dates are unique and sorted
+  const sorted = Array.from(new Set(dates)).sort();
   const groups = [];
   let currentGroup = [sorted[0]];
 
@@ -342,10 +343,11 @@ const groupDates = (dates) => {
     
     if (diff === 1) {
       currentGroup.push(sorted[i]);
-    } else {
+    } else if (diff > 1) {
       groups.push(currentGroup);
       currentGroup = [sorted[i]];
     }
+    // if diff === 0, skip (duplicate)
   }
   groups.push(currentGroup);
   return groups;
@@ -395,7 +397,9 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, se
     if (draft.start_date && draft.end_date) {
       const start = parseISO(draft.start_date);
       const end = parseISO(draft.end_date);
-      setSelectedDates(eachDayOfInterval({ start, end }));
+      // Ensure we don't have duplicates here either
+      const uniqueDates = eachDayOfInterval({ start, end });
+      setSelectedDates(uniqueDates);
     } else {
       setSelectedDates([]);
     }
@@ -428,7 +432,9 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, se
         // Populate dates
         if (editingProject.dates && Array.isArray(editingProject.dates) && editingProject.dates.length > 0) {
             // Prefer explicit dates array if available (handles disjoint dates correctly)
-            const dates = editingProject.dates.map(d => typeof d === 'string' ? parseISO(d) : d);
+            // Ensure dates are unique
+            const uniqueDateStrings = Array.from(new Set(editingProject.dates.map(d => typeof d === 'string' ? d : format(d, 'yyyy-MM-dd'))));
+            const dates = uniqueDateStrings.map(d => parseISO(d));
             setSelectedDates(dates);
         } else if (editingProject.startDate && editingProject.endDate) {
             const start = parseISO(editingProject.startDate);
@@ -507,9 +513,8 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, se
 
   // 1. Availability Logic for Multi-Unit & Shifts
   const requestedDates = useMemo(() => {
-    return selectedDates
-      .map(d => format(d, 'yyyy-MM-dd'))
-      .sort();
+    const unique = Array.from(new Set(selectedDates.map(d => format(d, 'yyyy-MM-dd'))));
+    return unique.sort();
   }, [selectedDates]);
 
   const getAvailableQty = (item, dates, requestedShift, ignoreBookingIds) => {

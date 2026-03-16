@@ -922,6 +922,10 @@ function RecordGroup({ group, onEdit, onCancel, currentUser, categoryOrder }) {
   const canEdit = useMemo(() => {
     if (!currentUser) return false;
 
+    // Only allow editing for active bookings
+    const isActive = group.items.some(i => i.status === 'active');
+    if (!isActive) return false;
+
     const isAdmin = currentUser.is_admin >= 1;
     if (isAdmin) return true;
 

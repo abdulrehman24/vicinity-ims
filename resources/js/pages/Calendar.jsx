@@ -12,10 +12,10 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
-const { FiCalendar, FiClock, FiUser, FiShare2, FiDownload, FiExternalLink, FiInfo, FiX, FiCopy, FiCheck, FiLayers, FiTrash2, FiPlus, FiSave } = FiIcons;
+const { FiCalendar, FiClock, FiUser, FiShare2, FiDownload, FiExternalLink, FiInfo, FiX, FiCopy, FiCheck, FiLayers, FiTrash2, FiPlus, FiSave, FiEdit2 } = FiIcons;
 
 function CalendarPage() {
-  const { bookings, equipment, categories: orderedCategories, cancelBooking, fetchPersonalBundles } = useInventory();
+  const { bookings, equipment, categories: orderedCategories, cancelBooking, fetchPersonalBundles, user } = useInventory();
   const navigate = useNavigate();
   const categoryOrder = useMemo(() => 
     (orderedCategories || []).reduce((acc, cat, idx) => ({ ...acc, [cat]: idx }), {}), 
@@ -28,6 +28,59 @@ function CalendarPage() {
 
   // Click event chip -> open full details (equipment list)
   const [selectedEvent, setSelectedEvent] = useState(null);
+
+  const canEdit = useMemo(() => {
+    if (!user || !selectedEvent) return false;
+    
+    // Only allow editing for active bookings
+    if (selectedEvent.status !== 'active') return false;
+    
+    const currentEmail = user.email ? user.email.toLowerCase() : null;
+    const currentId = user.id;
+
+    // Check ownership
+    const isOwner = (selectedEvent.userId && selectedEvent.userId === currentId) || 
+                   (selectedEvent.userEmail && currentEmail && selectedEvent.userEmail.toLowerCase() === currentEmail) ||
+                   (selectedEvent.userName && selectedEvent.userName === user.name);
+    
+    if (isOwner) return true;
+
+    // Check collaborators
+    const isCollaborator = Array.isArray(selectedEvent.collaborators) && currentEmail && 
+      selectedEvent.collaborators.some(c => {
+        const cEmail = typeof c === 'string' ? c : c?.email;
+        return cEmail && cEmail.toLowerCase() === currentEmail;
+      });
+
+    return isCollaborator;
+  }, [user, selectedEvent]);
+
+  const handleEdit = (event) => {
+    // Transform event to a format CheckInOut can use for editing
+    // This needs to match RecordGroup's onEdit in Records.jsx
+    const editProject = {
+      bookingIds: event.bookingIds,
+      shootName: event.shootName,
+      quotationNumber: event.quotationNumber,
+      dates: event.dates,
+      startDate: event.start,
+      endDate: event.endInclusive,
+      remarks: event.remarks,
+      collaborators: event.collaborators,
+      shift: event.shift,
+      shootType: event.shootType,
+      user: event.userName,
+      status: event.status,
+      items: (event.items || []).map(i => ({
+        equipmentId: i.id,
+        quantity: i.quantity,
+        equipmentName: i.name,
+        category: i.category
+      }))
+    };
+
+    navigate('/', { state: { editProject } });
+  };
 
   const handleDuplicate = (event) => {
     // Transform event to a format CheckInOut can use
@@ -197,6 +250,8 @@ function CalendarPage() {
           shootName: b.shootName || 'Untitled Project',
           quotationNumber: b.quotationNumber || '',
           userName: b.user?.name || 'Operations',
+          userId: b.user?.id,
+          userEmail: b.user?.email,
           createdAt: b.created_at || b.createdAt,
           status: b.status,
           remarks: b.remarks || '',
@@ -204,10 +259,14 @@ function CalendarPage() {
           returnedAt: safeParse(b.returnedAt),
           allDates: [],
           itemsMap: new Map(),
+          bookingIds: new Set(),
+          shift: b.shift || 'Full Day',
+          shootType: b.shoot_type || b.shootType || 'Commercial',
         });
       }
 
       const proj = projectsMap.get(bookingId);
+      proj.bookingIds.add(b.id);
 
       // Collect all involved dates:
       if (Array.isArray(b.dates) && b.dates.length > 0) {
@@ -239,7 +298,19 @@ function CalendarPage() {
 
     const bars = [];
     projectsMap.forEach((proj, bookingId) => {
-      const ranges = groupDatesIntoRanges(proj.allDates);
+      // Deduplicate dates for this project
+      const uniqueDateStrs = new Set();
+      const uniqueDates = [];
+      
+      proj.allDates.forEach(d => {
+        const key = dateOnlyStr(d);
+        if (!uniqueDateStrs.has(key)) {
+          uniqueDateStrs.add(key);
+          uniqueDates.push(d);
+        }
+      });
+      
+      const ranges = groupDatesIntoRanges(uniqueDates);
       
       ranges.forEach((range, idx) => {
         // If project is returned, we still want to see the original dates on the calendar
@@ -250,6 +321,8 @@ function CalendarPage() {
           shootName: proj.shootName,
           quotationNumber: proj.quotationNumber,
           userName: proj.userName,
+          userId: proj.userId,
+          userEmail: proj.userEmail,
           createdAt: proj.createdAt,
           status: proj.status,
           remarks: proj.remarks,
@@ -257,6 +330,10 @@ function CalendarPage() {
           start: range.start,
           endInclusive: range.end,
           returnedAt: proj.returnedAt,
+          bookingIds: Array.from(proj.bookingIds),
+          shift: proj.shift,
+          shootType: proj.shootType,
+          dates: uniqueDates.map(d => dateOnlyStr(d)),
           items: Array.from(proj.itemsMap.values()).sort((a, b) => {
             if (a.category === b.category) return a.name.localeCompare(b.name);
             return (a.category || '').localeCompare(b.category || '');
@@ -287,6 +364,8 @@ function CalendarPage() {
           shootName: b.shootName,
           quotationNumber: b.quotationNumber,
           userName: b.userName,
+          userId: b.userId,
+          userEmail: b.userEmail,
           createdAt: b.createdAt,
           items: b.items,
           remarks: b.remarks,
@@ -295,6 +374,10 @@ function CalendarPage() {
           returnedAt: b.returnedAt ? dateOnlyStr(b.returnedAt) : null,
           start: startStr,
           endInclusive: dateOnlyStr(b.endInclusive),
+          bookingIds: b.bookingIds,
+          shift: b.shift,
+          shootType: b.shootType,
+          dates: b.dates,
         },
       };
     });
@@ -451,6 +534,8 @@ function CalendarPage() {
                           shootName: b.shootName,
                           quotationNumber: b.quotationNumber,
                           userName: b.userName,
+                          userId: b.userId,
+                          userEmail: b.userEmail,
                           createdAt: b.createdAt,
                           items: b.items,
                           remarks: b.remarks,
@@ -459,6 +544,10 @@ function CalendarPage() {
                           returnedAt: b.returnedAt ? dateOnlyStr(b.returnedAt) : null,
                           start: dateOnlyStr(b.start),
                           endInclusive: dateOnlyStr(b.endInclusive),
+                          bookingIds: b.bookingIds,
+                          shift: b.shift,
+                          shootType: b.shootType,
+                          dates: b.dates,
                         });
                       }}
                     >
@@ -751,23 +840,31 @@ function CalendarPage() {
 
                 {/* Booking Actions */}
                 <div className="pt-4 border-t border-gray-100 dark:border-slate-700 flex flex-col space-y-3 transition-colors">
-                  <div className="flex space-x-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    {canEdit && (
+                      <button
+                        onClick={() => handleEdit(selectedEvent)}
+                        className="col-span-2 flex items-center justify-center space-x-2 py-4 bg-[#ebc1b6] text-[#4a5a67] rounded-xl font-black text-[11px] uppercase tracking-[0.2em] shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      >
+                        <SafeIcon icon={FiEdit2} className="text-sm" />
+                        <span>Modify Booking</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDuplicate(selectedEvent)}
-                      className="flex-1 flex items-center justify-center space-x-2 py-3 bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:shadow-lg transition-all"
+                      className="flex items-center justify-center space-x-2 py-3 bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:shadow-lg transition-all"
                     >
                       <SafeIcon icon={FiPlus} />
                       <span>Duplicate List</span>
                     </button>
                     <button
                       onClick={() => handleSaveAsBundle(selectedEvent)}
-                      className="flex-1 flex items-center justify-center space-x-2 py-3 bg-[#ebc1b6] dark:bg-[#ebc1b6] text-[#4a5a67] dark:text-[#4a5a67] rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md hover:shadow-lg transition-all"
+                      className="flex items-center justify-center space-x-2 py-3 bg-gray-50 dark:bg-slate-700 text-[#4a5a67] dark:text-[#ebc1b6] border border-gray-100 dark:border-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:shadow-md transition-all"
                     >
                       <SafeIcon icon={FiSave} />
                       <span>Save as Bundle</span>
                     </button>
                   </div>
-                  
                 </div>
               </div>
             </motion.div>
