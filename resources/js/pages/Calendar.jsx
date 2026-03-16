@@ -600,8 +600,8 @@ function CalendarPage() {
                           )
                             .sort(([a], [b]) => (categoryOrder[a] ?? 999) - (categoryOrder[b] ?? 999))
                             .map(([category, items]) => (
-                              <li key={category} className="space-y-1">
-                                <div className="text-[8px] font-black uppercase tracking-widest text-white/60">
+                              <li key={category} className="space-y-1.5">
+                                <div className="text-[12px] font-black uppercase tracking-widest text-white/70 mb-1">
                                   {category}
                                 </div>
                                 {items
@@ -610,9 +610,9 @@ function CalendarPage() {
                                   .map((item, idx) => (
                                     <div
                                       key={`${category}-${item.name}-${idx}`}
-                                      className="text-[9px] text-white/60 truncate flex items-center space-x-2"
+                                      className="text-[11px] text-white/80 truncate flex items-center space-x-2"
                                     >
-                                      <span className="w-5 shrink-0 opacity-80">
+                                      <span className="w-6 shrink-0 opacity-90 font-black">
                                         {item.quantity || 1}x
                                       </span>
                                       <span className="uppercase tracking-tight font-bold">
