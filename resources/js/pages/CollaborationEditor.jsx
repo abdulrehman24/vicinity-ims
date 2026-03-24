@@ -115,13 +115,19 @@ function CollaborationEditor() {
       setProjTitle(data.booking.project_title || '');
       setRemarks(data.booking.remarks || '');
       
-      const items = data.booking.equipments.map(e => ({
-        id: e.id,
-        qty: e.pivot?.quantity || 1,
-        name: e.name,
-        image: e.image_path || e.image,
-        category: e.category
-      }));
+      const items = data.booking.equipments.map(e => {
+        // Calculate basic max available (ignoring other bookings for now, focusing on inventory limits)
+        const maxAvail = (e.totalQuantity || 0) - (e.maintenanceQuantity || 0) - (e.decommissionedQuantity || 0);
+        
+        return {
+          id: e.id,
+          qty: e.pivot?.quantity || 1,
+          maxQty: maxAvail,
+          name: e.name,
+          image: e.image_path || e.image,
+          category: e.category
+        };
+      });
       setSelectedItems(items);
       setLoading(false);
     } catch (err) {
@@ -163,12 +169,21 @@ function CollaborationEditor() {
   };
 
   const updateQty = (id, delta) => {
-    setSelectedItems(prev => prev.map(i => {
-      if (i.id === id) {
-        return { ...i, qty: Math.max(1, i.qty + delta) };
-      }
-      return i;
-    }));
+    const item = selectedItems.find(i => i.id === id);
+    if (!item) return;
+
+    const newQty = item.qty + delta;
+    if (newQty < 1) return;
+
+    // Enforce max quantity if it exists
+    if (item.maxQty !== undefined && newQty > item.maxQty) {
+      toast.error(`Maximum inventory reached (${item.maxQty} units available)`);
+      return;
+    }
+
+    setSelectedItems(prev => prev.map(i => 
+      i.id === id ? { ...i, qty: newQty } : i
+    ));
   };
 
   const removeItem = (id) => {
@@ -180,9 +195,19 @@ function CollaborationEditor() {
       toast.error("Item already in cart");
       return;
     }
+    
+    // Calculate max availability
+    const maxAvail = (item.totalQuantity || 0) - (item.maintenanceQuantity || 0) - (item.decommissionedQuantity || 0);
+    
+    if (maxAvail <= 0) {
+      toast.error("No units available in inventory");
+      return;
+    }
+
     setSelectedItems(prev => [...prev, {
       id: item.id,
       qty: 1,
+      maxQty: maxAvail,
       name: item.name,
       image: item.image_path || item.image,
       category: item.category
@@ -313,7 +338,14 @@ function CollaborationEditor() {
                             <img src={item.image} className="w-12 h-12 rounded-xl object-cover" alt="" />
                             <div>
                               <p className="text-xs font-black text-[#4a5a67] dark:text-[#ebc1b6] uppercase tracking-wide group-hover:text-[#4a5a67] transition-colors">{item.name}</p>
-                              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{item.category}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{item.category}</p>
+                                {item.maxQty !== undefined && (
+                                  <span className="text-[8px] px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-md font-black uppercase tracking-tighter">
+                                    Limit: {item.maxQty}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center justify-between sm:justify-end gap-6">
@@ -390,7 +422,12 @@ function CollaborationEditor() {
                       <img src={item.image} className="w-10 h-10 rounded-lg object-cover grayscale group-hover:grayscale-0 transition-all" alt="" />
                       <div className="min-w-0 flex-1">
                         <p className="text-[11px] font-black text-[#4a5a67] dark:text-[#ebc1b6] uppercase truncate group-hover:text-[#ebc1b6] transition-colors">{item.name}</p>
-                        <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{item.category}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{item.category}</p>
+                          <span className="text-[7px] px-1 bg-white/50 dark:bg-slate-800/50 text-gray-400 dark:text-slate-500 rounded font-black uppercase">
+                            Qty: {(item.totalQuantity || 0) - (item.maintenanceQuantity || 0) - (item.decommissionedQuantity || 0)}
+                          </span>
+                        </div>
                       </div>
                       <div className="p-1.5 bg-white dark:bg-slate-800 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
                         <SafeIcon icon={FiPlus} className="text-[#ebc1b6]" />

@@ -61,7 +61,7 @@ class CollaborationController extends Controller
 
     public function validateToken($token)
     {
-        $invite = CollaborationInvite::with('booking.equipments', 'booking.dates', 'booking.user')
+        $invite = CollaborationInvite::with(['booking.equipments', 'booking.dates', 'booking.user'])
             ->where('token', $token)
             ->first();
 
@@ -69,10 +69,26 @@ class CollaborationController extends Controller
             return response()->json(['message' => 'Invalid or expired link'], 403);
         }
 
+        $booking = $invite->booking;
+        
+        // Transform the equipments to use EquipmentResource but keep the pivot data
+        $equipments = $booking->equipments->map(function ($e) {
+            $resource = (new EquipmentResource($e))->toArray(request());
+            $resource['pivot'] = $e->pivot;
+            return $resource;
+        });
+
         $categories = DB::table('categories')->where('is_active', true)->orderBy('sort_order')->get(['name', 'sort_order']);
 
         return response()->json([
-            'booking' => $invite->booking,
+            'booking' => [
+                'id' => $booking->id,
+                'project_title' => $booking->project_title,
+                'remarks' => $booking->remarks,
+                'user' => $booking->user,
+                'equipments' => $equipments,
+                'dates' => $booking->dates,
+            ],
             'invite' => $invite,
             'categories' => $categories
         ]);
@@ -96,27 +112,39 @@ class CollaborationController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-        DB::transaction(function () use ($booking, $validated) {
-            $booking->update([
-                'project_title' => $validated['shootName'],
-                'remarks' => $validated['remarks'],
-            ]);
-
-            // Sync items (simple version: delete and re-add)
-            DB::table('booking_equipment')->where('booking_id', $booking->id)->delete();
-
-            foreach ($validated['items'] as $item) {
-                DB::table('booking_equipment')->insert([
-                    'booking_id' => $booking->id,
-                    'equipment_id' => $item['equipmentId'],
-                    'quantity' => $item['quantity'],
-                    'status' => 'active',
-                    'created_at' => now(),
-                    'updated_at' => now(),
+        try {
+            DB::transaction(function () use ($booking, $validated) {
+                $booking->update([
+                    'project_title' => $validated['shootName'],
+                    'remarks' => $validated['remarks'],
                 ]);
-            }
-        });
 
-        return response()->json(['message' => 'Booking updated successfully']);
+                // Sync items (simple version: delete and re-add)
+                DB::table('booking_equipment')->where('booking_id', $booking->id)->delete();
+
+                foreach ($validated['items'] as $item) {
+                    // Double check availability on backend
+                    $equipment = Equipment::find($item['equipmentId']);
+                    $maxAvailable = ($equipment->total_quantity ?? 0) - ($equipment->maintenance_quantity ?? 0) - ($equipment->decommissioned_quantity ?? 0);
+                    
+                    if ($item['quantity'] > $maxAvailable) {
+                        throw new \Exception("Insufficient inventory for {$equipment->name}. Max available is {$maxAvailable}.");
+                    }
+
+                    DB::table('booking_equipment')->insert([
+                        'booking_id' => $booking->id,
+                        'equipment_id' => $item['equipmentId'],
+                        'quantity' => $item['quantity'],
+                        'status' => 'active',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            });
+
+            return response()->json(['message' => 'Booking updated successfully']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

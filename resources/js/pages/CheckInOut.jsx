@@ -289,6 +289,7 @@ function CheckInOut() {
             bundles={bundles} 
             categories={categories}
             onConfirm={handleManualOutConfirm}
+            isProcessing={isProcessing}
             setIsProcessing={setIsProcessing}
             setProcessingMessage={setProcessingMessage}
             editingProject={projectToEdit}
@@ -353,7 +354,7 @@ const groupDates = (dates) => {
   return groups;
 };
 
-function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, setIsProcessing, setProcessingMessage, editingProject, duplicateProject, onUsedDuplicate, onCancelEdit, collaboratorSuggestions }) {
+function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, isProcessing, setIsProcessing, setProcessingMessage, editingProject, duplicateProject, onUsedDuplicate, onCancelEdit, collaboratorSuggestions }) {
   const { personalBundles, fetchPersonalBundles, drafts, fetchDrafts, saveDraft, savePersonalBundle, deleteDraft } = useInventory();
   const [selectedItems, setSelectedItems] = useState([]); // Array of {id, qty}
   const [selectedDraftId, setSelectedDraftId] = useState(null);
@@ -1116,10 +1117,10 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, se
             <div className="flex flex-col space-y-3">
               <button 
                 onClick={handleBooking}
-                disabled={selectedItems.length === 0 || !formData.projTitle || requestedDates.length === 0}
+                disabled={isProcessing || selectedItems.length === 0 || !formData.projTitle || requestedDates.length === 0}
                 className="w-full py-5 bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-lg disabled:opacity-30 transition-all hover:scale-[1.01]"
               >
-                {editingProject ? 'Update Booking' : 'Confirm Deployment'}
+                {isProcessing ? 'Processing...' : (editingProject ? 'Update Booking' : 'Confirm Deployment')}
               </button>
 
               {!editingProject && (

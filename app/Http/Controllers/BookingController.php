@@ -60,6 +60,18 @@ class BookingController extends Controller
         ]);
 
         $dates = collect($validated['dates'])->sort()->values();
+
+        // Check availability for all items across all dates
+        foreach ($validated['items'] as $item) {
+            $available = $this->getAvailableQuantity($item['equipmentId'], $dates, $validated['shift']);
+            if ($item['quantity'] > $available) {
+                $equipment = Equipment::find($item['equipmentId']);
+                return response()->json([
+                    'message' => "Insufficient inventory for {$equipment->name}. Requested: {$item['quantity']}, Available: {$available}.",
+                ], 422);
+            }
+        }
+
         $startDate = $dates->first();
         $endDate = $dates->last();
 
@@ -458,6 +470,17 @@ class BookingController extends Controller
                 ->first() ?? $oldBookings->first();
 
             $dates = collect($validated['dates'])->sort()->values();
+
+            // Check availability for all items across all dates
+            $oldBookingIds = $oldBookings->pluck('id')->toArray();
+            foreach ($validated['items'] as $item) {
+                $available = $this->getAvailableQuantity($item['equipmentId'], $dates, $validated['shift'] ?? 'Full Day', $oldBookingIds);
+                if ($item['quantity'] > $available) {
+                    $equipment = Equipment::find($item['equipmentId']);
+                    abort(422, "Insufficient inventory for {$equipment->name}. Requested: {$item['quantity']}, Available: {$available}.");
+                }
+            }
+
             $startDate = $dates->first();
             $endDate = $dates->last();
 
@@ -668,5 +691,60 @@ class BookingController extends Controller
         }
 
         return response()->json(['message' => 'Booking updated successfully', 'booking_id' => $booking->id]);
+    }
+
+    private function getAvailableQuantity($equipmentId, $dates, $requestedShift, $excludeBookingIds = [])
+    {
+        $equipment = Equipment::find($equipmentId);
+        if (!$equipment) return 0;
+
+        $total = (int) $equipment->total_quantity;
+        $maintenance = (int) $equipment->maintenance_quantity;
+        $decommissioned = (int) $equipment->decommissioned_quantity;
+        $effectiveTotal = max(0, $total - $maintenance - $decommissioned);
+
+        // Convert dates to Y-m-d strings
+        $dateStrings = collect($dates)->map(fn($d) => \Carbon\Carbon::parse($d)->format('Y-m-d'))->toArray();
+
+        // Get all relevant bookings for this equipment on these dates
+        $relevantBookings = DB::table('booking_equipment')
+            ->join('bookings', 'booking_equipment.booking_id', '=', 'bookings.id')
+            ->join('booking_dates', 'bookings.id', '=', 'booking_dates.booking_id')
+            ->where('booking_equipment.equipment_id', $equipmentId)
+            ->where('booking_equipment.status', 'active')
+            ->whereIn('booking_dates.date', $dateStrings)
+            ->whereNotIn('bookings.id', $excludeBookingIds)
+            ->select('booking_equipment.quantity', 'bookings.shift', 'booking_dates.date', 'bookings.id as booking_id')
+            ->get();
+
+        $maxBookedOnAnyDay = 0;
+
+        foreach ($dateStrings as $date) {
+            $bookingsOnDate = $relevantBookings->filter(function ($b) use ($date, $requestedShift) {
+                if ($b->date !== $date) return false;
+
+                // Shift logic:
+                // Full Day conflicts with everything
+                if ($requestedShift === 'Full Day' || $b->shift === 'Full Day') return true;
+                
+                // AM conflicts with AM and Full Day (already handled)
+                if ($requestedShift === 'AM') return $b->shift === 'AM';
+                
+                // PM conflicts with PM and Full Day (already handled)
+                if ($requestedShift === 'PM') return $b->shift === 'PM';
+
+                return false;
+            });
+
+            // Need to sum quantities by unique booking_id on this date
+            // because a booking might have multiple date entries (from join)
+            $totalBookedOnDate = $bookingsOnDate->unique('booking_id')->sum('quantity');
+            
+            if ($totalBookedOnDate > $maxBookedOnAnyDay) {
+                $maxBookedOnAnyDay = $totalBookedOnDate;
+            }
+        }
+
+        return max(0, $effectiveTotal - $maxBookedOnAnyDay);
     }
 }
