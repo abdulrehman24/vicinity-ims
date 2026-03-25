@@ -51,10 +51,53 @@ function App() {
   };
 
   useEffect(() => {
+    let isRefreshing = false;
+    let failedQueue = [];
+
+    const processQueue = (error, token = null) => {
+      failedQueue.forEach(prom => {
+        if (error) {
+          prom.reject(error);
+        } else {
+          prom.resolve(token);
+        }
+      });
+      failedQueue = [];
+    };
+
     const interceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
         const status = error.response?.status;
+        const originalRequest = error.config;
+        
+        // Auto-refresh CSRF Token on 419 Mismatch
+        if (status === 419 && originalRequest && !originalRequest._retry) {
+          if (isRefreshing) {
+            return new Promise(function(resolve, reject) {
+              failedQueue.push({ resolve, reject });
+            }).then(() => axios(originalRequest))
+              .catch(err => Promise.reject(err));
+          }
+
+          originalRequest._retry = true;
+          isRefreshing = true;
+
+          return new Promise((resolve, reject) => {
+            // Hitting a lightweight public endpoint to retrieve a fresh cookies/tokens
+            axios.get('/api/login-settings').then(() => {
+              processQueue(null);
+              resolve(axios(originalRequest));
+            }).catch((err) => {
+              processQueue(err);
+              reject(err);
+            }).finally(() => {
+              isRefreshing = false;
+            });
+          });
+        }
+
+        // True Session Mismatch or Timeout (Auth Failed)
         if (user && (status === 419 || status === 401)) {
           setShowSessionModal(true);
         }

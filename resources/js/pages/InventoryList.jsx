@@ -20,9 +20,14 @@ const {
 } = FiIcons;
 
 function InventoryList() {
-  const { equipment, categories, addEquipment, updateEquipment, recommissionEquipment, isAdmin, toggleAdmin } = useInventory();
+  const { equipment, categories, bookings, addEquipment, updateEquipment, recommissionEquipment, isAdmin, toggleAdmin } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [filterDate, setFilterDate] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  });
+  const dateInputRef = React.useRef(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [adminAuthOpen, setAdminAuthOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
@@ -44,6 +49,28 @@ function InventoryList() {
     threshold: 0.3
   }), [equipment]);
 
+  const equipmentBookedQuantities = useMemo(() => {
+    const counts = {};
+    
+    let targetDate = filterDate;
+    if (!targetDate) {
+      const today = new Date();
+      targetDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    }
+    
+    // Calculate quantities booked for each equipment on the target date (either selected date or today)
+    bookings.forEach(b => {
+      // Don't count returned or cancelled bookings against availability
+      if (b.status === 'cancelled' || b.status === 'returned') return;
+      
+      // If the targeted date falls within the booking dates, it's considered booked
+      if (b.dates && b.dates.includes(targetDate)) {
+        counts[b.equipmentId] = (counts[b.equipmentId] || 0) + (b.quantity || 1);
+      }
+    });
+    return counts;
+  }, [bookings, filterDate]);
+
   const filtered = useMemo(() => {
     let result = searchTerm ? fuse.search(searchTerm).map(r => r.item) : equipment;
     if (selectedCategory) result = result.filter(i => i.category === selectedCategory);
@@ -53,6 +80,7 @@ function InventoryList() {
       result = result.filter(i => {
         const total = i.totalQuantity ?? 0;
         const decommissioned = i.decommissionedQuantity ?? 0;
+
         return i.status !== 'decommissioned' && (total - decommissioned) > 0;
       });
     } else {
@@ -60,11 +88,11 @@ function InventoryList() {
       result = result.filter(i => (i.decommissionedQuantity ?? 0) > 0);
     }
     return result;
-  }, [searchTerm, selectedCategory, equipment, fuse, showDecommissioned]);
+  }, [searchTerm, selectedCategory, equipment, fuse, showDecommissioned, filterDate, equipmentBookedQuantities]);
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, selectedCategory, showDecommissioned]);
+  }, [searchTerm, selectedCategory, showDecommissioned, filterDate]);
 
   const totalItems = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -206,6 +234,36 @@ function InventoryList() {
           <input type="text" placeholder="Search assets..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-slate-900 border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] rounded-xl outline-none transition-all font-medium text-[#4a5a67] dark:text-[#ebc1b6]" />
         </div>
         
+        <div 
+          className="relative w-full md:w-48 cursor-pointer group"
+          onClick={(e) => {
+            if (e.target.closest('button')) return;
+            if (dateInputRef.current) {
+               try { dateInputRef.current.showPicker(); } catch (err) { dateInputRef.current.focus(); }
+            }
+          }}
+        >
+          <SafeIcon icon={FiCalendar} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-[#ebc1b6] transition-colors" />
+          <input 
+            ref={dateInputRef}
+            type="date" 
+            value={filterDate} 
+            onChange={(e) => setFilterDate(e.target.value)} 
+            className="w-full pl-12 pr-10 py-3 bg-gray-50 dark:bg-slate-900 border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] rounded-xl outline-none transition-all font-medium text-[#4a5a67] dark:text-[#ebc1b6] text-sm cursor-pointer"
+          />
+          {filterDate && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setFilterDate('');
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#4a5a67] dark:hover:text-white transition-colors"
+            >
+              <SafeIcon icon={FiX} />
+            </button>
+          )}
+        </div>
+
         <div className="relative w-full md:w-64">
           <SafeIcon icon={FiFilter} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <select 
@@ -230,6 +288,8 @@ function InventoryList() {
             key={item.id} 
             item={item} 
             isAdmin={isAdmin} 
+            bookedQuantity={equipmentBookedQuantities[item.id] || 0}
+            filterDate={filterDate}
             onDecommission={() => setDecommissioningItem(item)}
             onRepair={() => setRepairingItem(item)}
             onEdit={() => executeProtectedAction(() => setEditingItem(item))}
@@ -477,8 +537,8 @@ function ActionModal({ item, type, onClose, onConfirm }) {
   );
 }
 
-function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate }) {
-  const availableCount = (item.totalQuantity || 0) - (item.maintenanceQuantity || 0) - (item.decommissionedQuantity || 0);
+function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate, bookedQuantity = 0, filterDate = null }) {
+  const availableCount = Math.max(0, (item.totalQuantity || 0) - (item.maintenanceQuantity || 0) - (item.decommissionedQuantity || 0) - bookedQuantity);
   const totalCount = item.totalQuantity || 1;
   const availabilityRate = (availableCount / totalCount) * 100;
 
@@ -577,6 +637,12 @@ function AssetCard({ item, isAdmin, onDecommission, onRepair, onEdit, onActivate
               <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-gray-50 dark:bg-slate-900 text-gray-500 dark:text-gray-400 rounded-lg border border-gray-100 dark:border-slate-700">
                 <SafeIcon icon={FiIcons.FiAlertTriangle} size={10} />
                 <span className="text-[9px] font-black uppercase tracking-widest">{item.decommissionedQuantity} Graveyard</span>
+              </div>
+            )}
+            {bookedQuantity > 0 && (
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg border border-purple-100 dark:border-purple-800/50" title={`Booked on ${filterDate || 'Today'}`}>
+                <SafeIcon icon={FiIcons.FiCalendar} size={10} />
+                <span className="text-[9px] font-black uppercase tracking-widest">{bookedQuantity} Booked</span>
               </div>
             )}
           </div>

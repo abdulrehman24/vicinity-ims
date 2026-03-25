@@ -61,17 +61,6 @@ class BookingController extends Controller
 
         $dates = collect($validated['dates'])->sort()->values();
 
-        // Check availability for all items across all dates
-        foreach ($validated['items'] as $item) {
-            $available = $this->getAvailableQuantity($item['equipmentId'], $dates, $validated['shift']);
-            if ($item['quantity'] > $available) {
-                $equipment = Equipment::find($item['equipmentId']);
-                return response()->json([
-                    'message' => "Insufficient inventory for {$equipment->name}. Requested: {$item['quantity']}, Available: {$available}.",
-                ], 422);
-            }
-        }
-
         $startDate = $dates->first();
         $endDate = $dates->last();
 
@@ -82,127 +71,145 @@ class BookingController extends Controller
 
         $sendNotifications = $request->boolean('sendNotifications', true);
 
-        $booking = Booking::create([
-            'user_id' => auth()->id() ?? 1,
-            'project_title' => $validated['shootName'],
-            'quotation_number' => $validated['quotationNumber'],
-            'shoot_type' => $validated['shootType'] ?? 'Commercial',
-            'start_date' => $startDate,
-            'end_date' => $endDate,
-            'shift' => $validated['shift'],
-            'remarks' => $validated['remarks'] ?? null,
-            'collaborators' => $validated['collaborators'] ?? [],
-            'status' => 'active',
-        ]);
+        return DB::transaction(function () use ($request, $validated, $dates, $startDate, $endDate, $allDates, $sendNotifications) {
+            // 1. Lock equipment rows pessimistically to prevent Time-Of-Check to Time-Of-Use race conditions
+            $equipmentIds = collect($validated['items'])->pluck('equipmentId');
+            Equipment::whereIn('id', $equipmentIds)->lockForUpdate()->get();
 
-        foreach ($dates as $date) {
-            $booking->dates()->create(['date' => $date]);
-        }
+            // 2. Check availability for all items across all dates
+            foreach ($validated['items'] as $item) {
+                $available = $this->getAvailableQuantity($item['equipmentId'], $dates, $validated['shift']);
+                if ($item['quantity'] > $available) {
+                    $equipment = Equipment::find($item['equipmentId']);
+                    return response()->json([
+                        'message' => "Insufficient inventory for {$equipment->name}. Requested: {$item['quantity']}, Available: {$available}.",
+                    ], 422);
+                }
+            }
 
-        foreach ($validated['items'] as $item) {
-            DB::table('booking_equipment')->insert([
-                'booking_id' => $booking->id,
-                'equipment_id' => $item['equipmentId'],
-                'quantity' => $item['quantity'],
+            // 3. Create the booking
+            $booking = Booking::create([
+                'user_id' => auth()->id() ?? 1,
+                'project_title' => $validated['shootName'],
+                'quotation_number' => $validated['quotationNumber'],
+                'shoot_type' => $validated['shootType'] ?? 'Commercial',
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'shift' => $validated['shift'],
+                'remarks' => $validated['remarks'] ?? null,
+                'collaborators' => $validated['collaborators'] ?? [],
                 'status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
 
-            $equipment = Equipment::find($item['equipmentId']);
-            if ($equipment) {
-                $equipment->status = 'checked_out';
-                $equipment->save();
+            foreach ($dates as $date) {
+                $booking->dates()->create(['date' => $date]);
             }
-        }
 
-        $booking->load(['equipments', 'user']);
+            foreach ($validated['items'] as $item) {
+                DB::table('booking_equipment')->insert([
+                    'booking_id' => $booking->id,
+                    'equipment_id' => $item['equipmentId'],
+                    'quantity' => $item['quantity'],
+                    'status' => 'active',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
-        if (! empty($validated['collaborators'])) {
-            foreach ($validated['collaborators'] as $collaborator) {
-                $email = is_string($collaborator) ? $collaborator : $collaborator['email'];
-                // Auto-set expiry to 7 days from now
-                $expiry = now()->addDays(7);
+                $equipment = Equipment::find($item['equipmentId']);
+                if ($equipment) {
+                    $equipment->status = 'checked_out';
+                    $equipment->save();
+                }
+            }
 
+            $booking->load(['equipments', 'user']);
+
+            if (! empty($validated['collaborators'])) {
+                foreach ($validated['collaborators'] as $collaborator) {
+                    $email = is_string($collaborator) ? $collaborator : $collaborator['email'];
+                    // Auto-set expiry to 7 days from now
+                    $expiry = now()->addDays(7);
+
+                    try {
+                        $user = User::where('email', $email)->first();
+
+                        if (! $user) {
+                            // Create new user for collaborator
+                            $password = Str::random(10);
+                            $user = User::create([
+                                'name' => explode('@', $email)[0], // Use email prefix as temporary name
+                                'email' => $email,
+                                'password' => Hash::make($password),
+                                'is_approved' => false, // MUST be approved by admin
+                                'must_change_password' => true,
+                                'expires_at' => $expiry,
+                            ]);
+
+                            // Send invitation email with credentials
+                            Mail::to($email)->queue(new CollaborationInviteMail($booking, $email, $password));
+                        } else {
+                            // Update expiry for existing users too
+                            $user->update(['expires_at' => $expiry]);
+                            Mail::to($email)->queue(new BookingNotificationMail($booking));
+                        }
+
+                    } catch (\Throwable $e) {
+                        Log::error('Booking notification/invite email failed for '.$email.': '.$e->getMessage());
+                    }
+                }
+            }
+
+            if ($sendNotifications) {
                 try {
-                    $user = User::where('email', $email)->first();
+                    $notifyCreator = Setting::where('key', 'booking_notify_creator')->value('value');
+                    $notifyAdmins = Setting::where('key', 'booking_notify_admins')->value('value');
+                    $notifyEmails = Setting::where('key', 'booking_notify_emails')->value('value');
 
-                    if (! $user) {
-                        // Create new user for collaborator
-                        $password = Str::random(10);
-                        $user = User::create([
-                            'name' => explode('@', $email)[0], // Use email prefix as temporary name
-                            'email' => $email,
-                            'password' => Hash::make($password),
-                            'is_approved' => false, // MUST be approved by admin
-                            'must_change_password' => true,
-                            'expires_at' => $expiry,
-                        ]);
+                    $shouldNotifyCreator = $notifyCreator === null ? true : $notifyCreator === '1';
+                    $shouldNotifyAdmins = $notifyAdmins === null ? true : $notifyAdmins === '1';
 
-                        // Send invitation email with credentials
-                        Mail::to($email)->queue(new CollaborationInviteMail($booking, $email, $password));
-                    } else {
-                        // Update expiry for existing users too
-                        $user->update(['expires_at' => $expiry]);
-                        Mail::to($email)->queue(new BookingNotificationMail($booking));
+                    $recipients = [];
+
+                    if ($shouldNotifyCreator && auth()->user()) {
+                        $recipients[] = auth()->user()->email;
                     }
 
+                    if ($shouldNotifyAdmins) {
+                        $adminEmails = User::where('is_admin', '>=', 1)->pluck('email')->toArray();
+                        $recipients = array_merge($recipients, $adminEmails);
+                    }
+
+                    if ($notifyEmails) {
+                        $additionalEmails = array_map('trim', explode(',', $notifyEmails));
+                        $recipients = array_merge($recipients, $additionalEmails);
+                    }
+
+                    $operationsAddress = config('mail.operations_address');
+                    if ($operationsAddress) {
+                        $recipients[] = $operationsAddress;
+                    }
+
+                    $recipients = array_unique(array_filter($recipients, function ($email) {
+                        return filter_var($email, FILTER_VALIDATE_EMAIL);
+                    }));
+
+                    $notificationDates = $allDates->map(function ($date) {
+                        return (string) $date;
+                    })->all();
+
+                    foreach ($recipients as $recipient) {
+                        Mail::to($recipient)->queue(new BookingNotificationMail($booking, $notificationDates));
+                    }
                 } catch (\Throwable $e) {
-                    Log::error('Booking notification/invite email failed for '.$email.': '.$e->getMessage());
+                    Log::error('Booking notification emails failed: '.$e->getMessage());
                 }
             }
-        }
 
-        if ($sendNotifications) {
-            try {
-                $notifyCreator = Setting::where('key', 'booking_notify_creator')->value('value');
-                $notifyAdmins = Setting::where('key', 'booking_notify_admins')->value('value');
-                $notifyEmails = Setting::where('key', 'booking_notify_emails')->value('value');
-
-                $shouldNotifyCreator = $notifyCreator === null ? true : $notifyCreator === '1';
-                $shouldNotifyAdmins = $notifyAdmins === null ? true : $notifyAdmins === '1';
-
-                $recipients = [];
-
-                if ($shouldNotifyCreator && auth()->user()) {
-                    $recipients[] = auth()->user()->email;
-                }
-
-                if ($shouldNotifyAdmins) {
-                    $adminEmails = User::where('is_admin', '>=', 1)->pluck('email')->toArray();
-                    $recipients = array_merge($recipients, $adminEmails);
-                }
-
-                if ($notifyEmails) {
-                    $additionalEmails = array_map('trim', explode(',', $notifyEmails));
-                    $recipients = array_merge($recipients, $additionalEmails);
-                }
-
-                $operationsAddress = config('mail.operations_address');
-                if ($operationsAddress) {
-                    $recipients[] = $operationsAddress;
-                }
-
-                $recipients = array_unique(array_filter($recipients, function ($email) {
-                    return filter_var($email, FILTER_VALIDATE_EMAIL);
-                }));
-
-                $notificationDates = $allDates->map(function ($date) {
-                    return (string) $date;
-                })->all();
-
-                foreach ($recipients as $recipient) {
-                    Mail::to($recipient)->queue(new BookingNotificationMail($booking, $notificationDates));
-                }
-            } catch (\Throwable $e) {
-                Log::error('Booking notification emails failed: '.$e->getMessage());
-            }
-        }
-
-        return response()->json([
-            'message' => 'Booking created successfully',
-            'data' => $booking->load('equipments'),
-        ], 201);
+            return response()->json([
+                'message' => 'Booking created successfully',
+                'data' => $booking->load('equipments'),
+            ], 201);
+        });
     }
 
     public function returnItems(Request $request)
@@ -471,6 +478,10 @@ class BookingController extends Controller
 
             $dates = collect($validated['dates'])->sort()->values();
 
+            // Lock equipment rows to prevent replace-based race conditions
+            $equipmentIds = collect($validated['items'])->pluck('equipmentId');
+            Equipment::whereIn('id', $equipmentIds)->lockForUpdate()->get();
+
             // Check availability for all items across all dates
             $oldBookingIds = $oldBookings->pluck('id')->toArray();
             foreach ($validated['items'] as $item) {
@@ -707,15 +718,23 @@ class BookingController extends Controller
         $dateStrings = collect($dates)->map(fn($d) => \Carbon\Carbon::parse($d)->format('Y-m-d'))->toArray();
 
         // Get all relevant bookings for this equipment on these dates
-        $relevantBookings = DB::table('booking_equipment')
+        $query = DB::table('booking_equipment')
             ->join('bookings', 'booking_equipment.booking_id', '=', 'bookings.id')
             ->join('booking_dates', 'bookings.id', '=', 'booking_dates.booking_id')
             ->where('booking_equipment.equipment_id', $equipmentId)
             ->where('booking_equipment.status', 'active')
-            ->whereIn('booking_dates.date', $dateStrings)
-            ->whereNotIn('bookings.id', $excludeBookingIds)
-            ->select('booking_equipment.quantity', 'bookings.shift', 'booking_dates.date', 'bookings.id as booking_id')
-            ->get();
+            ->whereIn('booking_dates.date', $dateStrings);
+
+        if (!empty($excludeBookingIds)) {
+            $query->whereNotIn('bookings.id', $excludeBookingIds);
+        }
+
+        $relevantBookings = $query->select(
+            'booking_equipment.quantity',
+            'bookings.shift',
+            'booking_dates.date',
+            'booking_equipment.id as be_id'
+        )->get();
 
         $maxBookedOnAnyDay = 0;
 
@@ -736,9 +755,9 @@ class BookingController extends Controller
                 return false;
             });
 
-            // Need to sum quantities by unique booking_id on this date
-            // because a booking might have multiple date entries (from join)
-            $totalBookedOnDate = $bookingsOnDate->unique('booking_id')->sum('quantity');
+            // Need to sum quantities by unique booking_equipment.id on this date
+            // to ensure duplicate equipment entries inside the same booking aren't dropped
+            $totalBookedOnDate = $bookingsOnDate->unique('be_id')->sum('quantity');
             
             if ($totalBookedOnDate > $maxBookedOnAnyDay) {
                 $maxBookedOnAnyDay = $totalBookedOnDate;
