@@ -525,7 +525,7 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, is
     const effectiveTotal = Math.max(0, total - maintenance - decommissioned);
 
     const relevantBookings = bookings.filter(b => {
-      if (b.status === 'returned') return false;
+      if (b.status === 'returned' || b.status === 'cancelled') return false;
       if (ignoreBookingIds && ignoreBookingIds.has && ignoreBookingIds.has(b.id)) return false;
       return b.equipmentId === item.id;
     });
