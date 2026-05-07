@@ -96,7 +96,9 @@ function StockTake() {
       name: record.equipment?.name || 'Unknown Equipment',
       serialNumber: record.equipment?.serial_number || 'N/A',
       location: record.equipment?.location || 'N/A',
-      image: record.equipment?.image || null
+      image: record.equipment?.image || null,
+      // Normalize API shapes (snake_case from backend relation vs camelCase in frontend context)
+      nextAuditDate: record.equipment?.nextAuditDate || record.equipment?.next_audit_date || null,
     }));
 
     // Create a Set of verified IDs to exclude duplicates if any
@@ -556,6 +558,10 @@ function StockTake() {
                                           {format(parseISO(item.auditRecord?.created_at), 'h:mm a')}
                                       </p>
                                     </div>
+                                    <p className="text-[9px] font-bold text-gray-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+                                      <SafeIcon icon={FiClock} className="text-[8px]" />
+                                      <span>Next: {item.nextAuditDate ? format(parseISO(item.nextAuditDate), 'MMM d, yyyy') : 'Date not set'}</span>
+                                    </p>
                                 </div>
                             </div>
                          );
@@ -570,6 +576,10 @@ function StockTake() {
                                 <h3 className="font-bold text-xs truncate">{item.name}</h3>
                                 <p className={`text-[9px] font-black uppercase tracking-widest mt-0.5 ${selectedEquipment.includes(item.id) ? 'text-[#4a5a67]/60' : 'text-gray-400 dark:text-slate-500'}`}>
                                   {item.serialNumber} • {item.location}
+                                <p className={`text-[9px] font-bold mt-1 flex items-center gap-1 ${selectedEquipment.includes(item.id) ? 'text-[#4a5a67]/70' : 'text-gray-400 dark:text-slate-500'}`}>
+                                  <SafeIcon icon={FiClock} className="text-[8px]" />
+                                  <span>Next: {item.nextAuditDate ? format(parseISO(item.nextAuditDate), 'MMM d, yyyy') : 'Date not set'}</span>
+                                </p>
                                 </p>
                               </div>
                               {selectedEquipment.includes(item.id) && <SafeIcon icon={FiCheck} className="text-sm" />}
@@ -683,6 +693,10 @@ function StockTake() {
                           <div>
                             <h3 className="text-xs font-black text-[#4a5a67] dark:text-slate-200 uppercase tracking-widest">{item.name}</h3>
                             <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500">{item.category} • {item.serialNumber}</p>
+                            <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+                              <SafeIcon icon={FiClock} className="text-[#ebc1b6]" />
+                              <span>Next Audit: {item.nextAuditDate ? format(parseISO(item.nextAuditDate), 'MMM d, yyyy') : 'Date not set'}</span>
+                            </p>
                           </div>
                         </div>
                         <button onClick={() => handleEquipmentSelect(equipmentId)} className="text-gray-300 dark:text-slate-600 hover:text-red-500 transition-colors">

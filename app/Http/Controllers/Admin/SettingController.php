@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Equipment;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -91,6 +92,11 @@ class SettingController extends Controller
                 ['key' => 'audit_next_date'],
                 ['value' => $data['audit_next_date']]
             );
+
+            // Keep all equipment audit schedules aligned with the admin-selected audit date.
+            Equipment::query()->update([
+                'next_audit_date' => $data['audit_next_date'],
+            ]);
         }
 
         return response()->json([
