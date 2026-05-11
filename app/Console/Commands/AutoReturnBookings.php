@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\Equipment;
 use App\Models\EquipmentLog;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -32,11 +33,31 @@ class AutoReturnBookings extends Command
     {
         $today = now()->startOfDay();
 
-        // Find all active bookings where end_date < today
-        $expiredBookings = Booking::where('status', 'active')
-            ->whereDate('end_date', '<', $today)
-            ->with('equipments')
+        // Find active bookings and decide expiry using the latest booked date from booking_dates.
+        // Fall back to end_date when no booking_dates rows exist.
+        $activeBookings = Booking::where('status', 'active')
+            ->with(['equipments', 'dates'])
             ->get();
+
+        $expiredBookings = $activeBookings->filter(function (Booking $booking) use ($today) {
+            $latestBookedDate = $booking->dates
+                ->sortByDesc('date')
+                ->pluck('date')
+                ->map(function ($date) {
+                    return Carbon::parse($date)->startOfDay();
+                })
+                ->first();
+
+            if ($latestBookedDate) {
+                return $latestBookedDate->lt($today);
+            }
+
+            if ($booking->end_date) {
+                return Carbon::parse($booking->end_date)->startOfDay()->lt($today);
+            }
+
+            return false;
+        })->values();
 
         if ($expiredBookings->isEmpty()) {
             $this->info('No expired active bookings found.');

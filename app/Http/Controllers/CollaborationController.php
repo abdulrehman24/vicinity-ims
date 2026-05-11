@@ -7,11 +7,11 @@ use App\Models\CollaborationInvite;
 use App\Models\Equipment;
 use App\Http\Resources\EquipmentResource;
 use App\Mail\CollaborationInviteMail;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 
 class CollaborationController extends Controller
 {
@@ -103,6 +103,11 @@ class CollaborationController extends Controller
         }
 
         $booking = $invite->booking;
+        $booking->loadMissing('dates');
+
+        if (in_array($booking->status, ['returned', 'cancelled'], true)) {
+            return response()->json(['message' => 'This booking is no longer active and cannot be edited.'], 422);
+        }
 
         $validated = $request->validate([
             'shootName' => 'required|string',
@@ -114,21 +119,86 @@ class CollaborationController extends Controller
 
         try {
             DB::transaction(function () use ($booking, $validated) {
+                $bookingDates = $booking->dates
+                    ->pluck('date')
+                    ->map(function ($date) {
+                        return Carbon::parse($date)->format('Y-m-d');
+                    })
+                    ->unique()
+                    ->sort()
+                    ->values();
+
+                if ($bookingDates->isEmpty()) {
+                    throw new \Exception('Booking has no valid scheduled dates.');
+                }
+
+                $equipmentIds = collect($validated['items'])->pluck('equipmentId')->unique()->values();
+                Equipment::whereIn('id', $equipmentIds)->lockForUpdate()->get();
+
                 $booking->update([
                     'project_title' => $validated['shootName'],
                     'remarks' => $validated['remarks'],
+                    'status' => 'active',
                 ]);
 
                 // Sync items (simple version: delete and re-add)
                 DB::table('booking_equipment')->where('booking_id', $booking->id)->delete();
 
                 foreach ($validated['items'] as $item) {
-                    // Double check availability on backend
                     $equipment = Equipment::find($item['equipmentId']);
-                    $maxAvailable = ($equipment->total_quantity ?? 0) - ($equipment->maintenance_quantity ?? 0) - ($equipment->decommissioned_quantity ?? 0);
-                    
-                    if ($item['quantity'] > $maxAvailable) {
-                        throw new \Exception("Insufficient inventory for {$equipment->name}. Max available is {$maxAvailable}.");
+                    if (! $equipment) {
+                        throw new \Exception('Selected equipment was not found.');
+                    }
+
+                    $effectiveTotal = max(0, (int) $equipment->total_quantity - (int) ($equipment->maintenance_quantity ?? 0) - (int) ($equipment->decommissioned_quantity ?? 0));
+
+                    $relevantBookings = DB::table('booking_equipment')
+                        ->join('bookings', 'booking_equipment.booking_id', '=', 'bookings.id')
+                        ->join('booking_dates', 'bookings.id', '=', 'booking_dates.booking_id')
+                        ->where('booking_equipment.equipment_id', $equipment->id)
+                        ->where('booking_equipment.status', 'active')
+                        ->where('bookings.status', 'active')
+                        ->where('bookings.id', '!=', $booking->id)
+                        ->whereIn('booking_dates.date', $bookingDates->all())
+                        ->select(
+                            'booking_equipment.quantity',
+                            'bookings.shift',
+                            'booking_dates.date'
+                        )
+                        ->get();
+
+                    $maxBookedOnAnyDay = 0;
+                    foreach ($bookingDates as $date) {
+                        $bookedForDay = $relevantBookings->filter(function ($b) use ($date, $booking) {
+                            if ((string) $b->date !== (string) $date) {
+                                return false;
+                            }
+
+                            if ($booking->shift === 'Full Day' || $b->shift === 'Full Day') {
+                                return true;
+                            }
+
+                            if ($booking->shift === 'AM') {
+                                return $b->shift === 'AM';
+                            }
+
+                            if ($booking->shift === 'PM') {
+                                return $b->shift === 'PM';
+                            }
+
+                            return false;
+                        })->sum(function ($b) {
+                            return (int) ($b->quantity ?? 1);
+                        });
+
+                        if ($bookedForDay > $maxBookedOnAnyDay) {
+                            $maxBookedOnAnyDay = $bookedForDay;
+                        }
+                    }
+
+                    $available = max(0, $effectiveTotal - $maxBookedOnAnyDay);
+                    if ((int) $item['quantity'] > $available) {
+                        throw new \Exception("Insufficient inventory for {$equipment->name}. Requested: {$item['quantity']}, Available: {$available}.");
                     }
 
                     DB::table('booking_equipment')->insert([

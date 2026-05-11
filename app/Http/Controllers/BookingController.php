@@ -476,7 +476,24 @@ class BookingController extends Controller
                 ->sortBy('start_date')
                 ->first() ?? $oldBookings->first();
 
-            $dates = collect($validated['dates'])->sort()->values();
+            $dates = collect($validated['dates'])->map(function ($date) {
+                return (string) $date;
+            })->unique()->sort()->values();
+
+            $allDatesInput = $request->input('allDates');
+            $allDates = is_array($allDatesInput) && count($allDatesInput) > 0
+                ? collect($allDatesInput)->map(function ($date) {
+                    return (string) $date;
+                })->unique()->sort()->values()
+                : $dates;
+
+            // Guard against inconsistent payloads that could create mismatched ranges.
+            if ($allDates->isEmpty()) {
+                abort(422, 'Booking must contain at least one valid date.');
+            }
+            if ($dates->diff($allDates)->isNotEmpty()) {
+                abort(422, 'Inconsistent booking dates payload. Please refresh and try again.');
+            }
 
             // Lock equipment rows to prevent replace-based race conditions
             $equipmentIds = collect($validated['items'])->pluck('equipmentId');
@@ -485,20 +502,15 @@ class BookingController extends Controller
             // Check availability for all items across all dates
             $oldBookingIds = $oldBookings->pluck('id')->toArray();
             foreach ($validated['items'] as $item) {
-                $available = $this->getAvailableQuantity($item['equipmentId'], $dates, $validated['shift'] ?? 'Full Day', $oldBookingIds);
+                $available = $this->getAvailableQuantity($item['equipmentId'], $allDates, $validated['shift'] ?? 'Full Day', $oldBookingIds);
                 if ($item['quantity'] > $available) {
                     $equipment = Equipment::find($item['equipmentId']);
                     abort(422, "Insufficient inventory for {$equipment->name}. Requested: {$item['quantity']}, Available: {$available}.");
                 }
             }
 
-            $startDate = $dates->first();
-            $endDate = $dates->last();
-
-            $allDatesInput = $request->input('allDates');
-            $allDates = is_array($allDatesInput) && count($allDatesInput) > 0
-                ? collect($allDatesInput)->sort()->values()
-                : $dates;
+            $startDate = $allDates->first();
+            $endDate = $allDates->last();
 
             // Update canonical booking in place
             $booking->update([

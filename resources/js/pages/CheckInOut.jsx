@@ -215,15 +215,8 @@ function CheckInOut() {
     setIsProcessing(true);
     try {
       if (projectToEdit) {
-        const [first, ...rest] = payloads;
-        
-        await replaceBooking(projectToEdit.bookingIds, first, { showToast: true });
-        
-        if (rest.length > 0) {
-          await Promise.all(
-            rest.map(p => checkOutEquipment(p, { showToast: false }))
-          );
-        }
+        // Edit mode must update the existing booking set in place as a single replace operation.
+        await replaceBooking(projectToEdit.bookingIds, payloads[0], { showToast: true });
 
         setProjectToEdit(null);
       } else {
@@ -765,28 +758,46 @@ function ManualOutForm({ equipment, bookings, bundles, categories, onConfirm, is
 
   const handleBooking = async () => {
     const dateGroups = groupDates(requestedDates);
-
-    const payloads = dateGroups.map((group, index) => ({
-      shootName: formData.projTitle,
-      quotationNumber: formData.quote,
-      shootType: formData.shootType,
-      remarks: formData.remarks,
-      shift,
-      dates: group,
-      startDate: group[0],
-      endDate: group[group.length - 1],
-      user: 'Operations Team',
-      collaborators: collaborators.map(c => {
-        if (typeof c === 'string') return { email: c, expiryDate: null };
-        return c;
-      }),
-      items: selectedItems.map(item => ({
-        equipmentId: item.id,
-        quantity: item.qty,
-      })),
-      allDates: requestedDates,
-      sendNotifications: index === 0,
+    const collaboratorPayload = collaborators.map(c => {
+      if (typeof c === 'string') return { email: c, expiryDate: null };
+      return c;
+    });
+    const itemPayload = selectedItems.map(item => ({
+      equipmentId: item.id,
+      quantity: item.qty,
     }));
+
+    const payloads = editingProject
+      ? [{
+          shootName: formData.projTitle,
+          quotationNumber: formData.quote,
+          shootType: formData.shootType,
+          remarks: formData.remarks,
+          shift,
+          dates: requestedDates,
+          startDate: requestedDates[0],
+          endDate: requestedDates[requestedDates.length - 1],
+          user: 'Operations Team',
+          collaborators: collaboratorPayload,
+          items: itemPayload,
+          allDates: requestedDates,
+          sendNotifications: true,
+        }]
+      : dateGroups.map((group, index) => ({
+          shootName: formData.projTitle,
+          quotationNumber: formData.quote,
+          shootType: formData.shootType,
+          remarks: formData.remarks,
+          shift,
+          dates: group,
+          startDate: group[0],
+          endDate: group[group.length - 1],
+          user: 'Operations Team',
+          collaborators: collaboratorPayload,
+          items: itemPayload,
+          allDates: requestedDates,
+          sendNotifications: index === 0,
+        }));
 
     await onConfirm(payloads);
     
