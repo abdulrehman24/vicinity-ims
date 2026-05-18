@@ -9,7 +9,9 @@ import SafeIcon from '../common/SafeIcon';
 const InviteCollabModal = ({ isOpen, onClose, bookingId, projectName }) => {
   const [email, setEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isGeneratingViewLink, setIsGeneratingViewLink] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
+  const [generatedLinkType, setGeneratedLinkType] = useState('edit');
   const [copied, setCopied] = useState(false);
 
   const handleInvite = async (e) => {
@@ -20,12 +22,28 @@ const InviteCollabModal = ({ isOpen, onClose, bookingId, projectName }) => {
     try {
       const response = await axios.post(`/bookings/${bookingId}/invite`, { email });
       setGeneratedLink(response.data.link);
+      setGeneratedLinkType('edit');
       toast.success("Invitation sent successfully!");
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || "Failed to send invitation");
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleCreateViewLink = async () => {
+    setIsGeneratingViewLink(true);
+    try {
+      const response = await axios.post(`/bookings/${bookingId}/invite/view-link`);
+      setGeneratedLink(response.data.link);
+      setGeneratedLinkType('view');
+      toast.success("View-only link generated successfully!");
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || "Failed to generate view-only link");
+    } finally {
+      setIsGeneratingViewLink(false);
     }
   };
 
@@ -39,6 +57,7 @@ const InviteCollabModal = ({ isOpen, onClose, bookingId, projectName }) => {
   const resetAndClose = () => {
     setEmail('');
     setGeneratedLink('');
+    setGeneratedLinkType('edit');
     setCopied(false);
     onClose();
   };
@@ -81,29 +100,44 @@ const InviteCollabModal = ({ isOpen, onClose, bookingId, projectName }) => {
               </div>
 
               {!generatedLink ? (
-                <form onSubmit={handleInvite} className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest ml-1">Collaborator Email</label>
-                    <div className="relative">
-                      <SafeIcon icon={FiMail} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="guest@example.com"
-                        className="w-full pl-11 pr-4 py-4 bg-gray-50 dark:bg-slate-900 border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] rounded-2xl outline-none font-bold text-sm text-[#4a5a67] dark:text-[#ebc1b6] transition-all"
-                      />
+                <div className="space-y-6">
+                  <form onSubmit={handleInvite} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest ml-1">Collaborator Email (Edit Access)</label>
+                      <div className="relative">
+                        <SafeIcon icon={FiMail} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="email"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="guest@example.com"
+                          className="w-full pl-11 pr-4 py-4 bg-gray-50 dark:bg-slate-900 border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] rounded-2xl outline-none font-bold text-sm text-[#4a5a67] dark:text-[#ebc1b6] transition-all"
+                        />
+                      </div>
                     </div>
+                    <button
+                      type="submit"
+                      disabled={isSending || !email}
+                      className="w-full py-4 bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+                    >
+                      {isSending ? "Generating Secure Link..." : "Send Editor Invitation"}
+                    </button>
+                  </form>
+
+                  <div className="border-t border-gray-100 dark:border-slate-700 pt-6 space-y-3">
+                    <p className="text-[10px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest">
+                      Or share a view-only link
+                    </p>
+                    <button
+                      onClick={handleCreateViewLink}
+                      disabled={isGeneratingViewLink}
+                      className="w-full py-4 bg-gray-100 dark:bg-slate-900 text-[#4a5a67] dark:text-[#ebc1b6] rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-slate-700 transition-all disabled:opacity-50"
+                    >
+                      {isGeneratingViewLink ? "Generating View-Only Link..." : "Generate View-Only Link"}
+                    </button>
                   </div>
-                  <button
-                    type="submit"
-                    disabled={isSending || !email}
-                    className="w-full py-4 bg-[#4a5a67] dark:bg-slate-900 text-[#ebc1b6] rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
-                  >
-                    {isSending ? "Generating Secure Link..." : "Send Secure Invitation"}
-                  </button>
-                </form>
+                </div>
               ) : (
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
                   <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 rounded-2xl">
@@ -112,7 +146,9 @@ const InviteCollabModal = ({ isOpen, onClose, bookingId, projectName }) => {
                       <span className="text-[10px] font-black uppercase tracking-widest">Link Generated</span>
                     </div>
                     <p className="text-xs text-emerald-700/70 dark:text-emerald-400/70 font-medium">
-                      Invite sent to <b>{email}</b>. You can also copy the link below.
+                      {generatedLinkType === 'edit'
+                        ? <>Invite sent to <b>{email}</b>. You can also copy the link below.</>
+                        : <>Your view-only link is ready. Share this link with external personnel to let them review the list without editing.</>}
                     </p>
                   </div>
 
@@ -131,7 +167,9 @@ const InviteCollabModal = ({ isOpen, onClose, bookingId, projectName }) => {
                   </div>
 
                   <p className="text-[9px] text-gray-400 dark:text-slate-500 text-center uppercase tracking-widest font-bold">
-                    Link expires 24h after shoot end date
+                    {generatedLinkType === 'edit'
+                      ? 'Editor link expires 24h after shoot end date'
+                      : 'View-only link stays active until a new one is generated'}
                   </p>
 
                   <button

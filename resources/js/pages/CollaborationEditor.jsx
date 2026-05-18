@@ -36,6 +36,7 @@ function CollaborationEditor() {
 
   // Use context if available, otherwise use local state
   const equipmentList = context?.equipment || localEquipment;
+  const isViewOnly = invite?.access_level === 'view';
 
   // Category Sort Map
   const categorySortMap = useMemo(() => {
@@ -143,6 +144,11 @@ function CollaborationEditor() {
   }, [fetchInviteData, fetchPublicEquipment]);
 
   const handleSave = async () => {
+    if (isViewOnly) {
+      toast.error("This is a view-only link");
+      return;
+    }
+
     if (selectedItems.length === 0) {
       toast.error("Booking must have at least one item");
       return;
@@ -169,6 +175,7 @@ function CollaborationEditor() {
   };
 
   const updateQty = (id, delta) => {
+    if (isViewOnly) return;
     const item = selectedItems.find(i => i.id === id);
     if (!item) return;
 
@@ -187,10 +194,12 @@ function CollaborationEditor() {
   };
 
   const removeItem = (id) => {
+    if (isViewOnly) return;
     setSelectedItems(prev => prev.filter(i => i.id !== id));
   };
 
   const addItem = (item) => {
+    if (isViewOnly) return;
     if (selectedItems.find(i => i.id === item.id)) {
       toast.error("Item already in cart");
       return;
@@ -253,20 +262,28 @@ function CollaborationEditor() {
           <div className="text-white">
             <div className="flex items-center gap-2 mb-3">
               <div className="px-3 py-1 bg-[#ebc1b6] text-[#4a5a67] rounded-lg text-[9px] font-black uppercase tracking-widest">
-                Collaborative Session
+                {isViewOnly ? 'View-Only Session' : 'Collaborative Session'}
               </div>
-              <div className="px-3 py-1 bg-white/10 text-white/60 rounded-lg text-[9px] font-bold uppercase tracking-widest">
-                Expires: {format(parseISO(invite.expires_at), 'MMM d, HH:mm')}
-              </div>
+              {invite?.expires_at ? (
+                <div className="px-3 py-1 bg-white/10 text-white/60 rounded-lg text-[9px] font-bold uppercase tracking-widest">
+                  Expires: {format(parseISO(invite.expires_at), 'MMM d, HH:mm')}
+                </div>
+              ) : (
+                <div className="px-3 py-1 bg-white/10 text-white/60 rounded-lg text-[9px] font-bold uppercase tracking-widest">
+                  Non-Expiring Link
+                </div>
+              )}
             </div>
             <h1 className="text-4xl font-black uppercase tracking-tight mb-2">{booking.project_title}</h1>
             <p className="text-sm text-white/60 font-medium max-w-xl">
-              You are collaborating on this project. Changes you make here will be updated in the main system immediately.
+              {isViewOnly
+                ? 'You are viewing this project with guest read-only access. Changes are disabled.'
+                : 'You are collaborating on this project. Changes you make here will be updated in the main system immediately.'}
             </p>
           </div>
           <button 
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || isViewOnly}
             className="flex items-center gap-3 px-8 py-4 bg-[#ebc1b6] text-[#4a5a67] rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
           >
             {isSaving ? (
@@ -290,6 +307,7 @@ function CollaborationEditor() {
                   <input 
                     value={projTitle} 
                     onChange={e => setProjTitle(e.target.value)}
+                    disabled={isViewOnly}
                     className="w-full bg-gray-50 dark:bg-slate-900 p-4 rounded-2xl border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] outline-none font-bold text-sm text-[#4a5a67] dark:text-[#ebc1b6] transition-all"
                   />
                 </div>
@@ -305,6 +323,7 @@ function CollaborationEditor() {
                 <textarea 
                   value={remarks} 
                   onChange={e => setRemarks(e.target.value)}
+                  disabled={isViewOnly}
                   placeholder="Additional notes for the owner..."
                   className="w-full bg-gray-50 dark:bg-slate-900 p-4 rounded-2xl border border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#ebc1b6] outline-none font-bold text-xs text-[#4a5a67] dark:text-[#ebc1b6] min-h-[100px] resize-none transition-all"
                 />
@@ -350,13 +369,14 @@ function CollaborationEditor() {
                           </div>
                           <div className="flex items-center justify-between sm:justify-end gap-6">
                             <div className="flex items-center gap-4 bg-gray-50 dark:bg-slate-900 px-4 py-2 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm transition-colors">
-                              <button onClick={() => updateQty(item.id, -1)} className="text-[#ebc1b6] hover:text-[#4a5a67] dark:hover:text-white p-1 transition-colors"><SafeIcon icon={FiMinus} /></button>
+                              <button onClick={() => updateQty(item.id, -1)} disabled={isViewOnly} className="text-[#ebc1b6] hover:text-[#4a5a67] dark:hover:text-white p-1 transition-colors disabled:opacity-40"><SafeIcon icon={FiMinus} /></button>
                               <span className="text-sm font-black text-[#4a5a67] dark:text-[#ebc1b6] w-6 text-center">{item.qty}</span>
-                              <button onClick={() => updateQty(item.id, 1)} className="text-[#ebc1b6] hover:text-[#4a5a67] dark:hover:text-white p-1 transition-colors"><SafeIcon icon={FiPlus} /></button>
+                              <button onClick={() => updateQty(item.id, 1)} disabled={isViewOnly} className="text-[#ebc1b6] hover:text-[#4a5a67] dark:hover:text-white p-1 transition-colors disabled:opacity-40"><SafeIcon icon={FiPlus} /></button>
                             </div>
                             <button 
                               onClick={() => removeItem(item.id)}
-                              className="p-2.5 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl transition-all"
+                              disabled={isViewOnly}
+                              className="p-2.5 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl transition-all disabled:opacity-40 disabled:hover:bg-rose-50 disabled:hover:text-rose-400"
                             >
                               <SafeIcon icon={FiTrash2} />
                             </button>
@@ -416,7 +436,8 @@ function CollaborationEditor() {
                   <button 
                     key={item.id}
                     onClick={() => addItem(item)}
-                    className="w-full group text-left p-3 bg-gray-50 dark:bg-slate-900 border border-transparent hover:border-[#ebc1b6] dark:hover:border-[#ebc1b6] rounded-2xl transition-all"
+                    disabled={isViewOnly}
+                    className="w-full group text-left p-3 bg-gray-50 dark:bg-slate-900 border border-transparent hover:border-[#ebc1b6] dark:hover:border-[#ebc1b6] rounded-2xl transition-all disabled:opacity-40 disabled:hover:border-transparent"
                   >
                     <div className="flex items-center gap-3">
                       <img src={item.image} className="w-10 h-10 rounded-lg object-cover grayscale group-hover:grayscale-0 transition-all" alt="" />

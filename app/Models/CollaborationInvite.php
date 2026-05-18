@@ -10,6 +10,7 @@ class CollaborationInvite extends Model
         'booking_id',
         'email',
         'token',
+        'access_level',
         'expires_at',
         'is_active',
     ];
@@ -26,6 +27,14 @@ class CollaborationInvite extends Model
 
     public function isValid()
     {
-        return $this->is_active && $this->expires_at->isFuture();
+        if (! $this->is_active) {
+            return false;
+        }
+
+        if ($this->access_level === 'view') {
+            return true;
+        }
+
+        return $this->expires_at && $this->expires_at->isFuture();
     }
 }

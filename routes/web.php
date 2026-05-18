@@ -101,6 +101,7 @@ Route::middleware(['auth'])->group(function () {
     
     // Collaboration Invite
     Route::post('/bookings/{booking}/invite', [CollaborationController::class, 'invite']);
+    Route::post('/bookings/{booking}/invite/view-link', [CollaborationController::class, 'createViewLink']);
 });
 
 Route::resource('equipment', EquipmentController::class);

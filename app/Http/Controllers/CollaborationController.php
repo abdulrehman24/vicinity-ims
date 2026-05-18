@@ -42,6 +42,7 @@ class CollaborationController extends Controller
             'booking_id' => $booking->id,
             'email' => $validated['email'],
             'token' => $token,
+            'access_level' => 'edit',
             'expires_at' => $expiresAt,
         ]);
 
@@ -56,6 +57,31 @@ class CollaborationController extends Controller
         return response()->json([
             'message' => 'Invite sent successfully',
             'link' => url("/collaborate/{$token}"),
+        ]);
+    }
+
+    public function createViewLink(Booking $booking)
+    {
+        CollaborationInvite::where('booking_id', $booking->id)
+            ->where('access_level', 'view')
+            ->where('is_active', true)
+            ->update(['is_active' => false]);
+
+        $token = Str::random(64);
+
+        $invite = CollaborationInvite::create([
+            'booking_id' => $booking->id,
+            'email' => null,
+            'token' => $token,
+            'access_level' => 'view',
+            'expires_at' => null,
+            'is_active' => true,
+        ]);
+
+        return response()->json([
+            'message' => 'View-only link generated successfully',
+            'link' => url("/collaborate/{$invite->token}"),
+            'invite' => $invite,
         ]);
     }
 
@@ -100,6 +126,10 @@ class CollaborationController extends Controller
 
         if (!$invite || !$invite->isValid()) {
             return response()->json(['message' => 'Invalid or expired link'], 403);
+        }
+        
+        if ($invite->access_level !== 'edit') {
+            return response()->json(['message' => 'This link is view-only and cannot be used to edit this booking.'], 403);
         }
 
         $booking = $invite->booking;
